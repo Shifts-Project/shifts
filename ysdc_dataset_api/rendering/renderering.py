@@ -1,4 +1,7 @@
+import cv2
 import numpy as np
+
+from ysdc_dataset_api.utils import get_track_polygon
 
 
 def _create_feature_map(rows, cols, num_channels, data_format):
@@ -57,7 +60,24 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
 
     def render(self, scene, transform):
         feature_map = self._create_feature_map()
+        for ts_ind in range(-self.n_history_steps, 0):
+            for track in scene.past_vehicle_tracks[ts_ind].tracks:
+                track_polygon = transform @ get_track_polygon(track)
+                for v in self._get_fm_values(track):
+                    cv2.fillPoly()
         return feature_map
+
+    def _get_fm_values(self, track):
+        values = []
+        if 'occupancy' in self._spec:
+            values += 1.
+        if 'velocity' in self._spec:
+            values += track.linear_velocity.x
+            values += track.linear_velocity.y
+        if 'acceleration' in self._spec:
+            values += track.linear_acceleration.x
+            values += track.linear_acceleration.y
+        return values
 
 
 class PedestrianTracksRenderer(FeatureMapRendererBase):
