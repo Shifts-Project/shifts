@@ -4,7 +4,7 @@ from google.protobuf.internal.decoder import _DecodeVarint32
 from torch.utils.data import IterableDataset
 
 from ysdc_dataset_api.proto import Scene
-from ysdc_dataset_api.rendering import DummyRenderer
+from ysdc_dataset_api.rendering import FeatureRenderer
 
 
 N_SCENES_PER_FILE = 5000
@@ -16,7 +16,7 @@ class MotionPredictionDataset(IterableDataset):
         self._dataset_path = dataset_path
         self._file_names = [f for f in os.listdir(dataset_path) if f.endswith('.bin')]
         self._filtration_config = filtration_config
-        self._renderer = DummyRenderer(renderer_spec)
+        self._renderer = FeatureRenderer(renderer_spec)
 
     def __iter__(self):
         def data_gen():
@@ -37,8 +37,14 @@ class MotionPredictionDataset(IterableDataset):
                         for request in scene.prediction_requests:
                             if not self._request_is_valid(request):
                                 continue
-                            track_id, scene = self._renderer.render(request.track_id, scene)
-                            yield track_id, scene
+                            transform = get_to_fm_transform()
+                            feature_maps = self._renderer.render_features(scene)
+                            gt_trajectory = transform_points(
+                                get_gt_trajectory(scene, request.track_id), transform)
+                            yield {
+                                'feature_maps': feature_maps,
+                                'gt_trajectory': gt_trajectory,
+                            }
         return data_gen()
 
     def _scene_is_valid(self, scene):
