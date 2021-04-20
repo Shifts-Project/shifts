@@ -13,8 +13,8 @@ def _create_feature_map(rows, cols, num_channels, data_format):
 
 
 class FeatureMapRendererBase:
-    def __init__(self, spec, feature_map_params, n_history_steps):
-        self._spec = spec
+    def __init__(self, config, feature_map_params, n_history_steps):
+        self._config = config
         self._feature_map_params = feature_map_params
         self._n_history_steps = n_history_steps
         self._num_channels = self._get_num_channels()
@@ -45,13 +45,13 @@ class FeatureMapRendererBase:
 class VehicleTracksRenderer(FeatureMapRendererBase):
     def _get_num_channels(self):
         num_channels = 0
-        if 'occupancy' in self._spec:
+        if 'occupancy' in self._config:
             num_channels += 1
-        if 'velocity' in self._spec:
+        if 'velocity' in self._config:
             num_channels += 2
-        if 'acceleration' in self._spec:
+        if 'acceleration' in self._config:
             num_channels += 2
-        if 'angular_velocity' in self._spec:
+        if 'angular_velocity' in self._config:
             num_channels += 1
         return num_channels
 
@@ -63,9 +63,9 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
 class PedestrianTracksRenderer(FeatureMapRendererBase):
     def _get_num_channels(self):
         num_channels = 0
-        if 'occupancy' in self._spec:
+        if 'occupancy' in self._config:
             num_channels += 1
-        if 'velocity' in self._spec:
+        if 'velocity' in self._config:
             num_channels += 2
         return num_channels
 
@@ -75,14 +75,14 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
 
 class FeatureRenderer:
-    def __init__(self, spec):
-        self._fm_params = spec['fm_params']
+    def __init__(self, config):
+        self._fm_params = config['fm_params']
 
         self._renderers = []
-        for group in spec['groups']:
-            for renderer_spec in group['renderers']:
+        for group in config['groups']:
+            for renderer_config in group['renderers']:
                 self._renderers.append(
-                    self._create_renderer(renderer_spec, self._fm_params, group['n_history_steps']))
+                    self._create_renderer(renderer_config, self._fm_params, group['n_history_steps']))
         self._num_channels = self._get_num_channels()
         self._fm_shift_scale_transform = self._get_fm_shift_scale_transform()
 
@@ -124,12 +124,12 @@ class FeatureRenderer:
             for renderer in self._renderers
         )
 
-    def _create_renderer(self, spec, feature_map_params, n_history_steps):
-        if 'vehicles' in spec:
+    def _create_renderer(self, config, feature_map_params, n_history_steps):
+        if 'vehicles' in config:
             return VehicleTracksRenderer(
-                spec['vehicles'], feature_map_params, n_history_steps)
-        elif 'pedestrians' in spec:
+                config['vehicles'], feature_map_params, n_history_steps)
+        elif 'pedestrians' in config:
             return PedestrianTracksRenderer(
-                spec['pedestrians'], feature_map_params, n_history_steps)
+                config['pedestrians'], feature_map_params, n_history_steps)
         else:
             raise NotImplementedError()

@@ -12,12 +12,12 @@ N_SCENES_PER_FILE = 5000
 
 
 class MotionPredictionDataset(IterableDataset):
-    def __init__(self, dataset_path, filtration_config=None, renderer_spec=None):
+    def __init__(self, dataset_path, filtration_config=None, renderer_config=None):
         super(MotionPredictionDataset, self).__init__()
         self._dataset_path = dataset_path
         self._file_names = [f for f in os.listdir(dataset_path) if f.endswith('.bin')]
         self._filtration_config = filtration_config
-        self._renderer = FeatureRenderer(renderer_spec)
+        self._renderer = FeatureRenderer(renderer_config)
 
     def __iter__(self):
         def data_gen():
