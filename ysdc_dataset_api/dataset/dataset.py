@@ -12,12 +12,20 @@ N_SCENES_PER_FILE = 5000
 
 
 class MotionPredictionDataset(IterableDataset):
-    def __init__(self, dataset_path, filtration_config=None, renderer_config=None):
+    def __init__(
+            self,
+            dataset_path,
+            renderer_config=None,
+            scene_tags_filter=None,
+            trajectory_tags_filter=None,
+        ):
         super(MotionPredictionDataset, self).__init__()
         self._dataset_path = dataset_path
         self._file_names = [f for f in os.listdir(dataset_path) if f.endswith('.bin')]
-        self._filtration_config = filtration_config
         self._renderer = FeatureRenderer(renderer_config)
+
+        self._scene_tags_filter = self._callable_or_lambda_true(scene_tags_filter)
+        self._trajectory_tags_filter = self._callable_or_lambda_true(trajectory_tags_filter)
 
     def __iter__(self):
         def data_gen():
@@ -33,10 +41,10 @@ class MotionPredictionDataset(IterableDataset):
                         n += msg_len
                         scene = Scene()
                         scene.ParseFromString(msg_buf)
-                        if not self._scene_is_valid(scene):
+                        if not self._scene_tags_filter(scene.scene_tags):
                             continue
                         for request in scene.prediction_requests:
-                            if not self._request_is_valid(request):
+                            if not self._trajectory_tags_filter(request):
                                 continue
                             track = get_track_for_transform(scene, request.track_id)
                             track_to_fm_transform = get_track_to_fm_transform(track)
@@ -50,10 +58,9 @@ class MotionPredictionDataset(IterableDataset):
                             }
         return data_gen()
 
-    def _scene_is_valid(self, scene):
-        # Filter by scene tags
-        return True
-
-    def _request_is_valid(self, request):
-        # Filter by trajectory tags
-        return True
+    def _callable_or_lambda_true(self, f):
+        if f is None:
+            return lambda x: True
+        if not callable(f):
+            raise ValueError('Expected callable, got {}'.format(type(f)))
+        return f
