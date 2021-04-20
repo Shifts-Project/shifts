@@ -45,7 +45,7 @@ class MotionPredictionDataset(IterableDataset):
                         if not self._scene_tags_filter(scene_tags):
                             continue
                         for request in scene.prediction_requests:
-                            request_tags = proto_to_dict(request.trajectory_tags)
+                            request_tags = proto_to_dict(request)['trajectory_tags']
                             if not self._trajectory_tags_filter(request_tags):
                                 continue
                             track = get_track_for_transform(scene, request.track_id)
