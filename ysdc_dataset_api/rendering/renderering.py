@@ -17,12 +17,21 @@ class FeatureMapRendererBase:
         self._spec = spec
         self._feature_map_params = feature_map_params
         self._n_history_steps = n_history_steps
+        self._num_channels = self._get_num_channels()
 
     def render(self, scene, transform):
         raise NotImplementedError()
 
-    def get_num_channels(self):
+    def _get_num_channels(self):
         raise NotImplementedError()
+
+    @property
+    def n_history_steps(self):
+        return self._n_history_steps
+
+    @property
+    def num_channels(self):
+        return self._num_channels
 
     def _create_feature_map(self):
         return _create_feature_map(
@@ -34,7 +43,7 @@ class FeatureMapRendererBase:
 
 
 class VehicleTracksRenderer(FeatureMapRendererBase):
-    def get_num_channels(self):
+    def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._spec:
             num_channels += 1
@@ -44,7 +53,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         if 'angular_velocity' in self._spec:
             num_channels += 1
-        return num_channels * self._n_history_steps
+        return num_channels
 
     def render(self, scene, transform):
         feature_map = self._create_feature_map()
@@ -52,13 +61,13 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
 
 
 class PedestrianTracksRenderer(FeatureMapRendererBase):
-    def get_num_channels(self):
+    def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._spec:
             num_channels += 1
         if 'velocity' in self._spec:
             num_channels += 2
-        return num_channels * self._n_history_steps
+        return num_channels
 
     def render(self, scene, transform):
         feature_map = self._create_feature_map()
@@ -82,7 +91,7 @@ class FeatureRenderer:
         fm = self._create_feature_map()
         fm_slice_start = 0
         for renderer in self._renderers:
-            fm_slice_end = fm_slice_start + renderer.get_num_channels()
+            fm_slice_end = fm_slice_start + renderer.num_channels * renderer.n_history_steps
             if self._fm_params['data_format'] == 'channels_first':
                 fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
             else:
@@ -110,7 +119,10 @@ class FeatureRenderer:
         )
 
     def _get_num_channels(self):
-        return sum(renderer.get_num_channels() for renderer in self._renderers)
+        return sum(
+            renderer.num_channels * renderer.n_history_steps
+            for renderer in self._renderers
+        )
 
     def _create_renderer(self, spec, feature_map_params, n_history_steps):
         if 'vehicles' in spec:
