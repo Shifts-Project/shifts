@@ -3,7 +3,7 @@ import os
 from google.protobuf.internal.decoder import _DecodeVarint32
 from torch.utils.data import IterableDataset
 
-from ysdc_dataset_api.proto import Scene
+from ysdc_dataset_api.proto import Scene, proto_to_dict
 from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_transform
 
@@ -41,10 +41,12 @@ class MotionPredictionDataset(IterableDataset):
                         n += msg_len
                         scene = Scene()
                         scene.ParseFromString(msg_buf)
-                        if not self._scene_tags_filter(scene.scene_tags):
+                        scene_tags = proto_to_dict(scene.scene_tags)
+                        if not self._scene_tags_filter(scene_tags):
                             continue
                         for request in scene.prediction_requests:
-                            if not self._trajectory_tags_filter(request):
+                            request_tags = proto_to_dict(request.trajectory_tags)
+                            if not self._trajectory_tags_filter(request_tags):
                                 continue
                             track = get_track_for_transform(scene, request.track_id)
                             track_to_fm_transform = get_track_to_fm_transform(track)
