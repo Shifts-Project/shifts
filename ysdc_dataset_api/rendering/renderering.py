@@ -75,8 +75,10 @@ class FeatureRenderer:
                 self._renderers.append(
                     self._create_renderer(renderer_spec, self._fm_params, group['n_history_steps']))
         self._num_channels = self._get_num_channels()
+        self._fm_shift_scale_transform = self._get_fm_shift_scale_transform()
 
-    def render_features(self, scene, transform):
+    def render_features(self, scene, track_to_fm_transform):
+        transform = self._fm_shift_scale_transform @ track_to_fm_transform
         fm = self._create_feature_map()
         fm_slice_start = 0
         for renderer in self._renderers:
@@ -87,6 +89,17 @@ class FeatureRenderer:
                 fm[:, :, fm_slice_start:fm_slice_end] = renderer.render(scene, transform)
             fm_slice_start = fm_slice_end
         return fm
+
+    def _get_fm_shift_scale_transform(self):
+        fm_scale = 1. / self._fm_params['resolution']
+        fm_origin_x = 0.5 * self._fm_params['rows']
+        fm_origin_y = 0.5 * self._fm_params['cols']
+        return np.array([
+            [fm_scale, 0, 0, fm_origin_x],
+            [0, fm_scale, 0, fm_origin_y],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1],
+        ])
 
     def _create_feature_map(self):
         return _create_feature_map(

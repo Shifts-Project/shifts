@@ -5,6 +5,7 @@ from torch.utils.data import IterableDataset
 
 from ysdc_dataset_api.proto import Scene
 from ysdc_dataset_api.rendering import FeatureRenderer
+from ysdc_dataset_api.utils import get_traack_to_fm_transform, get_track_for_transform
 
 
 N_SCENES_PER_FILE = 5000
@@ -37,8 +38,10 @@ class MotionPredictionDataset(IterableDataset):
                         for request in scene.prediction_requests:
                             if not self._request_is_valid(request):
                                 continue
-                            transform = get_to_fm_transform()
-                            feature_maps = self._renderer.render_features(scene)
+                            track = get_track_for_transform(scene, request.track_id)
+                            track_to_fm_transform = get_track_to_fm_transform(track)
+                            feature_maps = self._renderer.render_features(
+                                scene, track_to_fm_transform)
                             gt_trajectory = transform_points(
                                 get_gt_trajectory(scene, request.track_id), transform)
                             yield {
