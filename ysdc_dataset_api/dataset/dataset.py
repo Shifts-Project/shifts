@@ -5,7 +5,7 @@ from torch.utils.data import IterableDataset
 
 from ysdc_dataset_api.proto import Scene
 from ysdc_dataset_api.rendering import FeatureRenderer
-from ysdc_dataset_api.utils import get_traack_to_fm_transform, get_track_for_transform
+from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_transform
 
 
 N_SCENES_PER_FILE = 5000
