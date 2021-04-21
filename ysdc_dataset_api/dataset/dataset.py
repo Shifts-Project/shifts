@@ -33,33 +33,22 @@ class MotionPredictionDataset(IterableDataset):
         def data_gen():
             for fname in self._file_names:
                 fpath = os.path.join(self._dataset_path, fname)
-                with open(fpath, 'rb') as f:
-                    buf = f.read()
-                    n = 0
-                    while n < len(buf):
-                        msg_len, new_pos = _DecodeVarint32(buf, n)
-                        n = new_pos
-                        msg_buf = buf[n:n+msg_len]
-                        n += msg_len
-                        scene = Scene()
-                        scene.ParseFromString(msg_buf)
-                        scene_tags = proto_to_dict(scene.scene_tags)
-                        if not self._scene_tags_filter(scene_tags):
+                for scene in _dataset_file_iterator(fpath):
+                    if not self._scene_tags_filter(scene):
+                        continue
+                    for request in scene.prediction_requests:
+                        if not self._trajectory_tags_filter(request):
                             continue
-                        for request in scene.prediction_requests:
-                            request_tags = proto_to_dict(request)['trajectory_tags']
-                            if not self._trajectory_tags_filter(request_tags):
-                                continue
-                            track = get_track_for_transform(scene, request.track_id)
-                            track_to_fm_transform = get_track_to_fm_transform(track)
-                            feature_maps = self._renderer.render_features(
-                                scene, track_to_fm_transform)
-                            gt_trajectory = transform_points(
-                                get_gt_trajectory(scene, request.track_id), transform)
-                            yield {
-                                'feature_maps': feature_maps,
-                                'gt_trajectory': gt_trajectory,
-                            }
+                        track = get_track_for_transform(scene, request.track_id)
+                        track_to_fm_transform = get_track_to_fm_transform(track)
+                        feature_maps = self._renderer.render_features(
+                            scene, track_to_fm_transform)
+                        gt_trajectory = transform_points(
+                            get_gt_trajectory(scene, request.track_id), transform)
+                        yield {
+                            'feature_maps': feature_maps,
+                            'gt_trajectory': gt_trajectory,
+                        }
         return data_gen()
 
     def _callable_or_lambda_true(self, f):
@@ -111,3 +100,16 @@ class MotionPredictionDatasetV2(Dataset):
             for f in os.listdir(dataset_dir)
             if f.endswith('.bin')
         ])
+
+
+def _dataset_file_iterator(filepath, scenes_offset=0):
+    with open(filepath, 'rb') as f:
+        file_content = f.read()
+        n = 0
+        while n < len(file_content):
+            msg_len, new_pos = _DecodeVarint32(file_content, n)
+            n = new_pos
+            encoded_message = file_content[n:n + msg_len]
+            n += msg_len
+            scene = Scene.FromString(encoded_message)
+            yield scene
