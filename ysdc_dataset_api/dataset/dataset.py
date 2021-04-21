@@ -22,8 +22,7 @@ class MotionPredictionDataset(IterableDataset):
             trajectory_tags_filter=None,
         ):
         super(MotionPredictionDataset, self).__init__()
-        self._dataset_path = dataset_path
-        self._file_names = [f for f in os.listdir(dataset_path) if f.endswith('.bin')]
+        self._file_paths = self._get_filepaths(dataset_path)
         self._renderer = FeatureRenderer(renderer_config)
 
         self._scene_tags_filter = self._callable_or_lambda_true(scene_tags_filter)
@@ -31,7 +30,7 @@ class MotionPredictionDataset(IterableDataset):
 
     def __iter__(self):
         def data_gen():
-            for fname in self._file_names:
+            for fname in self._file_paths:
                 fpath = os.path.join(self._dataset_path, fname)
                 for scene in _dataset_file_iterator(fpath):
                     if not self._scene_tags_filter(scene):
@@ -57,6 +56,13 @@ class MotionPredictionDataset(IterableDataset):
         if not callable(f):
             raise ValueError('Expected callable, got {}'.format(type(f)))
         return f
+
+    def _get_filepaths(self, dataset_dir):
+        return sorted([
+            os.path.join(dataset_dir, f)
+            for f in os.listdir(dataset_dir)
+            if f.endswith('.bin')
+        ])
 
 
 class MotionPredictionDatasetV2(Dataset):
