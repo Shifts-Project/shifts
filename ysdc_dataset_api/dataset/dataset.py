@@ -2,8 +2,8 @@ import os
 import random
 
 import numpy as np
+import torch
 from google.protobuf.internal.decoder import _DecodeVarint32
-from torch.utils.data import Dataset, IterableDataset
 
 from ysdc_dataset_api.proto import Scene, proto_to_dict
 from ysdc_dataset_api.rendering import FeatureRenderer
@@ -13,7 +13,7 @@ from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_tran
 N_SCENES_PER_FILE = 5000
 
 
-class MotionPredictionDataset(IterableDataset):
+class MotionPredictionDataset(torch.utils.data.IterableDataset):
     def __init__(
             self,
             dataset_path,
@@ -29,10 +29,18 @@ class MotionPredictionDataset(IterableDataset):
         self._trajectory_tags_filter = self._callable_or_lambda_true(trajectory_tags_filter)
 
     def __iter__(self):
-        def data_gen():
-            for fname in self._file_paths:
-                fpath = os.path.join(self._dataset_path, fname)
-                for scene in _dataset_file_iterator(fpath):
+        worker_info = torch.utils.data.get_worker_info()
+        if worker_info is None:
+            file_paths = self._file_paths
+            start_ind = 0
+            stop_ind = N_SCENES_PER_FILE
+        else:
+            file_paths, start_ind, stop_ind = self._split_filepaths_by_worker(
+                worker_info.id, worker_info.num_workers)
+
+        def data_gen(file_paths, start_ind, stop_ind):
+            for fpath in file_paths:
+                for scene in _dataset_file_iterator(fpath, start_ind, stop_ind):
                     if not self._scene_tags_filter(scene):
                         continue
                     for request in scene.prediction_requests:
@@ -48,7 +56,22 @@ class MotionPredictionDataset(IterableDataset):
                             'feature_maps': feature_maps,
                             'gt_trajectory': gt_trajectory,
                         }
-        return data_gen()
+        return data_gen(file_paths, start_ind, stop_ind)
+
+    def _split_filepaths_by_worker(self, worker_id, num_workers):
+        scenes_per_worker = len(self._file_paths) * N_SCENES_PER_FILE // num_workers
+        dataset_start_ind = scenes_per_worker * worker_id
+        dataset_stop_ind = dataset_start_ind + scenes_per_worker
+
+        list_slice = slice(
+            dataset_start_ind // N_SCENES_PER_FILE,
+            dataset_stop_ind // N_SCENES_PER_FILE + 1
+        )
+        filepaths = self._file_paths[list_slice]
+
+        file_start_ind = dataset_start_ind % N_SCENES_PER_FILE
+        file_stop_ind = dataset_stop_ind % N_SCENES_PER_FILE
+        return filepaths, file_start_ind, file_stop_ind
 
     def _callable_or_lambda_true(self, f):
         if f is None:
@@ -108,14 +131,21 @@ class MotionPredictionDatasetV2(Dataset):
         ])
 
 
-def _dataset_file_iterator(filepath, scenes_offset=0):
+def _dataset_file_iterator(filepath, start_ind=0, stop_ind=-1):
     with open(filepath, 'rb') as f:
         file_content = f.read()
-        n = 0
-        while n < len(file_content):
-            msg_len, new_pos = _DecodeVarint32(file_content, n)
-            n = new_pos
-            encoded_message = file_content[n:n + msg_len]
-            n += msg_len
-            scene = Scene.FromString(encoded_message)
-            yield scene
+    sep_pos = 0
+    scene_ind = 0
+    while sep_pos < len(file_content):
+        msg_len, new_sep_pos = _DecodeVarint32(file_content, sep_pos)
+        sep_pos = new_sep_pos
+        encoded_message = file_content[sep_pos:sep_pos + msg_len]
+        sep_pos += msg_len
+        if scene_ind < start_ind:
+            scene_ind += 1
+            continue
+        if stop_ind > 0 and scene_ind == stop_ind:
+            break
+        scene = Scene.FromString(encoded_message)
+        scene_ind += 1
+        yield scene
