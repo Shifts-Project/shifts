@@ -11,6 +11,7 @@ from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_tran
 
 
 N_SCENES_PER_FILE = 5000
+N_SCENES_PER_SUBDIR = 1000
 
 
 class MotionPredictionDataset(torch.utils.data.IterableDataset):
@@ -89,46 +90,54 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
 
 
 class MotionPredictionDatasetV2(torch.utils.data.Dataset):
-    def __init__(self, dataset_path):
+    def __init__(self, dataset_path, scene_tags_filter=None, trajectory_tags_filter=None):
         super(MotionPredictionDatasetV2, self).__init__()
-        self._filepaths = self._get_filepaths(dataset_path)
+        self._dataset_path = dataset_path
+        self._sub_dirs = os.listdir(dataset_path)
+
+        self._scene_tags_filter = self._callable_or_trivial_filter(scene_tags_filter)
+        self._trajectory_tags_filter = self._callable_or_trivial_filter(trajectory_tags_filter)
+
+        self._scene_indices = self._filter_scenes(
+            np.arange(0, len(self._sub_dirs) * N_SCENES_PER_SUBDIR)
+        )
 
     def __getitem__(self, idx):
-        file_idx = idx // N_SCENES_PER_FILE
-        scene_in_file_idx = idx % N_SCENES_PER_FILE
-        scene = self._read_scene_by_idx(self._filepaths[file_idx], scene_in_file_idx)
+        scene_idx = self._scene_indices[idx]
+        scene = self._read_scene_by_idx(scene_idx)
         return {
-            'pedestrians': np.random.rand(random.randint(0, 5), 25, 2),
-            'vehicles': np.random.rand(random.randint(0, 10), 25, 2),
-            'gt_vehicles': np.random.rand(random.randint(0, 3), 25, 2),
+            'pedestrians': np.random.rand(5, 25, 2),
+            'vehicles': np.random.rand(5, 25, 2),
+            'gt_vehicles': np.random.rand(5, 25, 2),
         }
 
     def __len__(self):
-        return len(self._filepaths) * N_SCENES_PER_FILE
+        return self._scene_indices.shape[0]
 
-    def _read_scene_by_idx(self, filepath, idx):
-        assert idx < N_SCENES_PER_FILE
+    def _read_scene_by_idx(self, scene_idx):
+        dir_num = scene_idx // N_SCENES_PER_SUBDIR
+        fpath = os.path.join(self._dataset_path, f'{dir_num:03d}', f'{scene_idx:06d}.pb')
+        return self._read_scene_from_file(fpath)
+
+    def _read_scene_from_file(self, filepath):
         with open(filepath, 'rb') as f:
-            file_buf = f.read()
-        scene_idx = 0
-        sep_pos = 0
-        while sep_pos < len(file_buf):
-            msg_len, new_sep_pos = _DecodeVarint32(file_buf, sep_pos)
-            sep_pos = new_sep_pos
-            msg_buf = file_buf[sep_pos:sep_pos + msg_len]
-            sep_pos += msg_len
-            if scene_idx == idx:
-                scene = Scene()
-                scene.ParseFromString(msg_buf)
-                return scene
-            scene_idx += 1
+            scene_serialized = f.read()
+        scene = Scene()
+        return scene.ParseFromString(scene_serialized)
 
-    def _get_filepaths(self, dataset_dir):
-        return sorted([
-            os.path.join(dataset_dir, f)
-            for f in os.listdir(dataset_dir)
-            if f.endswith('.bin')
-        ])
+    def _filter_scenes(self, indices):
+        return indices
+
+    def _callable_or_trivial_filter(self, f):
+        if f is None:
+            return _trivial_filter
+        if not callable(f):
+            raise ValueError('Expected callable, got {}'.format(type(f)))
+        return f
+
+
+def _trivial_filter(x):
+    return x
 
 
 def _dataset_file_iterator(filepath, start_ind=0, stop_ind=-1):
