@@ -88,7 +88,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         ])
 
 
-class MotionPredictionDatasetV2(Dataset):
+class MotionPredictionDatasetV2(torch.utils.data.Dataset):
     def __init__(self, dataset_path):
         super(MotionPredictionDatasetV2, self).__init__()
         self._filepaths = self._get_filepaths(dataset_path)
