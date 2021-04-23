@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from google.protobuf.internal.decoder import _DecodeVarint32
 
-from ysdc_dataset_api.proto import Scene, proto_to_dict
+from ysdc_dataset_api.proto import Scene, get_tags_from_request, proto_to_dict
 from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_transform
 
@@ -27,8 +27,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         super(MotionPredictionDataset, self).__init__()
         self._renderer = FeatureRenderer(renderer_config)
 
-        self._scene_tags_filter = self._callable_or_lambda_true(scene_tags_filter)
-        self._trajectory_tags_filter = self._callable_or_lambda_true(trajectory_tags_filter)
+        self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
+        self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
 
         self._scene_file_paths = self._filter_paths(
             get_file_paths(dataset_path), scene_tags_fpath)
@@ -40,47 +40,37 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is None:
-            file_paths = self._file_paths
-            start_ind = 0
-            stop_ind = N_SCENES_PER_FILE
+            file_paths = self._scene_file_paths
         else:
-            file_paths, start_ind, stop_ind = self._split_filepaths_by_worker(
-                worker_info.id, worker_info.num_workers)
+            file_paths = self._split_filepaths_by_worker(worker_info.id, worker_info.num_workers)
 
-        def data_gen(file_paths, start_ind, stop_ind):
+        def data_gen(_file_paths):
             for fpath in file_paths:
-                for scene in _dataset_file_iterator(fpath, start_ind, stop_ind):
-                    if not self._scene_tags_filter(scene):
+                scene = _read_scene_from_file(fpath)
+                for request in scene.prediction_requests:
+                    trajectory_tags = get_tags_from_request(request)
+                    if not self._trajectory_tags_filter(trajectory_tags):
                         continue
-                    for request in scene.prediction_requests:
-                        if not self._trajectory_tags_filter(request):
-                            continue
-                        track = get_track_for_transform(scene, request.track_id)
-                        track_to_fm_transform = get_track_to_fm_transform(track)
-                        feature_maps = self._renderer.render_features(
-                            scene, track_to_fm_transform)
-                        gt_trajectory = transform_points(
-                            get_gt_trajectory(scene, request.track_id), transform)
-                        yield {
-                            'feature_maps': feature_maps,
-                            'gt_trajectory': gt_trajectory,
-                        }
-        return data_gen(file_paths, start_ind, stop_ind)
+                    track = get_track_for_transform(scene, request.track_id)
+                    track_to_fm_transform = get_track_to_fm_transform(track)
+                    feature_maps = self._renderer.render_features(scene, track_to_fm_transform)
+                    gt_trajectory = transform_points(
+                        get_gt_trajectory(scene, request.track_id), transform)
+                    yield {
+                        'feature_maps': feature_maps,
+                        'gt_trajectory': gt_trajectory,
+                    }
+
+        return data_gen(file_paths)
 
     def _split_filepaths_by_worker(self, worker_id, num_workers):
-        scenes_per_worker = len(self._file_paths) * N_SCENES_PER_FILE // num_workers
-        dataset_start_ind = scenes_per_worker * worker_id
-        dataset_stop_ind = dataset_start_ind + scenes_per_worker
-
-        list_slice = slice(
-            dataset_start_ind // N_SCENES_PER_FILE,
-            dataset_stop_ind // N_SCENES_PER_FILE + 1
-        )
-        filepaths = self._file_paths[list_slice]
-
-        file_start_ind = dataset_start_ind % N_SCENES_PER_FILE
-        file_stop_ind = dataset_stop_ind % N_SCENES_PER_FILE
-        return filepaths, file_start_ind, file_stop_ind
+        n_scenes_per_worker = self.num_scenes // num_workers
+        split = list(range(0, self.num_scenes, n_scenes_per_worker))
+        start = split[worker_id]
+        stop = split[worker_id + 1]
+        if worker_id == num_workers - 1:
+            stop = self.num_scenes
+        return self._scene_file_paths[start:stop]
 
     def _callable_or_lambda_true(self, f):
         if f is None:
@@ -98,12 +88,13 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     valid_indices.append(i)
         return [file_paths[i] for i in valid_indices]
 
+
 class MotionPredictionDatasetV2(torch.utils.data.Dataset):
     def __init__(self, dataset_path, scene_tags_filter=None, trajectory_tags_filter=None):
         super(MotionPredictionDatasetV2, self).__init__()
 
-        self._scene_tags_filter = self._callable_or_trivial_filter(scene_tags_filter)
-        self._trajectory_tags_filter = self._callable_or_trivial_filter(trajectory_tags_filter)
+        self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
+        self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
 
         self._dataset_files = self._filter_scenes(get_file_paths(dataset_path))
 
@@ -122,23 +113,10 @@ class MotionPredictionDatasetV2(torch.utils.data.Dataset):
     def _read_scene_by_idx(self, scene_idx):
         dir_num = scene_idx // N_SCENES_PER_SUBDIR
         fpath = os.path.join(self._dataset_path, f'{dir_num:03d}', f'{scene_idx:06d}.pb')
-        return self._read_scene_from_file(fpath)
-
-    def _read_scene_from_file(self, filepath):
-        with open(filepath, 'rb') as f:
-            scene_serialized = f.read()
-        scene = Scene()
-        return scene.ParseFromString(scene_serialized)
+        return _read_scene_from_file(fpath)
 
     def _filter_scenes(self, indices):
         return indices
-
-    def _callable_or_trivial_filter(self, f):
-        if f is None:
-            return _trivial_filter
-        if not callable(f):
-            raise ValueError('Expected callable, got {}'.format(type(f)))
-        return f
 
 
 def get_file_paths(dataset_path):
@@ -151,6 +129,22 @@ def get_file_paths(dataset_path):
         file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
         res += [os.path.join(d, fname) for fname in file_names]
     return res
+
+
+def _read_scene_from_file(filepath):
+    with open(filepath, 'rb') as f:
+        scene_serialized = f.read()
+    scene = Scene()
+    scene.ParseFromString(scene_serialized)
+    return scene
+
+
+def _callable_or_trivial_filter(f):
+    if f is None:
+        return _trivial_filter
+    if not callable(f):
+        raise ValueError('Expected callable, got {}'.format(type(f)))
+    return f
 
 
 def _trivial_filter(x):
