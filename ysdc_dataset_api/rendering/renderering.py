@@ -63,9 +63,9 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
         for ts_ind in range(-self.n_history_steps, 0):
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
                 track_polygon = transform2dpoints(get_track_polygon(track), transform)
-                track_polygon = np.int32(track_polygon).reshape(1, -1, 2)
+                track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
                 for v in self._get_fm_values(track):
-                    cv2.fillPoly(feature_map[:, :, 0], track_polygon, v)
+                    cv2.fillPoly(feature_map[:, :, 0], track_polygon, v, lineType=cv2.LINE_AA)
         return feature_map
 
     def _get_fm_values(self, track):
