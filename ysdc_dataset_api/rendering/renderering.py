@@ -34,7 +34,7 @@ class FeatureMapRendererBase:
         return _create_feature_map(
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
-            self._num_channels,
+            self._num_channels * self._n_history_steps,
         )
 
 
@@ -57,8 +57,13 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
                 track_polygon = transform2dpoints(get_track_polygon(track), transform)
                 track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-                for v in self._get_fm_values(track):
-                    cv2.fillPoly(feature_map[:, :, 0], track_polygon, v, lineType=cv2.LINE_AA)
+                for i, v in enumerate(self._get_fm_values(track)):
+                    cv2.fillPoly(
+                        feature_map[ts_ind * self._n_history_steps + i, :, :],
+                        track_polygon,
+                        v,
+                        lineType=cv2.LINE_AA
+                    )
         return feature_map
 
     def _get_fm_values(self, track):
@@ -106,7 +111,10 @@ class FeatureRenderer:
         fm_slice_start = 0
         for renderer in self._renderers:
             fm_slice_end = fm_slice_start + renderer.num_channels * renderer.n_history_steps
-            fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
+            try:
+                fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
+            except ValueError:
+                import pdb; pdb.set_trace()
             fm_slice_start = fm_slice_end
         return fm
 
