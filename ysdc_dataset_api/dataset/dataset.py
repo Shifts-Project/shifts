@@ -8,7 +8,11 @@ from google.protobuf.internal.decoder import _DecodeVarint32
 
 from ysdc_dataset_api.proto import Scene, get_tags_from_request, proto_to_dict
 from ysdc_dataset_api.rendering import FeatureRenderer
-from ysdc_dataset_api.utils import get_track_to_fm_transform, get_track_for_transform
+from ysdc_dataset_api.utils import (
+    get_track_for_transform,
+    get_track_to_fm_transform,
+    request_is_valid,
+)
 
 
 N_SCENES_PER_FILE = 5000
@@ -48,6 +52,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             for fpath in file_paths:
                 scene = _read_scene_from_file(fpath)
                 for request in scene.prediction_requests:
+                    if not request_is_valid(scene, request):
+                        continue
                     trajectory_tags = get_tags_from_request(request)
                     if not self._trajectory_tags_filter(trajectory_tags):
                         continue
