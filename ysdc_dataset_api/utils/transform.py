@@ -35,10 +35,13 @@ def get_track_to_fm_transform(track):
         track.position.z
     ])
     yaw = track.yaw
-    orientation_vec = np.array([np.cos(yaw), np.sin(yaw)])
+
     # Flip orientation so that non-zero velocity is directed forwards
-    if position[:2] @ orientation_vec < 0:
+    orientation_vec = np.array([np.cos(yaw), np.sin(yaw)])
+    velocity_vec = np.array([track.linear_velocity.x, track.linear_velocity.y])
+    if velocity_vec @ orientation_vec < 0:
         yaw += np.pi
+
     rotation = tf.euler.euler2mat(0, 0, yaw)
     transform = tf.affines.compose(position, rotation, np.ones(3))
     transform = np.linalg.inv(transform)
