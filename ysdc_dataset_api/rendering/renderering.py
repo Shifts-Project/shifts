@@ -99,9 +99,31 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         return num_channels
 
-    def render(self, scene, transform):
+    def render(self, scene, to_track_transform):
         feature_map = self._create_feature_map()
+        for ts_ind in range(-self.n_history_steps, 0):
+            for track in scene.past_pedestrian_tracks[ts_ind].tracks:
+                transform = self._to_feature_map_tf @ to_track_transform
+                track_polygon = transform2dpoints(get_track_polygon(track), transform)
+                track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
+                    cv2.fillPoly(
+                        feature_map[ts_ind * self.num_channels + i, :, :],
+                        track_polygon,
+                        v,
+                        lineType=cv2.LINE_AA,
+                    )
         return feature_map
+
+    def _get_fm_values(self, track, to_track_transform):
+        values = []
+        if 'occupancy' in self._config:
+            values.append(1.)
+        if 'velocity' in self._config:
+            velocity_transformed = get_transformed_velocity(track, to_track_transform)
+            values.append(velocity_transformed[0])
+            values.append(velocity_transformed[1])
+        return values
 
 
 class FeatureRenderer:
