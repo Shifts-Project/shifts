@@ -73,9 +73,10 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         n_scenes_per_worker = self.num_scenes // num_workers
         split = list(range(0, self.num_scenes, n_scenes_per_worker))
         start = split[worker_id]
-        stop = split[worker_id + 1]
         if worker_id == num_workers - 1:
             stop = self.num_scenes
+        else:
+            stop = split[worker_id + 1]
         return self._scene_file_paths[start:stop]
 
     def _callable_or_lambda_true(self, f):
