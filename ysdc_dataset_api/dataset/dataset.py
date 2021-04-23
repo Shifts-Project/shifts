@@ -1,3 +1,4 @@
+import json
 import os
 import random
 
@@ -18,16 +19,23 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
     def __init__(
             self,
             dataset_path,
+            scene_tags_fpath,
             renderer_config=None,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
         ):
         super(MotionPredictionDataset, self).__init__()
-        self._file_paths = self._get_filepaths(dataset_path)
         self._renderer = FeatureRenderer(renderer_config)
 
         self._scene_tags_filter = self._callable_or_lambda_true(scene_tags_filter)
         self._trajectory_tags_filter = self._callable_or_lambda_true(trajectory_tags_filter)
+
+        self._scene_file_paths = self._filter_paths(
+            get_file_paths(dataset_path), scene_tags_fpath)
+
+    @property
+    def num_scenes(self):
+        return len(self._scene_file_paths)
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -81,13 +89,14 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             raise ValueError('Expected callable, got {}'.format(type(f)))
         return f
 
-    def _get_filepaths(self, dataset_dir):
-        return sorted([
-            os.path.join(dataset_dir, f)
-            for f in os.listdir(dataset_dir)
-            if f.endswith('.bin')
-        ])
-
+    def _filter_paths(self, file_paths, scene_tags_fpath):
+        valid_indices = []
+        with open(scene_tags_fpath, 'r') as f:
+            for i, line in enumerate(f):
+                tags = json.loads(line.strip())
+                if self._scene_tags_filter(tags):
+                    valid_indices.append(i)
+        return [file_paths[i] for i in valid_indices]
 
 class MotionPredictionDatasetV2(torch.utils.data.Dataset):
     def __init__(self, dataset_path, scene_tags_filter=None, trajectory_tags_filter=None):
