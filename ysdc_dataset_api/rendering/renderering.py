@@ -1,7 +1,12 @@
 import cv2
 import numpy as np
 
-from ysdc_dataset_api.utils import get_track_polygon, transform2dpoints
+from ysdc_dataset_api.utils import (
+    get_track_polygon,
+    get_transformed_velocity,
+    get_transformed_acceleration,
+    transform2dpoints,
+)
 
 
 def _create_feature_map(rows, cols, num_channels):
@@ -10,13 +15,14 @@ def _create_feature_map(rows, cols, num_channels):
 
 
 class FeatureMapRendererBase:
-    def __init__(self, config, feature_map_params, n_history_steps):
+    def __init__(self, config, feature_map_params, n_history_steps, to_feature_map_tf):
         self._config = config
         self._feature_map_params = feature_map_params
         self._n_history_steps = n_history_steps
         self._num_channels = self._get_num_channels()
+        self._to_feature_map_tf = to_feature_map_tf
 
-    def render(self, scene, transform):
+    def render(self, scene, to_track_transform):
         raise NotImplementedError()
 
     def _get_num_channels(self):
@@ -51,31 +57,36 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 1
         return num_channels
 
-    def render(self, scene, transform):
+    def render(self, scene, to_track_transform):
         feature_map = self._create_feature_map()
         for ts_ind in range(-self.n_history_steps, 0):
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
+                transform = self._to_feature_map_tf @ to_track_transform
                 track_polygon = transform2dpoints(get_track_polygon(track), transform)
                 track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-                for i, v in enumerate(self._get_fm_values(track)):
+                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
                     cv2.fillPoly(
-                        feature_map[ts_ind * self._n_history_steps + i, :, :],
+                        feature_map[ts_ind * self.num_channels + i, :, :],
                         track_polygon,
                         v,
-                        lineType=cv2.LINE_AA
+                        lineType=cv2.LINE_AA,
                     )
         return feature_map
 
-    def _get_fm_values(self, track):
+    def _get_fm_values(self, track, to_track_transform):
         values = []
         if 'occupancy' in self._config:
             values.append(1.)
         if 'velocity' in self._config:
-            values.append(track.linear_velocity.x)
-            values.append(track.linear_velocity.y)
+            velocity_transformed = get_transformed_velocity(track, to_track_transform)
+            values.append(velocity_transformed[0])
+            values.append(velocity_transformed[1])
         if 'acceleration' in self._config:
-            values.append(track.linear_acceleration.x)
-            values.append(track.linear_acceleration.y)
+            acceleration_transformed = get_transformed_acceleration(track, to_track_transform)
+            values.append(acceleration_transformed[0])
+            values.append(acceleration_transformed[1])
+        if 'angular_velocity' in self._config:
+            values.append(track.yaw)
         return values
 
 
@@ -98,23 +109,15 @@ class FeatureRenderer:
         self._fm_params = config['fm_params']
         self._to_feature_map_tf = self._get_to_feature_map_transform()
 
-        self._renderers = []
-        for group in config['groups']:
-            for renderer_config in group['renderers']:
-                self._renderers.append(
-                    self._create_renderer(renderer_config, self._fm_params, group['n_history_steps']))
+        self._renderers = self._create_renderers_list(config)
         self._num_channels = self._get_num_channels()
 
     def render_features(self, scene, to_track_frame_tf):
-        transform = self._to_feature_map_tf @ to_track_frame_tf
         fm = self._create_feature_map()
         fm_slice_start = 0
         for renderer in self._renderers:
             fm_slice_end = fm_slice_start + renderer.num_channels * renderer.n_history_steps
-            try:
-                fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
-            except ValueError:
-                import pdb; pdb.set_trace()
+            fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, to_track_frame_tf)
             fm_slice_start = fm_slice_end
         return fm
 
@@ -142,12 +145,26 @@ class FeatureRenderer:
             for renderer in self._renderers
         )
 
-    def _create_renderer(self, config, feature_map_params, n_history_steps):
+    def _create_renderers_list(self, config):
+        renderers = []
+        for group in config['groups']:
+            for renderer_config in group['renderers']:
+                renderers.append(
+                    self._create_renderer(
+                        renderer_config,
+                        self._fm_params,
+                        group['n_history_steps'],
+                        self._to_feature_map_tf,
+                    )
+                )
+        return renderers
+
+    def _create_renderer(self, config, feature_map_params, n_history_steps, to_feature_map_tf):
         if 'vehicles' in config:
             return VehicleTracksRenderer(
-                config['vehicles'], feature_map_params, n_history_steps)
+                config['vehicles'], feature_map_params, n_history_steps, to_feature_map_tf)
         elif 'pedestrians' in config:
             return PedestrianTracksRenderer(
-                config['pedestrians'], feature_map_params, n_history_steps)
+                config['pedestrians'], feature_map_params, n_history_steps, to_feature_map_tf)
         else:
             raise NotImplementedError()
