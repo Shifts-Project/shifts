@@ -45,6 +45,15 @@ def get_track_to_fm_transform(track):
     return transform
 
 
+def transform2dpoints(points, transform):
+    ph = np.zeros((points.shape[0], 4))
+    ph[:, :2] = points
+    ph[:, 3] = np.ones(points.shape[0])
+    ph = np.transpose(ph)
+    res = np.dot(transform, ph)
+    return np.transpose(res[:2, :])
+
+
 def linear_interpolate_vehicle_track(first, second, ratio):
     track = VehicleTrack()
     track.track_id = first.track_id

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from ysdc_dataset_api.utils import get_track_polygon
+from ysdc_dataset_api.utils import get_track_polygon, transform2dpoints
 
 
 def _create_feature_map(rows, cols, num_channels, data_format):
@@ -40,7 +40,7 @@ class FeatureMapRendererBase:
         return _create_feature_map(
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
-            self.get_num_channels(),
+            self._num_channels,
             self._feature_map_params['data_format'],
         )
 
@@ -62,21 +62,22 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
         feature_map = self._create_feature_map()
         for ts_ind in range(-self.n_history_steps, 0):
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
-                track_polygon = transform @ get_track_polygon(track)
+                track_polygon = transform2dpoints(get_track_polygon(track), transform)
+                track_polygon = np.int32(track_polygon).reshape(1, -1, 2)
                 for v in self._get_fm_values(track):
-                    cv2.fillPoly()
+                    cv2.fillPoly(feature_map[:, :, 0], track_polygon, v)
         return feature_map
 
     def _get_fm_values(self, track):
         values = []
-        if 'occupancy' in self._spec:
-            values += 1.
-        if 'velocity' in self._spec:
-            values += track.linear_velocity.x
-            values += track.linear_velocity.y
-        if 'acceleration' in self._spec:
-            values += track.linear_acceleration.x
-            values += track.linear_acceleration.y
+        if 'occupancy' in self._config:
+            values.append(1.)
+        if 'velocity' in self._config:
+            values.append(track.linear_velocity.x)
+            values.append(track.linear_velocity.y)
+        if 'acceleration' in self._config:
+            values.append(track.linear_acceleration.x)
+            values.append(track.linear_acceleration.y)
         return values
 
 
