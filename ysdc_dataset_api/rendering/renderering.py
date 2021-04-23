@@ -4,14 +4,8 @@ import numpy as np
 from ysdc_dataset_api.utils import get_track_polygon, transform2dpoints
 
 
-def _create_feature_map(rows, cols, num_channels, data_format):
-    shape = [rows, cols]
-    if data_format == 'channels_first':
-        shape.insert(0, num_channels)
-    elif data_format == 'channels_last':
-        shape.append(num_channels)
-    else:
-        raise ValueError('Unknown data format')
+def _create_feature_map(rows, cols, num_channels):
+    shape = [num_channels, rows, cols]
     return np.zeros(shape, dtype=np.float32)
 
 
@@ -41,7 +35,6 @@ class FeatureMapRendererBase:
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
             self._num_channels,
-            self._feature_map_params['data_format'],
         )
 
 
@@ -113,10 +106,7 @@ class FeatureRenderer:
         fm_slice_start = 0
         for renderer in self._renderers:
             fm_slice_end = fm_slice_start + renderer.num_channels * renderer.n_history_steps
-            if self._fm_params['data_format'] == 'channels_first':
-                fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
-            else:
-                fm[:, :, fm_slice_start:fm_slice_end] = renderer.render(scene, transform)
+            fm[fm_slice_start:fm_slice_end, :, :] = renderer.render(scene, transform)
             fm_slice_start = fm_slice_end
         return fm
 
@@ -136,7 +126,6 @@ class FeatureRenderer:
             self._fm_params['rows'],
             self._fm_params['cols'],
             self._num_channels,
-            self._fm_params['data_format'],
         )
 
     def _get_num_channels(self):
