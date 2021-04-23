@@ -96,6 +96,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 class FeatureRenderer:
     def __init__(self, config):
         self._fm_params = config['fm_params']
+        self._to_feature_map_tf = self._get_to_feature_map_transform()
 
         self._renderers = []
         for group in config['groups']:
@@ -103,10 +104,9 @@ class FeatureRenderer:
                 self._renderers.append(
                     self._create_renderer(renderer_config, self._fm_params, group['n_history_steps']))
         self._num_channels = self._get_num_channels()
-        self._fm_shift_scale_transform = self._get_fm_shift_scale_transform()
 
-    def render_features(self, scene, track_to_fm_transform):
-        transform = self._fm_shift_scale_transform @ track_to_fm_transform
+    def render_features(self, scene, to_track_frame_tf):
+        transform = self._to_feature_map_tf @ to_track_frame_tf
         fm = self._create_feature_map()
         fm_slice_start = 0
         for renderer in self._renderers:
@@ -118,7 +118,7 @@ class FeatureRenderer:
             fm_slice_start = fm_slice_end
         return fm
 
-    def _get_fm_shift_scale_transform(self):
+    def _get_to_feature_map_transform(self):
         fm_scale = 1. / self._fm_params['resolution']
         fm_origin_x = 0.5 * self._fm_params['rows']
         fm_origin_y = 0.5 * self._fm_params['cols']

@@ -28,7 +28,7 @@ def get_first_gt_track_value(scene, track_id):
     raise ValueError(f'future track for track_id {track_id} was not found in scene {scene.id}')
 
 
-def get_track_to_fm_transform(track):
+def get_to_track_frame_transform(track):
     position = np.array([
         track.position.x,
         track.position.y,

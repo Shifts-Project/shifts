@@ -11,7 +11,7 @@ from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import (
     get_gt_trajectory,
     get_track_for_transform,
-    get_track_to_fm_transform,
+    get_to_track_frame_transform,
     request_is_valid,
     transform2dpoints,
 )
@@ -60,10 +60,10 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     if not self._trajectory_tags_filter(trajectory_tags):
                         continue
                     track = get_track_for_transform(scene, request.track_id)
-                    track_to_fm_transform = get_track_to_fm_transform(track)
-                    feature_maps = self._renderer.render_features(scene, track_to_fm_transform)
+                    to_track_frame_tf = get_to_track_frame_transform(track)
+                    feature_maps = self._renderer.render_features(scene, to_track_frame_tf)
                     gt_trajectory = transform2dpoints(
-                        get_gt_trajectory(scene, request.track_id), track_to_fm_transform)
+                        get_gt_trajectory(scene, request.track_id), to_track_frame_tf)
                     yield {
                         'feature_maps': feature_maps,
                         'gt_trajectory': gt_trajectory,
