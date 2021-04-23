@@ -92,19 +92,14 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
 class MotionPredictionDatasetV2(torch.utils.data.Dataset):
     def __init__(self, dataset_path, scene_tags_filter=None, trajectory_tags_filter=None):
         super(MotionPredictionDatasetV2, self).__init__()
-        self._dataset_path = dataset_path
-        self._sub_dirs = os.listdir(dataset_path)
 
         self._scene_tags_filter = self._callable_or_trivial_filter(scene_tags_filter)
         self._trajectory_tags_filter = self._callable_or_trivial_filter(trajectory_tags_filter)
 
-        self._scene_indices = self._filter_scenes(
-            np.arange(0, len(self._sub_dirs) * N_SCENES_PER_SUBDIR)
-        )
+        self._dataset_files = self._filter_scenes(get_file_paths(dataset_path))
 
     def __getitem__(self, idx):
-        scene_idx = self._scene_indices[idx]
-        scene = self._read_scene_by_idx(scene_idx)
+        scene = self._read_scene_from_file(self._dataset_files[idx])
         return {
             'pedestrians': np.random.rand(5, 25, 2),
             'vehicles': np.random.rand(5, 25, 2),
@@ -112,7 +107,8 @@ class MotionPredictionDatasetV2(torch.utils.data.Dataset):
         }
 
     def __len__(self):
-        return self._scene_indices.shape[0]
+        # This is broken due to more than one actor in request per scene
+        return len(self._dataset_files)
 
     def _read_scene_by_idx(self, scene_idx):
         dir_num = scene_idx // N_SCENES_PER_SUBDIR
@@ -134,6 +130,18 @@ class MotionPredictionDatasetV2(torch.utils.data.Dataset):
         if not callable(f):
             raise ValueError('Expected callable, got {}'.format(type(f)))
         return f
+
+
+def get_file_paths(dataset_path):
+    sub_dirs = sorted([
+        os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
+        if os.path.isdir(os.path.join(dataset_path, d))
+    ])
+    res = []
+    for d in sub_dirs:
+        file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
+        res += [os.path.join(d, fname) for fname in file_names]
+    return res
 
 
 def _trivial_filter(x):
