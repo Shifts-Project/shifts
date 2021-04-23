@@ -17,3 +17,14 @@ def get_track_polygon(track):
     poly.append(position - front + left)
     poly.append(position + front + left)
     return np.array(poly)
+
+
+def get_gt_trajectory(scene, track_id):
+    horizon = len(scene.future_vehicle_tracks)
+    ph = np.zeros((horizon, 2), dtype=np.float32)
+    for t in range(horizon):
+        for track in scene.future_vehicle_tracks[t].tracks:
+            if track.track_id == track_id:
+                ph[t, 0] = track.position.x
+                ph[t, 1] = track.position.y
+    return ph

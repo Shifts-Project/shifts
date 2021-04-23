@@ -9,9 +9,11 @@ from google.protobuf.internal.decoder import _DecodeVarint32
 from ysdc_dataset_api.proto import Scene, get_tags_from_request, proto_to_dict
 from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import (
+    get_gt_trajectory,
     get_track_for_transform,
     get_track_to_fm_transform,
     request_is_valid,
+    transform2dpoints,
 )
 
 
@@ -60,8 +62,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     track = get_track_for_transform(scene, request.track_id)
                     track_to_fm_transform = get_track_to_fm_transform(track)
                     feature_maps = self._renderer.render_features(scene, track_to_fm_transform)
-                    gt_trajectory = transform_points(
-                        get_gt_trajectory(scene, request.track_id), transform)
+                    gt_trajectory = transform2dpoints(
+                        get_gt_trajectory(scene, request.track_id), track_to_fm_transform)
                     yield {
                         'feature_maps': feature_maps,
                         'gt_trajectory': gt_trajectory,
