@@ -157,7 +157,7 @@ def _callable_or_trivial_filter(f):
 
 
 def _trivial_filter(x):
-    return x
+    return True
 
 
 def _dataset_file_iterator(filepath, start_ind=0, stop_ind=-1):
