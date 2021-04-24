@@ -43,6 +43,11 @@ class FeatureMapRendererBase:
             self._num_channels * self._n_history_steps,
         )
 
+    def _get_transformed_track_polygon(self, track, transform):
+        polygon = transform2dpoints(get_track_polygon(track), transform)
+        polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+        return polygon
+
 
 class VehicleTracksRenderer(FeatureMapRendererBase):
     def _get_num_channels(self):
@@ -62,8 +67,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
         for ts_ind in range(-self.n_history_steps, 0):
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
                 transform = self._to_feature_map_tf @ to_track_transform
-                track_polygon = transform2dpoints(get_track_polygon(track), transform)
-                track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+                track_polygon = self._get_transformed_track_polygon(track, transform)
                 for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
                     cv2.fillPoly(
                         feature_map[ts_ind * self.num_channels + i, :, :],
@@ -71,6 +75,15 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
                         v,
                         lineType=cv2.LINE_AA,
                     )
+            ego_track = scene.past_ego_track[ts_ind]
+            ego_track_polygon = self._get_transformed_track_polygon(ego_track, transform)
+            for i, v in enumerate(self._get_fm_values(ego_track, to_track_transform)):
+                cv2.fillPoly(
+                    feature_map[ts_ind * self.num_channels + i, :, :],
+                    ego_track_polygon,
+                    v,
+                    lineType=cv2.LINE_AA,
+                )
         return feature_map
 
     def _get_fm_values(self, track, to_track_transform):
@@ -104,8 +117,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
         for ts_ind in range(-self.n_history_steps, 0):
             for track in scene.past_pedestrian_tracks[ts_ind].tracks:
                 transform = self._to_feature_map_tf @ to_track_transform
-                track_polygon = transform2dpoints(get_track_polygon(track), transform)
-                track_polygon = np.around(track_polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+                track_polygon = self._get_transformed_track_polygon(track, transform)
                 for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
                     cv2.fillPoly(
                         feature_map[ts_ind * self.num_channels + i, :, :],
