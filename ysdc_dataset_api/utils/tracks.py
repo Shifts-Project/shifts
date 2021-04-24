@@ -6,9 +6,6 @@ import transforms3d as tf
 from ysdc_dataset_api.proto import PedestrianTrack, VehicleTrack
 
 
-def tracks_as_np():
-    pass
-
 def get_track_polygon(track):
     position = np.array([track.position.x, track.position.y])
     if isinstance(track, PedestrianTrack):

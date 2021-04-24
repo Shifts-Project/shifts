@@ -1,5 +1,5 @@
 def request_is_valid(scene, request):
-    # Checks whether all request.track_id is present at all future tracks steps
+    # Checks whether request.track_id is present at all future tracks steps
     for i in range(len(scene.future_vehicle_tracks)):
         current_track_ids = {
             t.track_id

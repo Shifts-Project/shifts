@@ -1,12 +1,11 @@
 import json
 import os
-import random
 
 import numpy as np
 import torch
 from google.protobuf.internal.decoder import _DecodeVarint32
 
-from ysdc_dataset_api.proto import Scene, get_tags_from_request, proto_to_dict
+from ysdc_dataset_api.proto import Scene, get_tags_from_request
 from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import (
     get_gt_trajectory,
@@ -15,10 +14,6 @@ from ysdc_dataset_api.utils import (
     request_is_valid,
     transform2dpoints,
 )
-
-
-N_SCENES_PER_FILE = 5000
-N_SCENES_PER_SUBDIR = 1000
 
 
 class MotionPredictionDataset(torch.utils.data.IterableDataset):
@@ -98,36 +93,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         return [file_paths[i] for i in valid_indices]
 
 
-class MotionPredictionDatasetV2(torch.utils.data.Dataset):
-    def __init__(self, dataset_path, scene_tags_filter=None, trajectory_tags_filter=None):
-        super(MotionPredictionDatasetV2, self).__init__()
-
-        self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
-        self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
-
-        self._dataset_files = self._filter_scenes(get_file_paths(dataset_path))
-
-    def __getitem__(self, idx):
-        scene = self._read_scene_from_file(self._dataset_files[idx])
-        return {
-            'pedestrians': np.random.rand(5, 25, 2),
-            'vehicles': np.random.rand(5, 25, 2),
-            'gt_vehicles': np.random.rand(5, 25, 2),
-        }
-
-    def __len__(self):
-        # This is broken due to more than one actor in request per scene
-        return len(self._dataset_files)
-
-    def _read_scene_by_idx(self, scene_idx):
-        dir_num = scene_idx // N_SCENES_PER_SUBDIR
-        fpath = os.path.join(self._dataset_path, f'{dir_num:03d}', f'{scene_idx:06d}.pb')
-        return _read_scene_from_file(fpath)
-
-    def _filter_scenes(self, indices):
-        return indices
-
-
 def get_file_paths(dataset_path):
     sub_dirs = sorted([
         os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
@@ -158,23 +123,3 @@ def _callable_or_trivial_filter(f):
 
 def _trivial_filter(x):
     return True
-
-
-def _dataset_file_iterator(filepath, start_ind=0, stop_ind=-1):
-    with open(filepath, 'rb') as f:
-        file_content = f.read()
-    sep_pos = 0
-    scene_ind = 0
-    while sep_pos < len(file_content):
-        msg_len, new_sep_pos = _DecodeVarint32(file_content, sep_pos)
-        sep_pos = new_sep_pos
-        encoded_message = file_content[sep_pos:sep_pos + msg_len]
-        sep_pos += msg_len
-        if scene_ind < start_ind:
-            scene_ind += 1
-            continue
-        if stop_ind > 0 and scene_ind == stop_ind:
-            break
-        scene = Scene.FromString(encoded_message)
-        scene_ind += 1
-        yield scene
