@@ -1,9 +1,7 @@
 import json
 import os
 
-import numpy as np
 import torch
-from google.protobuf.internal.decoder import _DecodeVarint32
 
 from ysdc_dataset_api.proto import Scene, get_tags_from_request
 from ysdc_dataset_api.rendering import FeatureRenderer
@@ -24,7 +22,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             renderer_config=None,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
-        ):
+    ):
         super(MotionPredictionDataset, self).__init__()
         self._renderer = FeatureRenderer(renderer_config)
 
@@ -43,7 +41,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         if worker_info is None:
             file_paths = self._scene_file_paths
         else:
-            file_paths = self._split_filepaths_by_worker(worker_info.id, worker_info.num_workers)
+            file_paths = self._split_filepaths_by_worker(
+                worker_info.id, worker_info.num_workers)
 
         def data_gen(_file_paths):
             for fpath in file_paths:
@@ -56,7 +55,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         continue
                     track = get_track_for_transform(scene, request.track_id)
                     to_track_frame_tf = get_to_track_frame_transform(track)
-                    feature_maps = self._renderer.render_features(scene, to_track_frame_tf)
+                    feature_maps = self._renderer.render_features(
+                        scene, to_track_frame_tf)
                     gt_trajectory = transform2dpoints(
                         get_gt_trajectory(scene, request.track_id), to_track_frame_tf)
                     yield {

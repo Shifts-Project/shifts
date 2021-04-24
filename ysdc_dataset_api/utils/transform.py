@@ -18,14 +18,16 @@ def get_last_track_offset(scene, track_id):
         trackid2track = {t.track_id: t for t in scene.past_vehicle_tracks[i].tracks}
         if track_id in trackid2track:
             return trackid2track[track_id], i
-    raise ValueError(f'past track track_id {track_id} was not found in scene {scene.id}')
+    raise ValueError(
+        f'past track track_id {track_id} was not found in scene {scene.id}')
 
 
 def get_first_gt_track_value(scene, track_id):
     for track in scene.future_vehicle_tracks[0].tracks:
         if track.track_id == track_id:
             return track
-    raise ValueError(f'future track for track_id {track_id} was not found in scene {scene.id}')
+    raise ValueError(
+        f'future track for track_id {track_id} was not found in scene {scene.id}')
 
 
 def get_to_track_frame_transform(track):

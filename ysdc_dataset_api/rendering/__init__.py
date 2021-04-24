@@ -1,1 +1,1 @@
-from .renderering import *
+from .renderering import FeatureRenderer
