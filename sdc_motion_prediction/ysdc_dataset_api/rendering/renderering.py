@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 
-from ysdc_dataset_api.utils import (
+from sdc_motion_prediction.ysdc_dataset_api import (
     get_track_polygon,
     get_transformed_velocity,
     get_transformed_acceleration,

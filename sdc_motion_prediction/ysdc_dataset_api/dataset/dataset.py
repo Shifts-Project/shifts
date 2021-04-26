@@ -3,9 +3,9 @@ import os
 
 import torch
 
-from ysdc_dataset_api.proto import Scene, get_tags_from_request
-from ysdc_dataset_api.rendering import FeatureRenderer
-from ysdc_dataset_api.utils import (
+from sdc_motion_prediction.ysdc_dataset_api.proto import Scene, get_tags_from_request
+from sdc_motion_prediction.ysdc_dataset_api import FeatureRenderer
+from sdc_motion_prediction.ysdc_dataset_api import (
     get_gt_trajectory,
     get_track_for_transform,
     get_to_track_frame_transform,
