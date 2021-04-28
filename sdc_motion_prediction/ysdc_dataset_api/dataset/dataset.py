@@ -6,10 +6,12 @@ import torch
 from ysdc_dataset_api.proto import Scene, get_tags_from_request
 from ysdc_dataset_api.rendering import FeatureRenderer
 from ysdc_dataset_api.utils import (
+    get_file_paths,
     get_gt_trajectory,
     get_track_for_transform,
     get_to_track_frame_transform,
     request_is_valid,
+    scenes_generator,
     transform2dpoints,
 )
 
@@ -45,8 +47,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 worker_info.id, worker_info.num_workers)
 
         def data_gen(_file_paths):
-            for fpath in file_paths:
-                scene = _read_scene_from_file(fpath)
+            for scene in scenes_generator(file_paths):
                 for request in scene.prediction_requests:
                     if not request_is_valid(scene, request):
                         continue
@@ -91,26 +92,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 if self._scene_tags_filter(tags):
                     valid_indices.append(i)
         return [file_paths[i] for i in valid_indices]
-
-
-def get_file_paths(dataset_path):
-    sub_dirs = sorted([
-        os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
-        if os.path.isdir(os.path.join(dataset_path, d))
-    ])
-    res = []
-    for d in sub_dirs:
-        file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
-        res += [os.path.join(d, fname) for fname in file_names]
-    return res
-
-
-def _read_scene_from_file(filepath):
-    with open(filepath, 'rb') as f:
-        scene_serialized = f.read()
-    scene = Scene()
-    scene.ParseFromString(scene_serialized)
-    return scene
 
 
 def _callable_or_trivial_filter(f):
