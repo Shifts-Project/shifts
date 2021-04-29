@@ -9,6 +9,9 @@ from ysdc_dataset_api.utils import (
 )
 
 
+MAX_HISTORY_LENGTH = 25
+
+
 def _create_feature_map(rows, cols, num_channels):
     shape = [num_channels, rows, cols]
     return np.zeros(shape, dtype=np.float32)
@@ -19,12 +22,12 @@ class FeatureMapRendererBase:
             self,
             config,
             feature_map_params,
-            n_history_steps,
+            time_grid_params,
             to_feature_map_tf,
     ):
         self._config = config
         self._feature_map_params = feature_map_params
-        self._n_history_steps = n_history_steps
+        self._history_indices = self._get_history_indices(time_grid_params)
         self._num_channels = self._get_num_channels()
         self._to_feature_map_tf = to_feature_map_tf
 
@@ -34,9 +37,16 @@ class FeatureMapRendererBase:
     def _get_num_channels(self):
         raise NotImplementedError()
 
+    def _get_history_indices(self, time_grid_params):
+        return list(range(
+            -time_grid_params['stop'] - 1,
+            -time_grid_params['start'],
+            time_grid_params['step'],
+        ))
+
     @property
     def n_history_steps(self):
-        return self._n_history_steps
+        return len(self._history_indices)
 
     @property
     def num_channels(self):
@@ -46,7 +56,7 @@ class FeatureMapRendererBase:
         return _create_feature_map(
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
-            self._num_channels * self._n_history_steps,
+            self._num_channels * self.n_history_steps,
         )
 
     def _get_transformed_track_polygon(self, track, transform):
@@ -64,15 +74,15 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         if 'acceleration' in self._config:
             num_channels += 2
-        if 'angular_velocity' in self._config:
+        if 'yaw' in self._config:
             num_channels += 1
         return num_channels
 
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_map()
-        for ts_ind in range(-self.n_history_steps, 0):
+        transform = self._to_feature_map_tf @ to_track_transform
+        for ts_ind in self._history_indices:
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
-                transform = self._to_feature_map_tf @ to_track_transform
                 track_polygon = self._get_transformed_track_polygon(
                     track, transform)
                 for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
@@ -106,7 +116,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
                 track, to_track_transform)
             values.append(acceleration_transformed[0])
             values.append(acceleration_transformed[1])
-        if 'angular_velocity' in self._config:
+        if 'yaw' in self._config:
             values.append(track.yaw)
         return values
 
@@ -122,7 +132,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_map()
-        for ts_ind in range(-self.n_history_steps, 0):
+        for ts_ind in self._history_indices:
             for track in scene.past_pedestrian_tracks[ts_ind].tracks:
                 transform = self._to_feature_map_tf @ to_track_transform
                 track_polygon = self._get_transformed_track_polygon(track, transform)
@@ -195,11 +205,12 @@ class FeatureRenderer:
         renderers = []
         for group in config['renderers_groups']:
             for renderer_config in group['renderers']:
+                time_grid_params = self._validate_time_grid(group['time_grid_params'])
                 renderers.append(
                     self._create_renderer(
                         renderer_config,
                         self._feature_map_params,
-                        group['n_history_steps'],
+                        time_grid_params,
                         self._to_feature_map_tf,
                     )
                 )
@@ -228,3 +239,16 @@ class FeatureRenderer:
             )
         else:
             raise NotImplementedError()
+
+    @staticmethod
+    def _validate_time_grid(time_grid_params):
+        if time_grid_params['start'] < 0:
+            raise ValueError('"start" value must be non-negative.')
+        if time_grid_params['stop'] < 0:
+            raise ValueError('"stop" value must be non-negative')
+        if time_grid_params['start'] > time_grid_params['stop']:
+            raise ValueError('"start" must be less or equal to "stop"')
+        if time_grid_params['stop'] + 1 > MAX_HISTORY_LENGTH:
+            raise ValueError(
+                'Maximum history size is 25. Consider setting "stop" to 24 or less')
+        return time_grid_params
