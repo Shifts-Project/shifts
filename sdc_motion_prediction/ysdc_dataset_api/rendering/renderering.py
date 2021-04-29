@@ -148,7 +148,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
 class FeatureRenderer:
     def __init__(self, config):
-        self._fm_params = config['fm_params']
+        self._feature_map_params = config['feature_map_params']
         self._to_feature_map_tf = self._get_to_feature_map_transform()
 
         self._renderers = self._create_renderers_list(config)
@@ -163,10 +163,14 @@ class FeatureRenderer:
             slice_start = slice_end
         return fm
 
+    @property
+    def to_feature_map_tf(self):
+        return self._to_feature_map_tf
+
     def _get_to_feature_map_transform(self):
-        fm_scale = 1. / self._fm_params['resolution']
-        fm_origin_x = 0.5 * self._fm_params['rows']
-        fm_origin_y = 0.5 * self._fm_params['cols']
+        fm_scale = 1. / self._feature_map_params['resolution']
+        fm_origin_x = 0.5 * self._feature_map_params['rows']
+        fm_origin_y = 0.5 * self._feature_map_params['cols']
         return np.array([
             [fm_scale, 0, 0, fm_origin_x],
             [0, fm_scale, 0, fm_origin_y],
@@ -176,8 +180,8 @@ class FeatureRenderer:
 
     def _create_feature_map(self):
         return _create_feature_map(
-            self._fm_params['rows'],
-            self._fm_params['cols'],
+            self._feature_map_params['rows'],
+            self._feature_map_params['cols'],
             self._num_channels,
         )
 
@@ -189,12 +193,12 @@ class FeatureRenderer:
 
     def _create_renderers_list(self, config):
         renderers = []
-        for group in config['groups']:
+        for group in config['renderers_groups']:
             for renderer_config in group['renderers']:
                 renderers.append(
                     self._create_renderer(
                         renderer_config,
-                        self._fm_params,
+                        self._feature_map_params,
                         group['n_history_steps'],
                         self._to_feature_map_tf,
                     )
