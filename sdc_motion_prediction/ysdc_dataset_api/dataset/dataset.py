@@ -22,11 +22,13 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             dataset_path,
             scene_tags_fpath,
             renderer=None,
+            transform_ground_truth_to_agent_frame=True,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
     ):
         super(MotionPredictionDataset, self).__init__()
         self._renderer = renderer
+        self._transform_ground_truth_to_agent_frame = transform_ground_truth_to_agent_frame
 
         self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
         self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
@@ -56,8 +58,10 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         continue
                     track = get_track_for_transform(scene, request.track_id)
                     to_track_frame_tf = get_to_track_frame_transform(track)
-                    ground_truth_trajectory = transform2dpoints(
-                        get_gt_trajectory(scene, request.track_id), to_track_frame_tf)
+                    ground_truth_trajectory = get_gt_trajectory(scene, request.track_id)
+                    if self._transform_ground_truth_to_agent_frame:
+                        ground_truth_trajectory = transform2dpoints(
+                            ground_truth_trajectory, to_track_frame_tf)
                     result = {
                         'ground_truth_trajectory': ground_truth_trajectory
                     }
