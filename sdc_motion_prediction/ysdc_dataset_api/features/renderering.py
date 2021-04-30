@@ -7,12 +7,13 @@ from ysdc_dataset_api.utils import (
     get_transformed_acceleration,
     transform2dpoints,
 )
+from .producing import FeatureProducerBase
 
 
 MAX_HISTORY_LENGTH = 25
 
 
-def _create_feature_map(rows, cols, num_channels):
+def _create_feature_maps(rows, cols, num_channels):
     shape = [num_channels, rows, cols]
     return np.zeros(shape, dtype=np.float32)
 
@@ -52,8 +53,8 @@ class FeatureMapRendererBase:
     def num_channels(self):
         return self._num_channels
 
-    def _create_feature_map(self):
-        return _create_feature_map(
+    def _create_feature_maps(self):
+        return _create_feature_maps(
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
             self._num_channels * self.n_history_steps,
@@ -79,7 +80,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
         return num_channels
 
     def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_map()
+        feature_map = self._create_feature_maps()
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
@@ -131,7 +132,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
         return num_channels
 
     def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_map()
+        feature_map = self._create_feature_maps()
         for ts_ind in self._history_indices:
             for track in scene.past_pedestrian_tracks[ts_ind].tracks:
                 transform = self._to_feature_map_tf @ to_track_transform
@@ -156,7 +157,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
         return values
 
 
-class FeatureRenderer:
+class FeatureRenderer(FeatureProducerBase):
     def __init__(self, config):
         self._feature_map_params = config['feature_map_params']
         self._to_feature_map_tf = self._get_to_feature_map_transform()
@@ -164,14 +165,16 @@ class FeatureRenderer:
         self._renderers = self._create_renderers_list(config)
         self._num_channels = self._get_num_channels()
 
-    def render_features(self, scene, to_track_frame_tf):
-        fm = self._create_feature_map()
+    def produce_features(self, scene, to_track_frame_tf):
+        feature_maps = self._create_feature_maps()
         slice_start = 0
         for renderer in self._renderers:
             slice_end = slice_start + renderer.num_channels * renderer.n_history_steps
-            fm[slice_start:slice_end, :, :] = renderer.render(scene, to_track_frame_tf)
+            feature_maps[slice_start:slice_end, :, :] = renderer.render(scene, to_track_frame_tf)
             slice_start = slice_end
-        return fm
+        return {
+            'feature_maps': feature_maps,
+        }
 
     @property
     def to_feature_map_tf(self):
@@ -188,8 +191,8 @@ class FeatureRenderer:
             [0, 0, 0, 1],
         ])
 
-    def _create_feature_map(self):
-        return _create_feature_map(
+    def _create_feature_maps(self):
+        return _create_feature_maps(
             self._feature_map_params['rows'],
             self._feature_map_params['cols'],
             self._num_channels,

@@ -1,10 +1,8 @@
 import json
-import os
 
 import torch
 
-from ysdc_dataset_api.proto import Scene, get_tags_from_request
-from ysdc_dataset_api.rendering import FeatureRenderer
+from ysdc_dataset_api.proto import get_tags_from_request
 from ysdc_dataset_api.utils import (
     get_file_paths,
     get_gt_trajectory,
@@ -21,13 +19,13 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             self,
             dataset_path,
             scene_tags_fpath,
-            renderer=None,
+            feature_producer,
             transform_ground_truth_to_agent_frame=True,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
     ):
         super(MotionPredictionDataset, self).__init__()
-        self._renderer = renderer
+        self._feature_producer = feature_producer
         self._transform_ground_truth_to_agent_frame = transform_ground_truth_to_agent_frame
 
         self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
@@ -66,9 +64,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         'ground_truth_trajectory': ground_truth_trajectory
                     }
 
-                    if self._renderer is not None:
-                        result['feature_maps'] = self._renderer.render_features(
-                            scene, to_track_frame_tf)
+                    result.update(self._feature_producer.produce_features(scene, to_track_frame_tf))
                     yield result
 
         return data_gen(file_paths)
