@@ -34,7 +34,7 @@ def get_to_track_frame_transform(track):
     position = np.array([
         track.position.x,
         track.position.y,
-        track.position.z
+        0,
     ])
     yaw = track.yaw
 
@@ -94,9 +94,9 @@ def interpolate(v1, v2, ratio):
 
 def get_transformed_velocity(track, transform):
     vel_vec = np.array([track.linear_velocity.x, track.linear_velocity.y, 0, 1])
-    return (transform @ vel_vec)[:2]
+    return (transform @ vel_vec - transform[:, 3])[:2]
 
 
 def get_transformed_acceleration(track, transform):
     acc_vec = np.array([track.linear_acceleration.x, track.linear_acceleration.y, 0, 1])
-    return (transform @ acc_vec)[:2]
+    return (transform @ acc_vec - transform[:, 3])[:2]
