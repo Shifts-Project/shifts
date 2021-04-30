@@ -1,6 +1,6 @@
 import os
 
-from ysdc_dataset_api.proto import Scene
+from ..proto import Scene
 
 
 def scenes_generator(file_paths):

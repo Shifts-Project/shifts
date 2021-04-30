@@ -3,7 +3,7 @@ import math
 import numpy as np
 import transforms3d as tf
 
-from ysdc_dataset_api.proto import PedestrianTrack, VehicleTrack
+from ..proto import PedestrianTrack, VehicleTrack
 
 
 def get_track_polygon(track):

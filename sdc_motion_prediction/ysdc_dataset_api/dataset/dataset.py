@@ -2,8 +2,8 @@ import json
 
 import torch
 
-from ysdc_dataset_api.proto import get_tags_from_request
-from ysdc_dataset_api.utils import (
+from ..proto import get_tags_from_request
+from ..utils import (
     get_file_paths,
     get_gt_trajectory,
     get_track_for_transform,

@@ -1,7 +1,7 @@
 import numpy as np
 import transforms3d as tf
 
-from ysdc_dataset_api.proto import VehicleTrack
+from ..proto import VehicleTrack
 
 
 def get_track_for_transform(scene, track_id, timestamp=-1):

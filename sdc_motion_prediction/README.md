@@ -8,7 +8,7 @@ Package includes following utilities:
 - Base class for feature producing. Provides interface used inside pytorch style dataset:
     - [ysdc_dataset_api.features.producing.FeatureProducerBase](ysdc_dataset_api/features/producing.py#L7)
 - Renderer class, implementing FeatureProducerBase interface. Renders input scene to multichannel image according to specified config:
-    - [ysdc_dataset_api.features.renderering.FeatureRenderer](ysdc_dataset_api/features/renderering.py#L160)
+    - [ysdc_dataset_api.features.rendering.FeatureRenderer](ysdc_dataset_api/features/rendering.py#L160)
 - Pytorch-style dataset for iterating over scenes and individual agents:
     - [ysdc_dataset_api.dataset.dataset.MotionPredictionDataset](ysdc_dataset_api/dataset/dataset.py#L17)
 

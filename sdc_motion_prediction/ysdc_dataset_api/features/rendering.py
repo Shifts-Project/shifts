@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
 
-from ysdc_dataset_api.utils import (
+from .producing import FeatureProducerBase
+from ..utils import (
     get_track_polygon,
     get_transformed_velocity,
     get_transformed_acceleration,
     transform2dpoints,
 )
-from .producing import FeatureProducerBase
 
 
 MAX_HISTORY_LENGTH = 25
