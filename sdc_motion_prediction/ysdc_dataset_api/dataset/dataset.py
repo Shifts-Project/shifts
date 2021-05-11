@@ -1,15 +1,15 @@
 import json
-import os
 
 import torch
 
-from sdc_motion_prediction.ysdc_dataset_api.proto import Scene, get_tags_from_request
-from sdc_motion_prediction.ysdc_dataset_api import FeatureRenderer
-from sdc_motion_prediction.ysdc_dataset_api import (
+from ..proto import get_tags_from_request
+from ..utils import (
+    get_file_paths,
     get_gt_trajectory,
     get_track_for_transform,
     get_to_track_frame_transform,
     request_is_valid,
+    scenes_generator,
     transform2dpoints,
 )
 
@@ -19,12 +19,14 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             self,
             dataset_path,
             scene_tags_fpath,
-            renderer_config=None,
+            feature_producer,
+            transform_ground_truth_to_agent_frame=True,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
     ):
         super(MotionPredictionDataset, self).__init__()
-        self._renderer = FeatureRenderer(renderer_config)
+        self._feature_producer = feature_producer
+        self._transform_ground_truth_to_agent_frame = transform_ground_truth_to_agent_frame
 
         self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
         self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
@@ -45,8 +47,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 worker_info.id, worker_info.num_workers)
 
         def data_gen(_file_paths):
-            for fpath in file_paths:
-                scene = _read_scene_from_file(fpath)
+            for scene in scenes_generator(file_paths):
                 for request in scene.prediction_requests:
                     if not request_is_valid(scene, request):
                         continue
@@ -55,14 +56,16 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         continue
                     track = get_track_for_transform(scene, request.track_id)
                     to_track_frame_tf = get_to_track_frame_transform(track)
-                    feature_maps = self._renderer.render_features(
-                        scene, to_track_frame_tf)
-                    gt_trajectory = transform2dpoints(
-                        get_gt_trajectory(scene, request.track_id), to_track_frame_tf)
-                    yield {
-                        'feature_maps': feature_maps,
-                        'gt_trajectory': gt_trajectory,
+                    ground_truth_trajectory = get_gt_trajectory(scene, request.track_id)
+                    if self._transform_ground_truth_to_agent_frame:
+                        ground_truth_trajectory = transform2dpoints(
+                            ground_truth_trajectory, to_track_frame_tf)
+                    result = {
+                        'ground_truth_trajectory': ground_truth_trajectory
                     }
+
+                    result.update(self._feature_producer.produce_features(scene, to_track_frame_tf))
+                    yield result
 
         return data_gen(file_paths)
 
@@ -91,26 +94,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 if self._scene_tags_filter(tags):
                     valid_indices.append(i)
         return [file_paths[i] for i in valid_indices]
-
-
-def get_file_paths(dataset_path):
-    sub_dirs = sorted([
-        os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
-        if os.path.isdir(os.path.join(dataset_path, d))
-    ])
-    res = []
-    for d in sub_dirs:
-        file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
-        res += [os.path.join(d, fname) for fname in file_names]
-    return res
-
-
-def _read_scene_from_file(filepath):
-    with open(filepath, 'rb') as f:
-        scene_serialized = f.read()
-    scene = Scene()
-    scene.ParseFromString(scene_serialized)
-    return scene
 
 
 def _callable_or_trivial_filter(f):
