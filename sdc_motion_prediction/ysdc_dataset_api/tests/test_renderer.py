@@ -22,6 +22,27 @@ TEST_CONFIG = {
                 {'pedestrians': ['occupancy', 'velocity']},
             ]
         },
+        {
+            'time_grid_params': {
+                'start': 0,
+                'stop': 0,
+                'step': 1,
+            },
+            'renderers': [
+                {
+                    'road_graph': [
+                        'crosswalk_availability',
+                        'crosswalk_occupancy',
+                        # 'lane_availability',
+                        'lane_direction',
+                        'lane_occupancy',
+                        'lane_priority',
+                        'lane_speed_limit',
+                        'road_polygons',
+                    ]
+                }
+            ]
+        }
     ]
 }
 
