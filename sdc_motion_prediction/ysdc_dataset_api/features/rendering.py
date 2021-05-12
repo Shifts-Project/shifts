@@ -1,3 +1,5 @@
+import math
+
 import cv2
 import numpy as np
 
@@ -8,6 +10,7 @@ from ..utils import (
     get_transformed_acceleration,
     transform2dpoints,
 )
+from ..utils.map import get_crosswalk_availability, get_polygon
 
 
 MAX_HISTORY_LENGTH = 25
@@ -133,9 +136,9 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_maps()
+        transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
             for track in scene.past_pedestrian_tracks[ts_ind].tracks:
-                transform = self._to_feature_map_tf @ to_track_transform
                 track_polygon = self._get_transformed_track_polygon(track, transform)
                 for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
                     cv2.fillPoly(
@@ -154,6 +157,170 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             velocity_transformed = get_transformed_velocity(track, to_track_transform)
             values.append(velocity_transformed[0])
             values.append(velocity_transformed[1])
+        return values
+
+
+class RoadGraphRenderer(FeatureMapRendererBase):
+    def render(self, scene, to_track_transform):
+        feature_map = self._create_feature_maps()
+        transform = self._to_feature_map_tf @ to_track_transform
+        path_graph = scene.path_graph
+        for channel_ind in range(len(self._history_indices)):
+            traffic_light_sections = scene.traffic_lights[self._history_indices[channel_ind]]
+            if self._get_crosswalk_feature_map_size() > 0:
+                self._render_crosswalks(
+                    feature_map[self._get_crosswalk_feature_map_slice(channel_ind), :, :],
+                    path_graph,
+                    traffic_light_sections,
+                    transform,
+                )
+            if self._get_lane_feature_map_size() > 0:
+                self._render_lanes(
+                    feature_map[self._get_lanes_feature_map_slice(channel_ind), :, :],
+                    path_graph,
+                    traffic_light_sections,
+                    transform,
+                )
+            if self._get_road_feature_map_size() > 0:
+                self._render_road_polygons(
+                    feature_map[self._get_road_polygon_feature_map_slice(channel_ind), :, :],
+                    path_graph,
+                    transform,
+                )
+        return feature_map
+
+    def _render_crosswalks(self, feature_map, path_graph, traffic_light_sections, transform):
+        for crosswalk in path_graph.crosswalks:
+            polygon = get_polygon(crosswalk.geometry)
+            polygon = transform2dpoints(polygon, transform)
+            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+            for i, v in enumerate(self._get_crosswalk_feature_map_values(
+                    crosswalk, traffic_light_sections)):
+                cv2.fillPoly(
+                    feature_map[i, :, :],
+                    polygon,
+                    v,
+                    lineType=cv2.LINE_AA,
+                )
+
+    def _render_lanes(self, feature_map, path_graph, traffic_light_sections, transform):
+        for lane in path_graph.lanes:
+            lane_centers = transform2dpoints(
+                np.array([[p.x, p.y] for p in lane.centers]),
+                transform
+            )
+            lane_centers = np.around(lane_centers - 0.5).astype(np.int32)
+            for i in range(1, len(lane_centers)):
+                # import pdb; pdb.set_trace()
+                for channel, value in enumerate(self._get_lane_feature_map_values(
+                        lane_centers[i-1], lane_centers[i], lane)):
+                    cv2.polylines(
+                        feature_map[channel, :, :],
+                        [lane_centers],
+                        isClosed=False,
+                        color=value,
+                        thickness=1,
+                        lineType=cv2.LINE_AA,
+                    )
+
+    def _render_road_polygons(self, feature_map, path_graph, transform):
+        for road_polygon in path_graph.road_polygons:
+            polygon = get_polygon(road_polygon.geometry)
+            polygon = transform2dpoints(polygon, transform)
+            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
+            for i, v in enumerate(self._get_road_polygon_feature_map_values()):
+                cv2.fillPoly(
+                    feature_map[i, :, :],
+                    polygon,
+                    v,
+                    lineType=cv2.LINE_AA,
+                )
+
+    def _get_num_channels(self):
+        return (
+            self._get_crosswalk_feature_map_size() +
+            self._get_lane_feature_map_size() +
+            self._get_road_feature_map_size()
+        )
+
+    def _get_crosswalk_feature_map_size(self):
+        num_channels = 0
+        if 'crosswalk_occupancy' in self._config:
+            num_channels += 1
+        if 'crosswalk_availability' in self._config:
+            num_channels += 1
+        return num_channels
+
+    def _get_crosswalk_feature_map_slice(self, ts_ind):
+        return slice(
+            ts_ind * self.num_channels,
+            ts_ind * self.num_channels + self._get_crosswalk_feature_map_size()
+        )
+
+    def _get_crosswalk_feature_map_values(self, crosswalk, traffic_light_sections):
+        values = []
+        if 'crosswalk_occupancy' in self._config:
+            values.append(1.)
+        if 'crosswalk_avalability' in self._config:
+            values.append(get_crosswalk_availability(crosswalk, traffic_light_sections))
+        return values
+
+    def _get_lane_feature_map_size(self):
+        num_channels = 0
+        if 'lane_availability' in self._config:
+            raise NotImplementedError()
+            num_channels += 1
+        if 'lane_direction' in self._config:
+            num_channels += 1
+        if 'lane_occupancy' in self._config:
+            num_channels += 1
+        if 'lane_priority' in self._config:
+            num_channels += 1
+        if 'lane_speed_limit' in self._config:
+            num_channels += 1
+        return num_channels
+
+    def _get_lanes_feature_map_slice(self, ts_ind):
+        offset = (
+            ts_ind * self._num_channels +
+            self._get_crosswalk_feature_map_size()
+        )
+        return slice(offset, offset + self._get_lane_feature_map_size())
+
+    def _get_lane_feature_map_values(self, segment_start, segment_end, lane, some_tl_info=None):
+        values = []
+        if 'lane_availability' in self._config:
+            raise NotImplementedError()
+        if 'lane_direction' in self._config:
+            values.append(
+                math.atan2(segment_end[1] - segment_start[1], segment_end[0] - segment_start[0])
+            )
+        if 'lane_occupancy' in self._config:
+            values.append(1.0)
+        if 'lane_priority' in self._config:
+            values.append(float(lane.gives_way_to_some_lane))
+        if 'lane_speed_limit' in self._config:
+            values.append(lane.max_velocity / 15.0)
+        return values
+
+    def _get_road_feature_map_size(self):
+        num_channels = 0
+        if 'road_polygons' in self._config:
+            num_channels += 1
+        return num_channels
+
+    def _get_road_polygon_feature_map_slice(self, ts_ind):
+        offset = (
+            ts_ind * self._num_channels +
+            self._get_crosswalk_feature_map_size() +
+            self._get_lane_feature_map_size()
+        )
+        return slice(offset, offset + self._get_road_feature_map_size())
+
+    def _get_road_polygon_feature_map_values(self):
+        values = []
+        if 'road_polygons' in self._config:
+            values.append(1.0)
         return values
 
 
@@ -239,6 +406,13 @@ class FeatureRenderer(FeatureProducerBase):
                 feature_map_params,
                 n_history_steps,
                 to_feature_map_tf
+            )
+        elif 'road_graph' in config:
+            return RoadGraphRenderer(
+                config['road_graph'],
+                feature_map_params,
+                n_history_steps,
+                to_feature_map_tf,
             )
         else:
             raise NotImplementedError()
