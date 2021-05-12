@@ -211,9 +211,8 @@ class RoadGraphRenderer(FeatureMapRendererBase):
             )
             lane_centers = np.around(lane_centers - 0.5).astype(np.int32)
             for i in range(1, len(lane_centers)):
-                # import pdb; pdb.set_trace()
                 for channel, value in enumerate(self._get_lane_feature_map_values(
-                        lane_centers[i-1], lane_centers[i], lane)):
+                        lane_centers[i-1], lane_centers[i], lane, traffic_light_sections)):
                     cv2.polylines(
                         feature_map[channel, :, :],
                         [lane_centers],
@@ -287,7 +286,8 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         )
         return slice(offset, offset + self._get_lane_feature_map_size())
 
-    def _get_lane_feature_map_values(self, segment_start, segment_end, lane, some_tl_info=None):
+    def _get_lane_feature_map_values(
+            self, segment_start, segment_end, lane, traffic_light_sections):
         values = []
         if 'lane_availability' in self._config:
             raise NotImplementedError()
