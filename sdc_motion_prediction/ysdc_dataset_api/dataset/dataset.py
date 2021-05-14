@@ -12,6 +12,7 @@ from ..utils import (
     scenes_generator,
     transform2dpoints,
 )
+from typing import Optional, List
 
 
 class MotionPredictionDataset(torch.utils.data.IterableDataset):
@@ -23,6 +24,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             transform_ground_truth_to_agent_frame=True,
             scene_tags_filter=None,
             trajectory_tags_filter=None,
+            pre_filtered_scene_file_paths: Optional[List[str]] = None,
     ):
         super(MotionPredictionDataset, self).__init__()
         self._feature_producer = feature_producer
@@ -31,13 +33,19 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
         self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
 
-        self._scene_file_paths = self._filter_paths(
-            get_file_paths(dataset_path), scene_tags_fpath)
+        if pre_filtered_scene_file_paths is not None:
+            print('Building MotionPredictionDataset with pre-filtered '
+                  'scene file paths.')
+            self._scene_file_paths = pre_filtered_scene_file_paths
+        else:
+            self._scene_file_paths = self._filter_paths(
+                get_file_paths(dataset_path), scene_tags_fpath)
 
     @property
     def num_scenes(self):
         return len(self._scene_file_paths)
 
+    # @profile
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is None:
@@ -46,6 +54,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             file_paths = self._split_filepaths_by_worker(
                 worker_info.id, worker_info.num_workers)
 
+        # @profile
         def data_gen(_file_paths):
             for scene in scenes_generator(file_paths):
                 for request in scene.prediction_requests:
@@ -93,6 +102,10 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 tags = json.loads(line.strip())
                 if self._scene_tags_filter(tags):
                     valid_indices.append(i)
+
+        print(
+            f'{len(valid_indices)}/{len(file_paths)} '
+            f'scenes fit the filter criteria.')
         return [file_paths[i] for i in valid_indices]
 
 

@@ -82,6 +82,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 1
         return num_channels
 
+    # @profile
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_maps()
         transform = self._to_feature_map_tf @ to_track_transform
@@ -134,6 +135,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         return num_channels
 
+    # @profile
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_maps()
         transform = self._to_feature_map_tf @ to_track_transform
@@ -161,6 +163,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):
+    # @profile
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_maps()
         transform = self._to_feature_map_tf @ to_track_transform
@@ -332,6 +335,7 @@ class FeatureRenderer(FeatureProducerBase):
         self._renderers = self._create_renderers_list(config)
         self._num_channels = self._get_num_channels()
 
+    # @profile
     def produce_features(self, scene, to_track_frame_tf):
         feature_maps = self._create_feature_maps()
         slice_start = 0

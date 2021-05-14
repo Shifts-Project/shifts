@@ -3,7 +3,7 @@ import transforms3d as tf
 
 from ..proto import VehicleTrack
 
-
+# @profile
 def get_track_for_transform(scene, track_id, timestamp=-1):
     track, offset = get_last_track_offset(scene, track_id)
     if offset < -1:
@@ -29,7 +29,7 @@ def get_first_gt_track_value(scene, track_id):
     raise ValueError(
         f'future track for track_id {track_id} was not found in scene {scene.id}')
 
-
+# @profile
 def get_to_track_frame_transform(track):
     position = np.array([
         track.position.x,
@@ -49,7 +49,7 @@ def get_to_track_frame_transform(track):
     transform = np.linalg.inv(transform)
     return transform
 
-
+# @profile
 def transform2dpoints(points, transform):
     ph = np.zeros((points.shape[0], 4))
     ph[:, :2] = points

@@ -23,7 +23,7 @@ def get_track_polygon(track):
     poly.append(position + front + left)
     return np.array(poly)
 
-
+# @profile
 def get_gt_trajectory(scene, track_id):
     horizon = len(scene.future_vehicle_tracks)
     ph = np.zeros((horizon, 2), dtype=np.float32)

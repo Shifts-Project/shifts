@@ -1,0 +1,68 @@
+SPLIT_TO_DATASET_PATH = {
+    'train': '/train/',
+    'validation': '/validation/',
+    'test': '/test/'
+}
+SPLIT_TO_SCENE_TAGS_PATH = {
+    'train': '/train_tags.txt',
+    'validation': '/validation_tags.txt',
+    'test': '/test_tags.txt'
+}
+
+RENDERER_CONFIG = {
+    # parameters of feature maps to render
+    'feature_map_params': {
+        'rows': 400,
+        'cols': 400,
+        'resolution': 0.25,  # number of meters in one pixel
+    },
+    'renderers_groups': [
+        # Having several feature map groups
+        # allows to independently render feature maps with different history length.
+        # This could be useful to render static features (road graph, etc.) once.
+        {
+            # start: int, first timestamp into the past to render, 0 – prediction time
+            # stop: int, last timestamp to render inclusively, 24 – farthest known point into the past
+            # step: int, grid step size,
+            #            step=1 renders all points between start and stop,
+            #            step=2 renders every second point, etc.
+            'time_grid_params': {
+                'start': 0,
+                'stop': 0,
+                'step': 1,
+            },
+            'renderers': [
+                # each value is rendered at its own channel
+                # occupancy -- 1 channel
+                # velocity -- 2 channels (x, y)
+                # acceleration -- 2 channels (x, y)
+                # yaw -- 1 channel
+                {'vehicles': ['occupancy', 'velocity', 'acceleration', 'yaw']},
+                # only occupancy and velocity are available for pedestrians
+                {'pedestrians': ['occupancy', 'velocity']},
+            ]
+        },
+        # TODO: add back in if/when road graph is faster to render.
+        # {
+        #     'time_grid_params': {
+        #         'start': 0,
+        #         'stop': 0,
+        #         'step': 1,
+        #     },
+        #     'renderers': [
+        #         {
+        #             'road_graph': [
+        #                 'crosswalk_occupancy',
+        #                 'crosswalk_availability',
+        #                 # 'lane_availability',  # Currently unavailable due to problem in dataset
+        #                 'lane_direction',
+        #                 'lane_occupancy',
+        #                 'lane_priority',
+        #                 'lane_speed_limit',
+        #                 'road_polygons',
+        #             ]
+        #         }
+        #     ]
+        # }
+    ]
+}

@@ -8,7 +8,7 @@ def scenes_generator(file_paths):
         scene = read_scene_from_file(fpath)
         yield scene
 
-
+# @profile
 def read_scene_from_file(filepath):
     with open(filepath, 'rb') as f:
         scene_serialized = f.read()
