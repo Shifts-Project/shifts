@@ -268,12 +268,9 @@ class RoadGraphRenderer(FeatureMapRendererBase):
 
     def _render_lane_priority(self, feature_map, lane_centers, path_graph):
         non_priority_lanes = []
-        priority_lanes = []
         for i, lane in enumerate(path_graph.lanes):
             if lane.gives_way_to_some_lane:
                 non_priority_lanes.append(lane_centers[i])
-            else:
-                priority_lanes.append(lane_centers[i])
         cv2.polylines(
             feature_map,
             non_priority_lanes,
