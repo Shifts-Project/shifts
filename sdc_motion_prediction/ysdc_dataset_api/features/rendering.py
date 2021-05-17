@@ -72,7 +72,32 @@ class FeatureMapRendererBase:
         return polygon
 
 
-class VehicleTracksRenderer(FeatureMapRendererBase):
+class TrackRendererBase(FeatureMapRendererBase):
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        raise NotImplementedError
+
+    def render(self, feature_map, scene, to_track_transform):
+        transform = self._to_feature_map_tf @ to_track_transform
+        for ts_ind in self._history_indices:
+            tracks_at_frame = self._get_tracks_at_timestamp(scene, ts_ind)
+            if not tracks_at_frame:
+                continue
+            polygons = get_tracks_polygons(tracks_at_frame)
+            polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
+            polygons = np.around(polygons - 0.5).astype(np.int32)
+
+            for i, track in enumerate(tracks_at_frame):
+                for j, v in enumerate(self._get_fm_values(track, to_track_transform)):
+                    cv2.fillPoly(
+                        feature_map[ts_ind * self.num_channels + j, :, :],
+                        [polygons[i]],
+                        v,
+                        lineType=cv2.LINE_AA,
+                    )
+        return feature_map
+
+
+class VehicleTracksRenderer(TrackRendererBase):
     def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._config:
@@ -85,24 +110,10 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 1
         return num_channels
 
-    def render(self, feature_map, scene, to_track_transform):
-        transform = self._to_feature_map_tf @ to_track_transform
-        for ts_ind in self._history_indices:
-            tracks_at_frame = [track for track in scene.past_vehicle_tracks[ts_ind].tracks]
-            tracks_at_frame.append(scene.past_ego_track[ts_ind])
-            polygons = get_tracks_polygons(tracks_at_frame)
-            polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
-            polygons = np.around(polygons - 0.5).astype(np.int32)
-
-            for i, track in enumerate(scene.past_vehicle_tracks[ts_ind].tracks):
-                for j, v in enumerate(self._get_fm_values(track, to_track_transform)):
-                    cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + j, :, :],
-                        [polygons[i]],
-                        v,
-                        lineType=cv2.LINE_AA,
-                    )
-        return feature_map
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        return [
+            track for track in scene.past_vehicle_tracks[ts_ind].tracks
+        ] + [scene.past_ego_track[ts_ind]]
 
     def _get_fm_values(self, track, to_track_transform):
         values = []
@@ -122,7 +133,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
         return values
 
 
-class PedestrianTracksRenderer(FeatureMapRendererBase):
+class PedestrianTracksRenderer(TrackRendererBase):
     def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._config:
@@ -131,19 +142,10 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         return num_channels
 
-    def render(self, feature_map, scene, to_track_transform):
-        transform = self._to_feature_map_tf @ to_track_transform
-        for ts_ind in self._history_indices:
-            for track in scene.past_pedestrian_tracks[ts_ind].tracks:
-                track_polygon = self._get_transformed_track_polygon(track, transform)
-                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
-                    cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + i, :, :],
-                        track_polygon,
-                        v,
-                        lineType=cv2.LINE_AA,
-                    )
-        return feature_map
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        return [
+            track for track in scene.past_pedestrian_tracks[ts_ind].tracks
+        ]
 
     def _get_fm_values(self, track, to_track_transform):
         values = []
