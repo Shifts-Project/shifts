@@ -1,4 +1,5 @@
 import math
+from collections import defaultdict
 
 import cv2
 import numpy as np
@@ -64,7 +65,8 @@ class FeatureMapRendererBase:
         )
 
     def _get_transformed_track_polygon(self, track, transform):
-        polygon = transform2dpoints(get_track_polygon(track), transform)
+        polygon = get_track_polygon(track)
+        polygon = transform2dpoints(polygon, transform)
         polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
         return polygon
 
@@ -161,6 +163,9 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):
+    LINE_TYPE = cv2.LINE_AA
+    LINE_THICKNESS = 1
+
     def render(self, scene, to_track_transform):
         feature_map = self._create_feature_maps()
         transform = self._to_feature_map_tf @ to_track_transform
@@ -200,27 +205,97 @@ class RoadGraphRenderer(FeatureMapRendererBase):
                     feature_map[i, :, :],
                     polygon,
                     v,
-                    lineType=cv2.LINE_AA,
+                    lineType=self.LINE_TYPE,
                 )
 
     def _render_lanes(self, feature_map, path_graph, traffic_light_sections, transform):
+        lane_lengths = []
+        lane_centers_concatenated = []
         for lane in path_graph.lanes:
-            lane_centers = transform2dpoints(
-                np.array([[p.x, p.y] for p in lane.centers]),
-                transform
+            lane_lengths.append(len(lane.centers))
+            for p in lane.centers:
+                lane_centers_concatenated.append([p.x, p.y])
+        lane_centers_concatenated = np.array(lane_centers_concatenated, dtype=np.float32)
+        lane_centers_concatenated = transform2dpoints(lane_centers_concatenated, transform)
+        lane_centers_concatenated = np.around(lane_centers_concatenated - 0.5).astype(np.int32)
+
+        lane_centers = []
+        bounds = [0] + np.cumsum(lane_lengths).tolist()
+
+        for i in range(1, len(bounds)):
+            lane_centers.append(lane_centers_concatenated[bounds[i - 1]:bounds[i]])
+
+        channel = 0
+        if 'lane_availability' in self._config:
+            raise NotImplementedError
+            channel += 1
+        if 'lane_direction' in self._config:
+            self._render_lane_direction(feature_map[channel, ...], lane_centers)
+            channel += 1
+        if 'lane_occupancy' in self._config:
+            self._render_lane_occupancy(feature_map[channel, ...], lane_centers)
+            channel += 1
+        if 'lane_priority' in self._config:
+            self._render_lane_priority(feature_map[channel, ...], lane_centers, path_graph)
+            channel += 1
+        if 'lane_speed_limit' in self._config:
+            self._render_lane_speed_limit(feature_map[channel, ...], lane_centers, path_graph)
+            channel += 1
+
+    def _render_lane_direction(self, feature_map, lane_centers):
+        for lane in lane_centers:
+            for i in range(1, lane.shape[0]):
+                p1 = (lane[i - 1, 0], lane[i - 1, 1])
+                p2 = (lane[i, 0], lane[i, 1])
+                cv2.line(
+                    feature_map,
+                    p1,
+                    p2,
+                    math.atan2(p2[1] - p1[1], p2[0] - p1[0]),
+                    thickness=self.LINE_THICKNESS,
+                    lineType=self.LINE_TYPE,
+                )
+
+    def _render_lane_occupancy(self, feature_map, lane_centers):
+        cv2.polylines(
+            feature_map,
+            lane_centers,
+            isClosed=False,
+            color=1.,
+            thickness=self.LINE_THICKNESS,
+            lineType=self.LINE_TYPE,
+        )
+
+    def _render_lane_priority(self, feature_map, lane_centers, path_graph):
+        non_priority_lanes = []
+        priority_lanes = []
+        for i, lane in enumerate(path_graph.lanes):
+            if lane.gives_way_to_some_lane:
+                non_priority_lanes.append(lane_centers[i])
+            else:
+                priority_lanes.append(lane_centers[i])
+        cv2.polylines(
+            feature_map,
+            non_priority_lanes,
+            isClosed=False,
+            color=1.,
+            thickness=self.LINE_THICKNESS,
+            lineType=self.LINE_TYPE,
+        )
+
+    def _render_lane_speed_limit(self, feature_map, lane_centers, path_graph):
+        limit_to_lanes = defaultdict(list)
+        for i, lane in enumerate(path_graph.lanes):
+            limit_to_lanes[lane.max_velocity].append(lane_centers[i])
+        for limit, lanes in limit_to_lanes.items():
+            cv2.polylines(
+                feature_map,
+                lanes,
+                isClosed=False,
+                color=limit / 15.0,
+                thickness=self.LINE_THICKNESS,
+                lineType=self.LINE_TYPE,
             )
-            lane_centers = np.around(lane_centers - 0.5).astype(np.int32)
-            for i in range(1, len(lane_centers)):
-                for channel, value in enumerate(self._get_lane_feature_map_values(
-                        lane_centers[i-1], lane_centers[i], lane, traffic_light_sections)):
-                    cv2.polylines(
-                        feature_map[channel, :, :],
-                        [lane_centers],
-                        isClosed=False,
-                        color=value,
-                        thickness=1,
-                        lineType=cv2.LINE_AA,
-                    )
 
     def _render_road_polygons(self, feature_map, path_graph, transform):
         for road_polygon in path_graph.road_polygons:
@@ -232,7 +307,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
                     feature_map[i, :, :],
                     polygon,
                     v,
-                    lineType=cv2.LINE_AA,
+                    lineType=self.LINE_TYPE,
                 )
 
     def _get_num_channels(self):
@@ -285,23 +360,6 @@ class RoadGraphRenderer(FeatureMapRendererBase):
             self._get_crosswalk_feature_map_size()
         )
         return slice(offset, offset + self._get_lane_feature_map_size())
-
-    def _get_lane_feature_map_values(
-            self, segment_start, segment_end, lane, traffic_light_sections):
-        values = []
-        if 'lane_availability' in self._config:
-            raise NotImplementedError()
-        if 'lane_direction' in self._config:
-            values.append(
-                math.atan2(segment_end[1] - segment_start[1], segment_end[0] - segment_start[0])
-            )
-        if 'lane_occupancy' in self._config:
-            values.append(1.0)
-        if 'lane_priority' in self._config:
-            values.append(float(lane.gives_way_to_some_lane))
-        if 'lane_speed_limit' in self._config:
-            values.append(lane.max_velocity / 15.0)
-        return values
 
     def _get_road_feature_map_size(self):
         num_channels = 0
