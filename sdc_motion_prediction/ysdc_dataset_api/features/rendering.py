@@ -36,7 +36,7 @@ class FeatureMapRendererBase:
         self._num_channels = self._get_num_channels()
         self._to_feature_map_tf = to_feature_map_tf
 
-    def render(self, scene, to_track_transform):
+    def render(self, feature_map, scene, to_track_transform):
         raise NotImplementedError()
 
     def _get_num_channels(self):
@@ -84,8 +84,7 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 1
         return num_channels
 
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
+    def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
             for track in scene.past_vehicle_tracks[ts_ind].tracks:
@@ -136,8 +135,7 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         return num_channels
 
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
+    def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
             for track in scene.past_pedestrian_tracks[ts_ind].tracks:
@@ -166,8 +164,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
     LINE_TYPE = cv2.LINE_AA
     LINE_THICKNESS = 1
 
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
+    def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         path_graph = scene.path_graph
         for channel_ind in range(len(self._history_indices)):
@@ -392,7 +389,7 @@ class FeatureRenderer(FeatureProducerBase):
         slice_start = 0
         for renderer in self._renderers:
             slice_end = slice_start + renderer.num_channels * renderer.n_history_steps
-            feature_maps[slice_start:slice_end, :, :] = renderer.render(scene, to_track_frame_tf)
+            renderer.render(feature_maps[slice_start:slice_end, :, :], scene, to_track_frame_tf)
             slice_start = slice_end
         return {
             'feature_maps': feature_maps,
