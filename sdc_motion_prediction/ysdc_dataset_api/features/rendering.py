@@ -7,6 +7,7 @@ import numpy as np
 from .producing import FeatureProducerBase
 from ..utils import (
     get_track_polygon,
+    get_tracks_polygons,
     get_transformed_velocity,
     get_transformed_acceleration,
     transform2dpoints,
@@ -87,25 +88,20 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
     def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
-            for track in scene.past_vehicle_tracks[ts_ind].tracks:
-                track_polygon = self._get_transformed_track_polygon(
-                    track, transform)
-                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
+            tracks_at_frame = [track for track in scene.past_vehicle_tracks[ts_ind].tracks]
+            tracks_at_frame.append(scene.past_ego_track[ts_ind])
+            polygons = get_tracks_polygons(tracks_at_frame)
+            polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
+            polygons = np.around(polygons - 0.5).astype(np.int32)
+
+            for i, track in enumerate(scene.past_vehicle_tracks[ts_ind].tracks):
+                for j, v in enumerate(self._get_fm_values(track, to_track_transform)):
                     cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + i, :, :],
-                        track_polygon,
+                        feature_map[ts_ind * self.num_channels + j, :, :],
+                        [polygons[i]],
                         v,
                         lineType=cv2.LINE_AA,
                     )
-            ego_track = scene.past_ego_track[ts_ind]
-            ego_track_polygon = self._get_transformed_track_polygon(ego_track, transform)
-            for i, v in enumerate(self._get_fm_values(ego_track, to_track_transform)):
-                cv2.fillPoly(
-                    feature_map[ts_ind * self.num_channels + i, :, :],
-                    ego_track_polygon,
-                    v,
-                    lineType=cv2.LINE_AA,
-                )
         return feature_map
 
     def _get_fm_values(self, track, to_track_transform):
