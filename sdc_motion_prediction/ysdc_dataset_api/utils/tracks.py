@@ -40,7 +40,7 @@ def get_tracks_polygons(tracks):
     s = np.sin(yaws)
     c = np.cos(yaws)
     rotations = np.moveaxis(np.array([[c, s], [-s, c]]), 2, 0)
-    return boxes @ rotations + origins[:, np.newaxis, :]
+    return (boxes @ rotations + origins[:, np.newaxis, :]).astype(np.float32)
 
 
 def track_box(track):

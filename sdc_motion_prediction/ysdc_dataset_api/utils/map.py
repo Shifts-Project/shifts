@@ -4,7 +4,7 @@ from ..proto.map_pb2 import MovementType
 
 
 def get_polygon(geometry):
-    poly = np.zeros((len(geometry.points), 2))
+    poly = np.zeros((len(geometry.points), 2), dtype=np.float32)
     for i, point in enumerate(geometry.points):
         poly[i, 0] = point.x
         poly[i, 1] = point.y

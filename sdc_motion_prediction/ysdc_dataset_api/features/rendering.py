@@ -406,7 +406,7 @@ class FeatureRenderer(FeatureProducerBase):
             [0, fm_scale, 0, fm_origin_y],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
-        ])
+        ], dtype=np.float32)
 
     def _create_feature_maps(self):
         return _create_feature_maps(

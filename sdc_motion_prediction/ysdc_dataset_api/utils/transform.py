@@ -1,3 +1,4 @@
+import numba
 import numpy as np
 import transforms3d as tf
 
@@ -46,12 +47,13 @@ def get_to_track_frame_transform(track):
 
     rotation = tf.euler.euler2mat(0, 0, yaw)
     transform = tf.affines.compose(position, rotation, np.ones(3))
-    transform = np.linalg.inv(transform)
+    transform = np.linalg.inv(transform).astype(np.float32)
     return transform
 
 
+@numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
 def transform2dpoints(points, transform):
-    ph = np.zeros((points.shape[0], 4))
+    ph = np.zeros((points.shape[0], 4), dtype=np.float32)
     ph[:, :2] = points
     ph[:, 3] = np.ones(points.shape[0])
     ph = np.transpose(ph)
