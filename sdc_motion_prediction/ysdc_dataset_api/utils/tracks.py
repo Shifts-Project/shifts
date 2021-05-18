@@ -33,14 +33,22 @@ def get_gt_trajectory(scene, track_id):
 
 
 def get_tracks_polygons(tracks):
-    boxes = np.array([track_box(track) for track in tracks])
-    origins = np.array([[track.position.x, track.position.y] for track in tracks])
+    box_base = (np.asarray([[1, 1], [1, -1], [-1, -1], [-1, 1]]) * 0.5)[np.newaxis, ...]
+    dims = np.asarray(
+        [[track.dimensions.x, track.dimensions.y] for track in tracks]
+    )[:, np.newaxis, :]
+    boxes = box_base * dims
 
-    yaws = np.array([track_yaw(track) for track in tracks])
+    origins = np.asarray(
+        [[track.position.x, track.position.y] for track in tracks]
+    )[:, np.newaxis, :]
+
+    yaws = np.asarray([track_yaw(track) for track in tracks])
     s = np.sin(yaws)
     c = np.cos(yaws)
-    rotations = np.moveaxis(np.array([[c, s], [-s, c]]), 2, 0)
-    return (boxes @ rotations + origins[:, np.newaxis, :]).astype(np.float32)
+    rotation_matrices = np.array(((c, s), (-s, c))).transpose([2, 0, 1])
+
+    return (boxes @ rotation_matrices + origins).astype(np.float32)
 
 
 def track_box(track):
