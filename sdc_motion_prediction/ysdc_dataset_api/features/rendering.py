@@ -290,17 +290,18 @@ class RoadGraphRenderer(FeatureMapRendererBase):
             )
 
     def _render_road_polygons(self, feature_map, path_graph, transform):
+        road_polygons = []
         for road_polygon in path_graph.road_polygons:
             polygon = get_polygon(road_polygon.geometry)
             polygon = transform2dpoints(polygon, transform)
-            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-            for i, v in enumerate(self._get_road_polygon_feature_map_values()):
-                cv2.fillPoly(
-                    feature_map[i, :, :],
-                    polygon,
-                    v,
-                    lineType=self.LINE_TYPE,
-                )
+            polygon = np.around(polygon - 0.5).astype(np.int32)
+            road_polygons.append(polygon)
+        cv2.fillPoly(
+            feature_map[0, :, :],
+            road_polygons,
+            1.0,
+            lineType=self.LINE_TYPE,
+        )
 
     def _get_num_channels(self):
         return (
