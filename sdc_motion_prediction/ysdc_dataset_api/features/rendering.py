@@ -79,12 +79,13 @@ class TrackRendererBase(FeatureMapRendererBase):
 
             fm_values = self._get_fm_values(tracks_at_frame, to_track_transform)
 
-            for i, track in enumerate(tracks_at_frame):
-                for j, v in enumerate(fm_values[i]):
+            for channel_idx in range(fm_values.shape[1]):
+                fm_channel_slice = feature_map[ts_ind * self.num_channels + channel_idx, :, :]
+                for track_idx in range(fm_values.shape[0]):
                     cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + j, :, :],
-                        [polygons[i]],
-                        v,
+                        fm_channel_slice,
+                        [polygons[track_idx]],
+                        fm_values[track_idx, channel_idx],
                         lineType=self.LINE_TYPE,
                     )
         return feature_map
