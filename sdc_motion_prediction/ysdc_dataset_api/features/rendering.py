@@ -11,6 +11,7 @@ from ..utils import (
     get_transformed_velocity,
     get_transformed_acceleration,
     transform2dpoints,
+    transform2dvectors,
 )
 from ..utils.map import get_crosswalk_availability, get_polygon
 
@@ -76,6 +77,9 @@ class TrackRendererBase(FeatureMapRendererBase):
     def _get_tracks_at_timestamp(self, scene, ts_ind):
         raise NotImplementedError
 
+    def _get_fm_values(self, tracks, transform):
+        raise NotImplementedError
+
     def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
@@ -86,8 +90,10 @@ class TrackRendererBase(FeatureMapRendererBase):
             polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
             polygons = np.around(polygons - 0.5).astype(np.int32)
 
+            fm_values = self._get_fm_values(tracks_at_frame, to_track_transform)
+
             for i, track in enumerate(tracks_at_frame):
-                for j, v in enumerate(self._get_fm_values(track, to_track_transform)):
+                for j, v in enumerate(fm_values[i]):
                     cv2.fillPoly(
                         feature_map[ts_ind * self.num_channels + j, :, :],
                         [polygons[i]],
@@ -95,6 +101,26 @@ class TrackRendererBase(FeatureMapRendererBase):
                         lineType=cv2.LINE_AA,
                     )
         return feature_map
+
+    def _get_occupancy_values(self, tracks):
+        return np.ones((len(tracks), 1), dtype=np.float32)
+
+    def _get_velocity_values(self, tracks, transform):
+        velocities = np.asarray(
+            [[track.linear_velocity.x, track.linear_velocity.y] for track in tracks],
+            dtype=np.float32)
+        velocities = transform2dvectors(velocities, transform)
+        return velocities
+
+    def _get_acceleration_values(self, tracks, transform):
+        accelerations = np.asarray(
+            [[track.linear_acceleration.x, track.linear_acceleration.y] for track in tracks],
+            dtype=np.float32)
+        accelerations = transform2dvectors(accelerations, transform)
+        return accelerations
+
+    def _get_yaw_values(self, tracks):
+        return np.asarray([track.yaw for track in tracks])[:, np.newaxis]
 
 
 class VehicleTracksRenderer(TrackRendererBase):
@@ -115,22 +141,17 @@ class VehicleTracksRenderer(TrackRendererBase):
             track for track in scene.past_vehicle_tracks[ts_ind].tracks
         ] + [scene.past_ego_track[ts_ind]]
 
-    def _get_fm_values(self, track, to_track_transform):
+    def _get_fm_values(self, tracks, transform):
         values = []
         if 'occupancy' in self._config:
-            values.append(1.)
+            values.append(self._get_occupancy_values(tracks))
         if 'velocity' in self._config:
-            velocity_transformed = get_transformed_velocity(track, to_track_transform)
-            values.append(velocity_transformed[0])
-            values.append(velocity_transformed[1])
+            values.append(self._get_velocity_values(tracks, transform))
         if 'acceleration' in self._config:
-            acceleration_transformed = get_transformed_acceleration(
-                track, to_track_transform)
-            values.append(acceleration_transformed[0])
-            values.append(acceleration_transformed[1])
+            values.append(self._get_acceleration_values(tracks, transform))
         if 'yaw' in self._config:
-            values.append(track.yaw)
-        return values
+            values.append(self._get_yaw_values(tracks))
+        return np.concatenate(values, axis=1, dtype=np.float64)
 
 
 class PedestrianTracksRenderer(TrackRendererBase):
@@ -147,15 +168,13 @@ class PedestrianTracksRenderer(TrackRendererBase):
             track for track in scene.past_pedestrian_tracks[ts_ind].tracks
         ]
 
-    def _get_fm_values(self, track, to_track_transform):
+    def _get_fm_values(self, tracks, transform):
         values = []
         if 'occupancy' in self._config:
-            values.append(1.)
+            values.append(self._get_occupancy_values(tracks))
         if 'velocity' in self._config:
-            velocity_transformed = get_transformed_velocity(track, to_track_transform)
-            values.append(velocity_transformed[0])
-            values.append(velocity_transformed[1])
-        return values
+            values.append(self._get_velocity_values(tracks, transform))
+        return np.concatenate(values, axis=1, dtype=np.float64)
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):

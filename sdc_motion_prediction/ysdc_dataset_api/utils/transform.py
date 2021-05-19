@@ -53,12 +53,18 @@ def get_to_track_frame_transform(track):
 
 @numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
 def transform2dpoints(points, transform):
-    ph = np.zeros((points.shape[0], 4), dtype=np.float32)
-    ph[:, :2] = points
-    ph[:, 3] = np.ones(points.shape[0])
-    ph = np.transpose(ph)
-    res = np.dot(transform, ph)
+    ph = np.zeros((4, points.shape[0]), dtype=np.float32)
+    ph[:2, :] = points.transpose()
+    ph[3, :] = np.ones(points.shape[0])
+    res = transform @ ph
     return np.transpose(res[:2, :])
+
+
+@numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
+def transform2dvectors(vectors, transform):
+    vectors = transform2dpoints(vectors, transform)
+    vectors = vectors - np.asarray([[transform[0, 3], transform[1, 3]]])
+    return vectors
 
 
 def linear_interpolate_vehicle_track(first, second, ratio):
