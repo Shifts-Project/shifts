@@ -7,6 +7,7 @@ setup(
     install_requires=[
         "jupyter",
         "matplotlib",
+        "numba",
         "numpy",
         "opencv-contrib-python-headless",
         "protobuf>=3.12.2",

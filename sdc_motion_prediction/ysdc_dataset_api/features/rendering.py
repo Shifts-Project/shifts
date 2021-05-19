@@ -1,14 +1,14 @@
 import math
+from collections import defaultdict
 
 import cv2
 import numpy as np
 
 from .producing import FeatureProducerBase
 from ..utils import (
-    get_track_polygon,
-    get_transformed_velocity,
-    get_transformed_acceleration,
+    get_tracks_polygons,
     transform2dpoints,
+    transform2dvectors,
 )
 from ..utils.map import get_crosswalk_availability, get_polygon
 
@@ -22,6 +22,9 @@ def _create_feature_maps(rows, cols, num_channels):
 
 
 class FeatureMapRendererBase:
+    LINE_TYPE = cv2.LINE_AA
+    LINE_THICKNESS = 1
+
     def __init__(
             self,
             config,
@@ -35,7 +38,7 @@ class FeatureMapRendererBase:
         self._num_channels = self._get_num_channels()
         self._to_feature_map_tf = to_feature_map_tf
 
-    def render(self, scene, to_track_transform):
+    def render(self, feature_map, scene, to_track_transform):
         raise NotImplementedError()
 
     def _get_num_channels(self):
@@ -56,20 +59,59 @@ class FeatureMapRendererBase:
     def num_channels(self):
         return self._num_channels
 
-    def _create_feature_maps(self):
-        return _create_feature_maps(
-            self._feature_map_params['rows'],
-            self._feature_map_params['cols'],
-            self._num_channels * self.n_history_steps,
-        )
 
-    def _get_transformed_track_polygon(self, track, transform):
-        polygon = transform2dpoints(get_track_polygon(track), transform)
-        polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-        return polygon
+class TrackRendererBase(FeatureMapRendererBase):
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        raise NotImplementedError
+
+    def _get_fm_values(self, tracks, transform):
+        raise NotImplementedError
+
+    def render(self, feature_map, scene, to_track_transform):
+        transform = self._to_feature_map_tf @ to_track_transform
+        for ts_ind in self._history_indices:
+            tracks_at_frame = self._get_tracks_at_timestamp(scene, ts_ind)
+            if not tracks_at_frame:
+                continue
+            polygons = get_tracks_polygons(tracks_at_frame)
+            polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
+            polygons = np.around(polygons - 0.5).astype(np.int32)
+
+            fm_values = self._get_fm_values(tracks_at_frame, to_track_transform)
+
+            for channel_idx in range(fm_values.shape[1]):
+                fm_channel_slice = feature_map[ts_ind * self.num_channels + channel_idx, :, :]
+                for track_idx in range(fm_values.shape[0]):
+                    cv2.fillPoly(
+                        fm_channel_slice,
+                        [polygons[track_idx]],
+                        fm_values[track_idx, channel_idx],
+                        lineType=self.LINE_TYPE,
+                    )
+        return feature_map
+
+    def _get_occupancy_values(self, tracks):
+        return np.ones((len(tracks), 1), dtype=np.float32)
+
+    def _get_velocity_values(self, tracks, transform):
+        velocities = np.asarray(
+            [[track.linear_velocity.x, track.linear_velocity.y] for track in tracks],
+            dtype=np.float32)
+        velocities = transform2dvectors(velocities, transform)
+        return velocities
+
+    def _get_acceleration_values(self, tracks, transform):
+        accelerations = np.asarray(
+            [[track.linear_acceleration.x, track.linear_acceleration.y] for track in tracks],
+            dtype=np.float32)
+        accelerations = transform2dvectors(accelerations, transform)
+        return accelerations
+
+    def _get_yaw_values(self, tracks):
+        return np.asarray([track.yaw for track in tracks])[:, np.newaxis]
 
 
-class VehicleTracksRenderer(FeatureMapRendererBase):
+class VehicleTracksRenderer(TrackRendererBase):
     def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._config:
@@ -82,51 +124,25 @@ class VehicleTracksRenderer(FeatureMapRendererBase):
             num_channels += 1
         return num_channels
 
-    # @profile
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
-        transform = self._to_feature_map_tf @ to_track_transform
-        for ts_ind in self._history_indices:
-            for track in scene.past_vehicle_tracks[ts_ind].tracks:
-                track_polygon = self._get_transformed_track_polygon(
-                    track, transform)
-                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
-                    cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + i, :, :],
-                        track_polygon,
-                        v,
-                        lineType=cv2.LINE_AA,
-                    )
-            ego_track = scene.past_ego_track[ts_ind]
-            ego_track_polygon = self._get_transformed_track_polygon(ego_track, transform)
-            for i, v in enumerate(self._get_fm_values(ego_track, to_track_transform)):
-                cv2.fillPoly(
-                    feature_map[ts_ind * self.num_channels + i, :, :],
-                    ego_track_polygon,
-                    v,
-                    lineType=cv2.LINE_AA,
-                )
-        return feature_map
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        return [
+            track for track in scene.past_vehicle_tracks[ts_ind].tracks
+        ] + [scene.past_ego_track[ts_ind]]
 
-    def _get_fm_values(self, track, to_track_transform):
+    def _get_fm_values(self, tracks, transform):
         values = []
         if 'occupancy' in self._config:
-            values.append(1.)
+            values.append(self._get_occupancy_values(tracks))
         if 'velocity' in self._config:
-            velocity_transformed = get_transformed_velocity(track, to_track_transform)
-            values.append(velocity_transformed[0])
-            values.append(velocity_transformed[1])
+            values.append(self._get_velocity_values(tracks, transform))
         if 'acceleration' in self._config:
-            acceleration_transformed = get_transformed_acceleration(
-                track, to_track_transform)
-            values.append(acceleration_transformed[0])
-            values.append(acceleration_transformed[1])
+            values.append(self._get_acceleration_values(tracks, transform))
         if 'yaw' in self._config:
-            values.append(track.yaw)
-        return values
+            values.append(self._get_yaw_values(tracks))
+        return np.concatenate(values, axis=1, dtype=np.float64)
 
 
-class PedestrianTracksRenderer(FeatureMapRendererBase):
+class PedestrianTracksRenderer(TrackRendererBase):
     def _get_num_channels(self):
         num_channels = 0
         if 'occupancy' in self._config:
@@ -135,37 +151,22 @@ class PedestrianTracksRenderer(FeatureMapRendererBase):
             num_channels += 2
         return num_channels
 
-    # @profile
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
-        transform = self._to_feature_map_tf @ to_track_transform
-        for ts_ind in self._history_indices:
-            for track in scene.past_pedestrian_tracks[ts_ind].tracks:
-                track_polygon = self._get_transformed_track_polygon(track, transform)
-                for i, v in enumerate(self._get_fm_values(track, to_track_transform)):
-                    cv2.fillPoly(
-                        feature_map[ts_ind * self.num_channels + i, :, :],
-                        track_polygon,
-                        v,
-                        lineType=cv2.LINE_AA,
-                    )
-        return feature_map
+    def _get_tracks_at_timestamp(self, scene, ts_ind):
+        return [
+            track for track in scene.past_pedestrian_tracks[ts_ind].tracks
+        ]
 
-    def _get_fm_values(self, track, to_track_transform):
+    def _get_fm_values(self, tracks, transform):
         values = []
         if 'occupancy' in self._config:
-            values.append(1.)
+            values.append(self._get_occupancy_values(tracks))
         if 'velocity' in self._config:
-            velocity_transformed = get_transformed_velocity(track, to_track_transform)
-            values.append(velocity_transformed[0])
-            values.append(velocity_transformed[1])
-        return values
+            values.append(self._get_velocity_values(tracks, transform))
+        return np.concatenate(values, axis=1, dtype=np.float64)
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):
-    # @profile
-    def render(self, scene, to_track_transform):
-        feature_map = self._create_feature_maps()
+    def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         path_graph = scene.path_graph
         for channel_ind in range(len(self._history_indices)):
@@ -203,40 +204,108 @@ class RoadGraphRenderer(FeatureMapRendererBase):
                     feature_map[i, :, :],
                     polygon,
                     v,
-                    lineType=cv2.LINE_AA,
+                    lineType=self.LINE_TYPE,
                 )
 
     def _render_lanes(self, feature_map, path_graph, traffic_light_sections, transform):
+        lane_lengths = []
+        lane_centers_concatenated = []
         for lane in path_graph.lanes:
-            lane_centers = transform2dpoints(
-                np.array([[p.x, p.y] for p in lane.centers]),
-                transform
+            lane_lengths.append(len(lane.centers))
+            for p in lane.centers:
+                lane_centers_concatenated.append([p.x, p.y])
+        lane_centers_concatenated = np.array(lane_centers_concatenated, dtype=np.float32)
+        lane_centers_concatenated = transform2dpoints(lane_centers_concatenated, transform)
+        lane_centers_concatenated = np.around(lane_centers_concatenated - 0.5).astype(np.int32)
+
+        lane_centers = []
+        bounds = [0] + np.cumsum(lane_lengths).tolist()
+
+        for i in range(1, len(bounds)):
+            lane_centers.append(lane_centers_concatenated[bounds[i - 1]:bounds[i]])
+
+        channel = 0
+        if 'lane_availability' in self._config:
+            raise NotImplementedError
+            channel += 1
+        if 'lane_direction' in self._config:
+            self._render_lane_direction(feature_map[channel, ...], lane_centers)
+            channel += 1
+        if 'lane_occupancy' in self._config:
+            self._render_lane_occupancy(feature_map[channel, ...], lane_centers)
+            channel += 1
+        if 'lane_priority' in self._config:
+            self._render_lane_priority(feature_map[channel, ...], lane_centers, path_graph)
+            channel += 1
+        if 'lane_speed_limit' in self._config:
+            self._render_lane_speed_limit(feature_map[channel, ...], lane_centers, path_graph)
+            channel += 1
+
+    def _render_lane_direction(self, feature_map, lane_centers):
+        for lane in lane_centers:
+            for i in range(1, lane.shape[0]):
+                p1 = (lane[i - 1, 0], lane[i - 1, 1])
+                p2 = (lane[i, 0], lane[i, 1])
+                cv2.line(
+                    feature_map,
+                    p1,
+                    p2,
+                    math.atan2(p2[1] - p1[1], p2[0] - p1[0]),
+                    thickness=self.LINE_THICKNESS,
+                    lineType=self.LINE_TYPE,
+                )
+
+    def _render_lane_occupancy(self, feature_map, lane_centers):
+        cv2.polylines(
+            feature_map,
+            lane_centers,
+            isClosed=False,
+            color=1.,
+            thickness=self.LINE_THICKNESS,
+            lineType=self.LINE_TYPE,
+        )
+
+    def _render_lane_priority(self, feature_map, lane_centers, path_graph):
+        non_priority_lanes = []
+        for i, lane in enumerate(path_graph.lanes):
+            if lane.gives_way_to_some_lane:
+                non_priority_lanes.append(lane_centers[i])
+        cv2.polylines(
+            feature_map,
+            non_priority_lanes,
+            isClosed=False,
+            color=1.,
+            thickness=self.LINE_THICKNESS,
+            lineType=self.LINE_TYPE,
+        )
+
+    def _render_lane_speed_limit(self, feature_map, lane_centers, path_graph):
+        limit_to_lanes = defaultdict(list)
+        for i, lane in enumerate(path_graph.lanes):
+            limit_to_lanes[lane.max_velocity].append(lane_centers[i])
+        for limit, lanes in limit_to_lanes.items():
+            cv2.polylines(
+                feature_map,
+                lanes,
+                isClosed=False,
+                color=limit / 15.0,
+                thickness=self.LINE_THICKNESS,
+                lineType=self.LINE_TYPE,
             )
-            lane_centers = np.around(lane_centers - 0.5).astype(np.int32)
-            for i in range(1, len(lane_centers)):
-                for channel, value in enumerate(self._get_lane_feature_map_values(
-                        lane_centers[i-1], lane_centers[i], lane, traffic_light_sections)):
-                    cv2.polylines(
-                        feature_map[channel, :, :],
-                        [lane_centers],
-                        isClosed=False,
-                        color=value,
-                        thickness=1,
-                        lineType=cv2.LINE_AA,
-                    )
 
     def _render_road_polygons(self, feature_map, path_graph, transform):
+        road_polygons = []
         for road_polygon in path_graph.road_polygons:
             polygon = get_polygon(road_polygon.geometry)
             polygon = transform2dpoints(polygon, transform)
-            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-            for i, v in enumerate(self._get_road_polygon_feature_map_values()):
-                cv2.fillPoly(
-                    feature_map[i, :, :],
-                    polygon,
-                    v,
-                    lineType=cv2.LINE_AA,
-                )
+            polygon = np.around(polygon - 0.5).astype(np.int32)
+            road_polygons.append(polygon)
+        cv2.fillPoly(
+            feature_map[0, :, :],
+            road_polygons,
+            1.0,
+            lineType=self.LINE_TYPE,
+        )
 
     def _get_num_channels(self):
         return (
@@ -289,23 +358,6 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         )
         return slice(offset, offset + self._get_lane_feature_map_size())
 
-    def _get_lane_feature_map_values(
-            self, segment_start, segment_end, lane, traffic_light_sections):
-        values = []
-        if 'lane_availability' in self._config:
-            raise NotImplementedError()
-        if 'lane_direction' in self._config:
-            values.append(
-                math.atan2(segment_end[1] - segment_start[1], segment_end[0] - segment_start[0])
-            )
-        if 'lane_occupancy' in self._config:
-            values.append(1.0)
-        if 'lane_priority' in self._config:
-            values.append(float(lane.gives_way_to_some_lane))
-        if 'lane_speed_limit' in self._config:
-            values.append(lane.max_velocity / 15.0)
-        return values
-
     def _get_road_feature_map_size(self):
         num_channels = 0
         if 'road_polygons' in self._config:
@@ -341,7 +393,7 @@ class FeatureRenderer(FeatureProducerBase):
         slice_start = 0
         for renderer in self._renderers:
             slice_end = slice_start + renderer.num_channels * renderer.n_history_steps
-            feature_maps[slice_start:slice_end, :, :] = renderer.render(scene, to_track_frame_tf)
+            renderer.render(feature_maps[slice_start:slice_end, :, :], scene, to_track_frame_tf)
             slice_start = slice_end
         return {
             'feature_maps': feature_maps,
@@ -360,7 +412,7 @@ class FeatureRenderer(FeatureProducerBase):
             [0, fm_scale, 0, fm_origin_y],
             [0, 0, 1, 0],
             [0, 0, 0, 1],
-        ])
+        ], dtype=np.float32)
 
     def _create_feature_maps(self):
         return _create_feature_maps(
