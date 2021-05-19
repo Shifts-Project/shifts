@@ -6,10 +6,7 @@ import numpy as np
 
 from .producing import FeatureProducerBase
 from ..utils import (
-    get_track_polygon,
     get_tracks_polygons,
-    get_transformed_velocity,
-    get_transformed_acceleration,
     transform2dpoints,
     transform2dvectors,
 )
@@ -25,6 +22,9 @@ def _create_feature_maps(rows, cols, num_channels):
 
 
 class FeatureMapRendererBase:
+    LINE_TYPE = cv2.LINE_AA
+    LINE_THICKNESS = 1
+
     def __init__(
             self,
             config,
@@ -59,19 +59,6 @@ class FeatureMapRendererBase:
     def num_channels(self):
         return self._num_channels
 
-    def _create_feature_maps(self):
-        return _create_feature_maps(
-            self._feature_map_params['rows'],
-            self._feature_map_params['cols'],
-            self._num_channels * self.n_history_steps,
-        )
-
-    def _get_transformed_track_polygon(self, track, transform):
-        polygon = get_track_polygon(track)
-        polygon = transform2dpoints(polygon, transform)
-        polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-        return polygon
-
 
 class TrackRendererBase(FeatureMapRendererBase):
     def _get_tracks_at_timestamp(self, scene, ts_ind):
@@ -98,7 +85,7 @@ class TrackRendererBase(FeatureMapRendererBase):
                         feature_map[ts_ind * self.num_channels + j, :, :],
                         [polygons[i]],
                         v,
-                        lineType=cv2.LINE_AA,
+                        lineType=self.LINE_TYPE,
                     )
         return feature_map
 
@@ -178,9 +165,6 @@ class PedestrianTracksRenderer(TrackRendererBase):
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):
-    LINE_TYPE = cv2.LINE_AA
-    LINE_THICKNESS = 1
-
     def render(self, feature_map, scene, to_track_transform):
         transform = self._to_feature_map_tf @ to_track_transform
         path_graph = scene.path_graph
