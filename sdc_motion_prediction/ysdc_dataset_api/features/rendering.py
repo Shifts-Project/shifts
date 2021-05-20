@@ -194,16 +194,32 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         return feature_map
 
     def _render_crosswalks(self, feature_map, path_graph, traffic_light_sections, transform):
+        crosswalk_polygons = []
         for crosswalk in path_graph.crosswalks:
             polygon = get_polygon(crosswalk.geometry)
             polygon = transform2dpoints(polygon, transform)
-            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-            for i, v in enumerate(self._get_crosswalk_feature_map_values(
-                    crosswalk, traffic_light_sections)):
+            polygon = np.around(polygon - 0.5).astype(np.int32)
+            crosswalk_polygons.append(polygon)
+
+        channel = 0
+        if 'crosswalk_occupancy' in self._config:
+            cv2.fillPoly(
+                feature_map[channel, ...],
+                crosswalk_polygons,
+                1.,
+                lineType=self.LINE_TYPE,
+            )
+            channel += 1
+        if 'crosswalk_availability' in self._config:
+            availability_to_polygons = defaultdict(list)
+            for i, crosswalk in enumerate(path_graph.crosswalks):
+                availability = get_crosswalk_availability(crosswalk, traffic_light_sections)
+                availability_to_polygons[availability].append(crosswalk_polygons[i])
+            for availability, polygons in availability_to_polygons.items():
                 cv2.fillPoly(
-                    feature_map[i, :, :],
-                    polygon,
-                    v,
+                    feature_map[channel, ...],
+                    polygons,
+                    availability,
                     lineType=self.LINE_TYPE,
                 )
 
@@ -332,7 +348,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         values = []
         if 'crosswalk_occupancy' in self._config:
             values.append(1.)
-        if 'crosswalk_avalability' in self._config:
+        if 'crosswalk_availability' in self._config:
             values.append(get_crosswalk_availability(crosswalk, traffic_light_sections))
         return values
 
