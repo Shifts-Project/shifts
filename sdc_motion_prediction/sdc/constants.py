@@ -42,27 +42,26 @@ RENDERER_CONFIG = {
                 {'pedestrians': ['occupancy', 'velocity']},
             ]
         },
-        # TODO: add back in if/when road graph is faster to render.
-        # {
-        #     'time_grid_params': {
-        #         'start': 0,
-        #         'stop': 0,
-        #         'step': 1,
-        #     },
-        #     'renderers': [
-        #         {
-        #             'road_graph': [
-        #                 'crosswalk_occupancy',
-        #                 'crosswalk_availability',
-        #                 # 'lane_availability',  # Currently unavailable due to problem in dataset
-        #                 'lane_direction',
-        #                 'lane_occupancy',
-        #                 'lane_priority',
-        #                 'lane_speed_limit',
-        #                 'road_polygons',
-        #             ]
-        #         }
-        #     ]
-        # }
+        {
+            'time_grid_params': {
+                'start': 0,
+                'stop': 0,
+                'step': 1,
+            },
+            'renderers': [
+                {
+                    'road_graph': [
+                        'crosswalk_occupancy',
+                        'crosswalk_availability',
+                        # 'lane_availability',  # Currently unavailable due to problem in dataset
+                        'lane_direction',
+                        'lane_occupancy',
+                        'lane_priority',
+                        'lane_speed_limit',
+                        'road_polygons',
+                    ]
+                }
+            ]
+        }
     ]
 }

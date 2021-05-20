@@ -23,3 +23,8 @@ MODEL_NAME_TO_CLASS_FNS = {
     'bc': (BehaviouralModel, train_step_bc, evaluate_step_bc),
     'dim': (ImitativeModel, train_step_dim, evaluate_step_dim)
 }
+
+MODEL_TO_FULL_NAME = {
+    'bc': 'Behavioral Cloning',
+    'dim': 'Deep Imitative Model'
+}

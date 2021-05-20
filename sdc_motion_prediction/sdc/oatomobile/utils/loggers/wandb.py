@@ -26,6 +26,9 @@ class WandbLogger:
     Logs to a `wandb` dashboard.
     Credit to Jannik Kossen @jlko, OATML Group
     """
+    def __init__(self, optimizer):
+        self.optimizer = optimizer
+
     def start_counting(self):
         self.train_start = time.time()
         self.checkpoint_start = self.train_start

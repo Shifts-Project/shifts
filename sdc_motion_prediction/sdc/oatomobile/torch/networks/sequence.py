@@ -30,7 +30,7 @@ class AutoregressiveFlow(nn.Module):
 
   def __init__(
       self,
-      output_shape: types.Shape = (4, 2),
+      output_shape: types.Shape = (25, 2),
       hidden_size: int = 64,
   ):
     """Constructs a simple autoregressive flow-based sequence generator.
@@ -58,7 +58,7 @@ class AutoregressiveFlow(nn.Module):
     # The output head.
     self._locscale = MLP(
         input_size=hidden_size,
-        output_sizes=[32, self._output_shape[0]],
+        output_sizes=[32, self._output_shape[-1] * 2],
         activation_fn=nn.ReLU,
         dropout_rate=None,
         activate_final=False,

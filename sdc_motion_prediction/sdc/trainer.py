@@ -1,56 +1,88 @@
+import os
 from collections import defaultdict
-from typing import Mapping
+from functools import partial
 
 import torch
+import torch.distributions as D
 import torch.nn as nn
 import torch.optim as optim
 import tqdm as tq
 
-from sdc.dataset import load_datasets
+from transformers import get_cosine_schedule_with_warmup
+from sdc.dataset import load_datasets, load_dataloaders
 from sdc.oatomobile.torch.baselines import (
-    BehaviouralModel, ImitativeModel, MODEL_NAME_TO_CLASS_FNS)
+    MODEL_TO_FULL_NAME, MODEL_NAME_TO_CLASS_FNS)
+from sdc.oatomobile.torch.baselines import batch_transform
 from sdc.oatomobile.torch.savers import Checkpointer
 from sdc.oatomobile.utils.loggers.wandb import WandbLogger
-from functools import partial
-from sdc.oatomobile.torch.baselines import batch_transform
-import os
-from typing import Tuple
-import torch.distributions as D
+
+
+class MyDataset(torch.utils.data.Dataset):
+    def __init__(self):
+        super(MyDataset, self).__init__()
+        # do stuff here?
+        self.values = torch.randn((50000, 100, 100, 16))
+        self.labels = torch.randn((50000, 2, 25))
+        # self.labels = labels
+
+    def __len__(self):
+        return len(self.values)  # number of samples in the dataset
+
+    def __getitem__(self, index):
+        return self.values[index], self.labels[index]
+
+
+def count_parameters(model):
+    r"""
+    Due to Federico Baldassarre
+    https://discuss.pytorch.org/t/how-do-i-check-the-number-of-parameters-of-a-model/4325/7
+    """
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 # @profile
 def train(c):
     # Retrieve config args.
     lr = c.exp_lr  # Learning rate
-    batch_size = c.exp_batch_size
     weight_decay = c.model_weight_decay
     clip_gradients = c.model_clip_gradients
-    num_workers = c.data_num_workers
     num_epochs = c.exp_num_epochs
+    num_warmup_epochs = c.exp_num_lr_warmup_epochs
     checkpoint_frequency = c.exp_checkpoint_frequency
     num_timesteps_to_keep = 25
     downsample_hw = (c.exp_image_downsize_hw, c.exp_image_downsize_hw)
     data_dtype = c.data_dtype
     device = c.exp_device
+    dim_hidden = c.model_dim_hidden
+
     downsize_cast_batch_transform = partial(
         batch_transform, device=device, downsample_hw=downsample_hw,
         dtype=data_dtype, num_timesteps_to_keep=num_timesteps_to_keep)
     output_shape = (num_timesteps_to_keep, 2)  # Predict 25 timesteps
-    in_channels = 9
-    # in_channels = 16  # TODO: speed up featurization of roads/HD map
+    # in_channels = 9
+    in_channels = 16  # TODO: speed up featurization of roads/HD map
 
     # Initializes the model and its optimizer.
 
     # Obtain model class (e.g., ImitativeModel or BehavioralModel)
     # and its respective train/evaluate steps.
     model_name = c.model_name
+    print(f'Training {MODEL_TO_FULL_NAME[model_name]}.')
     model_class, train_step, evaluate_step = (
         MODEL_NAME_TO_CLASS_FNS[c.model_name])
     model = model_class(
-        in_channels=in_channels, output_shape=output_shape).to(device=device)
+        in_channels=in_channels, dim_hidden=dim_hidden,
+        output_shape=output_shape).to(device=device)
+    print(f'Model has {count_parameters(model)} parameters,'
+          f'batch size {c.exp_batch_size}.')
     criterion = nn.L1Loss(reduction="none")
     optimizer = optim.AdamW(
         model.parameters(), lr=lr, weight_decay=weight_decay)
+    # Based on the fairseq implementation, which is based on BERT
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer=optimizer,
+        num_warmup_steps=num_warmup_epochs,
+        num_training_steps=num_epochs)
 
     # Create checkpoint dir, if necessary; init Checkpointer.
     checkpoint_dir = c.dir_checkpoint
@@ -60,19 +92,7 @@ def train(c):
     # Init dataloaders.
     # Split = None loads train, validation, and test.
     datasets = load_datasets(c, split=None)
-    dataloader_train = torch.utils.data.DataLoader(
-        datasets['train']['moscow__train'], batch_size=batch_size,
-        num_workers=num_workers, pin_memory=True)
-
-    # Load dataloaders for in- and out-of-domain validation and test datasets.
-    eval_dataloaders = defaultdict(dict)
-    for eval_mode in ['validation', 'test']:
-        eval_dataset_dict = datasets[eval_mode]
-        for dataset_key, dataset in eval_dataset_dict.items():
-            eval_dataloaders[
-                eval_mode][dataset_key] = torch.utils.data.DataLoader(
-                dataset, batch_size=batch_size, num_workers=num_workers,
-                pin_memory=True)
+    train_dataloader, eval_dataloaders = load_dataloaders(datasets, c)
 
     # Init train and evaluate args for respective model backbone.
     train_args = {
@@ -101,7 +121,7 @@ def train(c):
 
     # @profile
     def train_epoch(
-        dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
+            dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
         """
         Performs an epoch of gradient descent optimization on `dataloader`."""
         model.train()
@@ -117,13 +137,14 @@ def train(c):
                 loss += train_step(**train_args)
                 steps += 1
 
-        return loss / len(dataloader), steps
+        return loss / steps, steps
 
     def evaluate_epoch(
       dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
         """Performs an evaluation of the `model` on the `dataloader."""
         model.eval()
         loss = 0.0
+        steps = 0
         with tq.tqdm(dataloader) as pbar:
             for batch in pbar:
                 # Prepares the batch.
@@ -132,22 +153,27 @@ def train(c):
 
                 # Accumulates loss in dataset.
                 with torch.no_grad():
-                    loss += evaluate_step(model, batch)
+                    loss += evaluate_step(**evaluate_args)
 
-        return loss / len(dataloader)
+                steps += 1
+
+        return loss / steps
 
     # Initialize wandb logger state
-    logger = WandbLogger()
+    logger = WandbLogger(optimizer)
     logger.start_counting()
     steps = 0
-    validation_dataloaders = eval_dataloaders['validation']
+    if c.debug_overfit_test_data_only:
+        validation_dataloaders = {}
+    else:
+        validation_dataloaders = eval_dataloaders['validation']
 
     with tq.tqdm(range(num_epochs)) as pbar_epoch:
         for epoch in pbar_epoch:
             # Trains model on whole training dataset
             epoch_loss_dict = defaultdict(dict)
 
-            loss_train, epoch_steps = train_epoch(dataloader_train)
+            loss_train, epoch_steps = train_epoch(train_dataloader)
             epoch_loss_dict['train']['moscow__train'] = loss_train
             steps += epoch_steps
             # write(model, dataloader_train, writer, "train", loss_train, epoch)
@@ -155,7 +181,7 @@ def train(c):
             # Evaluates model on validation datasets
             for dataset_key, dataloader_val in validation_dataloaders.items():
                 loss_val = evaluate_epoch(dataloader_val)
-                epoch_loss_dict['validation']['dataset_key'] = loss_val
+                epoch_loss_dict['validation'][dataset_key] = loss_val
 
             # write(model, dataloader_val, writer, "val", loss_val, epoch)
 
@@ -175,10 +201,14 @@ def train(c):
             for dataset_key, loss_val in epoch_loss_dict['validation'].items():
                 pbar_string += 'VL {} {:.2f} | '.format(
                     dataset_key, loss_val.detach().cpu().numpy().item())
+
+            pbar_string += '\n'
             pbar_epoch.set_description(pbar_string)
 
             # Log to wandb
             logger.log(epoch_loss_dict, steps, epoch)
+
+            scheduler.step()
 
 
 # def write(

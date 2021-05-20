@@ -75,7 +75,9 @@ def build_parser():
     parser.add_argument(
         '--exp_lr', type=float, default=1e-3)
     parser.add_argument(
-        '--exp_batch_size', type=int, default=1024)
+        '--exp_num_lr_warmup_epochs', type=int, default=10)
+    parser.add_argument(
+        '--exp_batch_size', type=int, default=16)
     parser.add_argument(
         '--exp_num_epochs', type=int, default=100)
     parser.add_argument(
@@ -90,9 +92,16 @@ def build_parser():
     # #### Model ##############################################################
     ###########################################################################
 
-    parser.add_argument('--model_name', type='str', default='bc',
-                        help="The backbone model. See "
-                             "sdc/oatomobile/torch/baselines/__init__.py.")
+    parser.add_argument(
+        '--model_name', type=str, default='bc',
+        help="The backbone model. See "
+             "sdc/oatomobile/torch/baselines/__init__.py.")
+    parser.add_argument(
+        '--model_dim_hidden', type=int, default=128,
+        help="Number of hidden dims, generally the size "
+             "of the embedding passed from the vision model "
+             "(e.g., MobileNetV2) to the autoregressive "
+             "decoder.")
     parser.add_argument('--model_weight_decay', type=float, default=0.0,
                         help="The L2 penalty (regularization) coefficient.")
     parser.add_argument(
@@ -105,6 +114,21 @@ def build_parser():
 
     parser.add_argument('--dim_noise_level', type=float, default=1e-2,
                         help="")
+
+    ###########################################################################
+    # #### Debug ##############################################################
+    ###########################################################################
+
+    parser.add_argument(
+        '--debug_overfit_eval', type='bool', default=False,
+        help='Train on a very small subset, try to overfit.')
+    parser.add_argument(
+        '--debug_overfit_test_data_only', type='bool', default=False,
+        help='If True, only use the test data.')
+    parser.add_argument(
+        '--debug_overfit_n_examples', type=int, default=10,
+        help='Size of the subset of train on which we try to overfit.')
+
 
     return parser
 

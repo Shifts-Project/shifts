@@ -30,6 +30,7 @@ class ImitativeModel(nn.Module):
     def __init__(
         self,
         in_channels: int = 16,
+        dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
     ) -> None:
         """Constructs a simple imitative model.
@@ -42,7 +43,8 @@ class ImitativeModel(nn.Module):
         self._output_shape = output_shape
 
         # The convolutional encoder model.
-        self._encoder = MobileNetV2(num_classes=64, in_channels=in_channels)
+        self._encoder = MobileNetV2(
+            num_classes=dim_hidden, in_channels=in_channels)
 
         # No need for an MLP merger, as all inputs (including static HD map
         # features) have been converted to an image representation.
@@ -50,7 +52,7 @@ class ImitativeModel(nn.Module):
         # The decoder recurrent network used for the sequence generation.
         self._decoder = AutoregressiveFlow(
             output_shape=self._output_shape,
-            hidden_size=64,
+            hidden_size=dim_hidden,
         )
 
     def to(self, *args, **kwargs):

@@ -14,8 +14,8 @@
 # ==============================================================================
 
 """
-Defines a behavioral cloning model with autoregressive RNN decoder as
-used in Conditional Imitation Learning (CIL) [Codevilla et al., 2017].
+Defines a behavioral cloning model with autoregressive RNN decoder,
+based on Conditional Imitation Learning (CIL) [Codevilla et al., 2017].
 """
 
 from typing import Mapping
@@ -34,6 +34,7 @@ class BehaviouralModel(nn.Module):
     def __init__(
         self,
         in_channels: int = 16,
+        dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
     ) -> None:
         """Constructs a simple behavioural cloning model.
@@ -46,17 +47,17 @@ class BehaviouralModel(nn.Module):
         self._output_shape = output_shape
 
         # The convolutional encoder model.
-        self._encoder = MobileNetV2(num_classes=64, in_channels=in_channels)
+        self._encoder = MobileNetV2(num_classes=dim_hidden, in_channels=in_channels)
 
         # No need for an MLP merger, as all inputs (including static HD map
         # features) have been converted to an image representation.
 
         # The decoder recurrent network used for the sequence generation.
-        self._decoder = nn.GRUCell(input_size=2, hidden_size=64)
+        self._decoder = nn.GRUCell(input_size=2, hidden_size=dim_hidden)
 
         # The output head.
         self._output = nn.Linear(
-            in_features=64,
+            in_features=dim_hidden,
             out_features=self._output_shape[-1],
         )
 
@@ -127,7 +128,7 @@ def train_step_bc(
 
 
 def evaluate_step_bc(
-    criterion: torch.nn.Module.Loss,
+    criterion: torch.nn.Module,
     model: BehaviouralModel,
     batch: Mapping[str, torch.Tensor],
 ) -> torch.Tensor:
