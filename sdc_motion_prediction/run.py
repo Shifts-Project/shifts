@@ -29,7 +29,7 @@ def main():
 
     wandb_args = dict(
         project=args.wandb_project,
-        entity="neilbband",
+        entity="shifts",
         dir=args.dir_wandb,
         reinit=True,
         name=args.exp_name,
@@ -65,4 +65,6 @@ def main():
 
 
 if __name__ == '__main__':
+    # import os
+    # os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
     main()
