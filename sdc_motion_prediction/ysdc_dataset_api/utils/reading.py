@@ -24,7 +24,7 @@ def get_file_paths(dataset_path):
     ])
     res = []
     for d in sub_dirs:
-        file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
+        file_names = sorted(os.listdir(d))
         res += [
             os.path.join(d, fname)
             for fname in file_names

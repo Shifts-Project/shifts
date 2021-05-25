@@ -47,7 +47,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 worker_info.id, worker_info.num_workers)
 
         def data_gen(_file_paths):
-            for scene in scenes_generator(file_paths):
+            for scene in scenes_generator(_file_paths):
                 for request in scene.prediction_requests:
                     if not request_is_valid(scene, request):
                         continue
