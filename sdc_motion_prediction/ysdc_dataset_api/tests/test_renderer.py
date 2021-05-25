@@ -33,7 +33,7 @@ TEST_CONFIG = {
                     'road_graph': [
                         'crosswalk_availability',
                         'crosswalk_occupancy',
-                        # 'lane_availability',
+                        'lane_availability',
                         'lane_direction',
                         'lane_occupancy',
                         'lane_priority',

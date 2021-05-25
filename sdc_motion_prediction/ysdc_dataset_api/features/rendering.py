@@ -10,7 +10,12 @@ from ..utils import (
     transform2dpoints,
     transform2dvectors,
 )
-from ..utils.map import get_crosswalk_availability, get_polygon
+from ..utils.map import (
+    get_crosswalk_availability,
+    get_lane_availability,
+    get_polygon,
+    get_section_to_state,
+)
 
 
 MAX_HISTORY_LENGTH = 25
@@ -242,7 +247,8 @@ class RoadGraphRenderer(FeatureMapRendererBase):
 
         channel = 0
         if 'lane_availability' in self._config:
-            raise NotImplementedError
+            self._render_lane_availability(
+                feature_map[channel, ...], lane_centers, path_graph, traffic_light_sections)
             channel += 1
         if 'lane_direction' in self._config:
             self._render_lane_direction(feature_map[channel, ...], lane_centers)
@@ -256,6 +262,22 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         if 'lane_speed_limit' in self._config:
             self._render_lane_speed_limit(feature_map[channel, ...], lane_centers, path_graph)
             channel += 1
+
+    def _render_lane_availability(self, feature_map, lane_centers, path_graph, tl_sections):
+        section_to_state = get_section_to_state(tl_sections)
+        availability_to_lanes = defaultdict(list)
+        for lane_idx, lane in enumerate(path_graph.lanes):
+            availability = get_lane_availability(lane, section_to_state)
+            availability_to_lanes[availability].append(lane_centers[lane_idx])
+        for v, lanes in availability_to_lanes.items():
+            cv2.polylines(
+                feature_map,
+                lanes,
+                isClosed=False,
+                color=v,
+                thickness=self.LINE_THICKNESS,
+                lineType=self.LINE_TYPE,
+            )
 
     def _render_lane_direction(self, feature_map, lane_centers):
         for lane in lane_centers:
@@ -355,7 +377,6 @@ class RoadGraphRenderer(FeatureMapRendererBase):
     def _get_lane_feature_map_size(self):
         num_channels = 0
         if 'lane_availability' in self._config:
-            raise NotImplementedError()
             num_channels += 1
         if 'lane_direction' in self._config:
             num_channels += 1
