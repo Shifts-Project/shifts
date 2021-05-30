@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pprint import pprint
-from typing import Optional
+from typing import Optional, List
 
 import torch
 
@@ -31,31 +31,39 @@ def load_overfit_set_file_paths(
                 break
 
     print(
-        f'Built overfit training dataset: used '
+        f'Built overfit dataset: used '
         f'{len(valid_indices)}/{len(file_paths)} '
         f'total scenes.')
     return [file_paths[i] for i in valid_indices]
 
 
-def load_datasets(c, split: Optional[str] = None):
+def load_datasets(c, splits: Optional[List[str]] = None):
     if c.debug_overfit_test_data_only:
-        split = 'test'
+        splits = ['test']
+    elif c.data_use_prerendered:
+        splits = ['train', 'test']
+    if splits is not None:
+        print(f'Loading datasets for splits {splits}.')
 
-    if split is not None:
-        print(f'Loading datasets for split {split}.')
+    dataset_args = {}
+    if not c.data_use_prerendered:
+        dataset_args['feature_producer'] = load_renderer()
+        dataset_args['transform_ground_truth_to_agent_frame'] = True
 
-    renderer = load_renderer()
     datasets = defaultdict(dict)
     for dataset_split, split_dict in DATASETS_TO_FILTERS.items():
-        if split is not None:
-            if dataset_split != split:
+        if splits is not None:
+            if dataset_split not in splits:
                 continue
 
         print(f'\nLoading {dataset_split} dataset(s).')
-        split_dataset_path = SPLIT_TO_DATASET_PATH[dataset_split]
+        split_dataset_path = SPLIT_TO_PB_DATASET_PATH[dataset_split]
         split_scene_tags_fpath = SPLIT_TO_SCENE_TAGS_PATH[dataset_split]
         split_dataset_path = f'{c.dir_data}{split_dataset_path}'
         split_scene_tags_fpath = f'{c.dir_data}{split_scene_tags_fpath}'
+        split_prerendered_dataset_path = SPLIT_TO_RENDERED_DATASET_PATH[
+            dataset_split]
+
         for dataset_key, scene_tags_filter_fn in split_dict.items():
             print(f'Loading dataset {dataset_key}.')
 
@@ -66,24 +74,20 @@ def load_datasets(c, split: Optional[str] = None):
                     scene_tags_fpath=split_scene_tags_fpath,
                     filter=scene_tags_filter_fn,
                     n_overfit_examples=c.debug_overfit_n_examples)
-                datasets[dataset_split][dataset_key] = MotionPredictionDataset(
-                    dataset_path=split_dataset_path,
-                    scene_tags_fpath=split_scene_tags_fpath,
-                    feature_producer=renderer,
-                    transform_ground_truth_to_agent_frame=True,
-                    pre_filtered_scene_file_paths=overfit_set_file_paths)
-                print(
-                    f'Debug Overfit: Loaded {c.debug_overfit_n_examples} '
-                    f'example subset of dataset {dataset_key}.')
-            else:
-                datasets[dataset_split][dataset_key] = MotionPredictionDataset(
-                    dataset_path=split_dataset_path,
-                    scene_tags_fpath=split_scene_tags_fpath,
-                    feature_producer=renderer,
-                    transform_ground_truth_to_agent_frame=True,
-                    scene_tags_filter=scene_tags_filter_fn,
-                    trajectory_tags_filter=None)
-                print(f'Loaded dataset {dataset_key}.')
+                dataset_args[
+                    'pre_filtered_scene_file_paths'] = overfit_set_file_paths
+
+            if c.data_use_prerendered:
+                dataset_args['prerendered_dataset_path'] = (
+                    split_prerendered_dataset_path)
+
+            datasets[dataset_split][dataset_key] = MotionPredictionDataset(
+                dataset_path=split_dataset_path,
+                scene_tags_fpath=split_scene_tags_fpath,
+                scene_tags_filter=scene_tags_filter_fn,
+                trajectory_tags_filter=None,
+                **dataset_args)
+            print(f'Loaded dataset {dataset_key}.')
 
     print('Finished loading all datasets.')
     pprint(datasets)
@@ -108,6 +112,9 @@ def load_dataloaders(datasets, c):
         # validation and test datasets.
         eval_dataloaders = defaultdict(dict)
         for eval_mode in ['validation', 'test']:
+            if eval_mode not in datasets.keys():
+                continue
+
             eval_dataset_dict = datasets[eval_mode]
             for dataset_key, dataset in eval_dataset_dict.items():
                 eval_dataloaders[

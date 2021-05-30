@@ -85,13 +85,13 @@ def train(c):
         num_training_steps=num_epochs)
 
     # Create checkpoint dir, if necessary; init Checkpointer.
-    checkpoint_dir = c.dir_checkpoint
+    checkpoint_dir = f'{c.dir_checkpoint}/{model_name}'
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpointer = Checkpointer(model=model, ckpt_dir=checkpoint_dir)
 
     # Init dataloaders.
     # Split = None loads train, validation, and test.
-    datasets = load_datasets(c, split=None)
+    datasets = load_datasets(c, splits=None)
     train_dataloader, eval_dataloaders = load_dataloaders(datasets, c)
 
     # Init train and evaluate args for respective model backbone.
@@ -166,7 +166,12 @@ def train(c):
     if c.debug_overfit_test_data_only:
         validation_dataloaders = {}
     else:
-        validation_dataloaders = eval_dataloaders['validation']
+        try:
+            validation_dataloaders = eval_dataloaders['validation']
+        except KeyError:
+            print('No validation sets found. Computing per-epoch test loss:')
+            validation_dataloaders = eval_dataloaders['test']
+            print(validation_dataloaders.keys())
 
     with tq.tqdm(range(num_epochs)) as pbar_epoch:
         for epoch in pbar_epoch:

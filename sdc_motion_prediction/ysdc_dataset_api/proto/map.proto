@@ -27,6 +27,7 @@ message Lane {
     repeated Vector3 centers = 1;
     float max_velocity = 2;  // m/s
     bool gives_way_to_some_lane = 3;
+    TrafficLightSectionIds traffic_light_section_ids = 4;
 }
 
 message PathGraph {
@@ -57,4 +58,10 @@ message TrafficLightSection {
 
 message TrafficLightSections {
     repeated TrafficLightSection sections = 1;
+}
+
+message TrafficLightSectionIds {
+    uint32 left_section_id = 1;
+    uint32 main_section_id = 2;
+    uint32 right_section_id = 3;
 }

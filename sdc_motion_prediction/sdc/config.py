@@ -10,7 +10,7 @@ def build_parser():
     # #### Wandb ##############################################################
     ###########################################################################
     parser.add_argument(
-        '--wandb_project', type=str, default='sdc',
+        '--wandb_project', type=str, default='sdc-debug',
         help='Wandb project name.')
 
     ###########################################################################
@@ -23,6 +23,9 @@ def build_parser():
         '--dir_data', type=str, default='data',
         help='Directory where SDC data is stored. We also use this to cache '
              'torch hub models.')
+    # parser.add_argument(
+    #     '--dir_prerendered_data', type=str, default='data',
+    #     help='Directory where pre-rendered SDC data is stored.')
     parser.add_argument(
         '--dir_checkpoint', type=str, default='model_checkpoints',
         help='Directory to which model checkpoints are stored.')
@@ -51,6 +54,10 @@ def build_parser():
         default='float32',
         type=str, help='Data type (supported for float32, float64) '
                          'used for data (e.g. inputs, ground truth).')
+    parser.add_argument(
+        '--data_use_prerendered',
+        default=False,
+        type='bool', help='Use pre-rendered data.')
 
     ###########################################################################
     # #### Experiment #########################################################
@@ -128,7 +135,6 @@ def build_parser():
     parser.add_argument(
         '--debug_overfit_n_examples', type=int, default=10,
         help='Size of the subset of train on which we try to overfit.')
-
 
     return parser
 

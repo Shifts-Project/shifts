@@ -10,7 +10,12 @@ from ..utils import (
     transform2dpoints,
     transform2dvectors,
 )
-from ..utils.map import get_crosswalk_availability, get_polygon
+from ..utils.map import (
+    get_crosswalk_availability,
+    get_lane_availability,
+    get_polygon,
+    get_section_to_state,
+)
 
 
 MAX_HISTORY_LENGTH = 25
@@ -194,16 +199,32 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         return feature_map
 
     def _render_crosswalks(self, feature_map, path_graph, traffic_light_sections, transform):
+        crosswalk_polygons = []
         for crosswalk in path_graph.crosswalks:
             polygon = get_polygon(crosswalk.geometry)
             polygon = transform2dpoints(polygon, transform)
-            polygon = np.around(polygon.reshape(1, -1, 2) - 0.5).astype(np.int32)
-            for i, v in enumerate(self._get_crosswalk_feature_map_values(
-                    crosswalk, traffic_light_sections)):
+            polygon = np.around(polygon - 0.5).astype(np.int32)
+            crosswalk_polygons.append(polygon)
+
+        channel = 0
+        if 'crosswalk_occupancy' in self._config:
+            cv2.fillPoly(
+                feature_map[channel, ...],
+                crosswalk_polygons,
+                1.,
+                lineType=self.LINE_TYPE,
+            )
+            channel += 1
+        if 'crosswalk_availability' in self._config:
+            availability_to_polygons = defaultdict(list)
+            for i, crosswalk in enumerate(path_graph.crosswalks):
+                availability = get_crosswalk_availability(crosswalk, traffic_light_sections)
+                availability_to_polygons[availability].append(crosswalk_polygons[i])
+            for availability, polygons in availability_to_polygons.items():
                 cv2.fillPoly(
-                    feature_map[i, :, :],
-                    polygon,
-                    v,
+                    feature_map[channel, ...],
+                    polygons,
+                    availability,
                     lineType=self.LINE_TYPE,
                 )
 
@@ -226,7 +247,8 @@ class RoadGraphRenderer(FeatureMapRendererBase):
 
         channel = 0
         if 'lane_availability' in self._config:
-            raise NotImplementedError
+            self._render_lane_availability(
+                feature_map[channel, ...], lane_centers, path_graph, traffic_light_sections)
             channel += 1
         if 'lane_direction' in self._config:
             self._render_lane_direction(feature_map[channel, ...], lane_centers)
@@ -240,6 +262,22 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         if 'lane_speed_limit' in self._config:
             self._render_lane_speed_limit(feature_map[channel, ...], lane_centers, path_graph)
             channel += 1
+
+    def _render_lane_availability(self, feature_map, lane_centers, path_graph, tl_sections):
+        section_to_state = get_section_to_state(tl_sections)
+        availability_to_lanes = defaultdict(list)
+        for lane_idx, lane in enumerate(path_graph.lanes):
+            availability = get_lane_availability(lane, section_to_state)
+            availability_to_lanes[availability].append(lane_centers[lane_idx])
+        for v, lanes in availability_to_lanes.items():
+            cv2.polylines(
+                feature_map,
+                lanes,
+                isClosed=False,
+                color=v,
+                thickness=self.LINE_THICKNESS,
+                lineType=self.LINE_TYPE,
+            )
 
     def _render_lane_direction(self, feature_map, lane_centers):
         for lane in lane_centers:
@@ -332,14 +370,13 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         values = []
         if 'crosswalk_occupancy' in self._config:
             values.append(1.)
-        if 'crosswalk_avalability' in self._config:
+        if 'crosswalk_availability' in self._config:
             values.append(get_crosswalk_availability(crosswalk, traffic_light_sections))
         return values
 
     def _get_lane_feature_map_size(self):
         num_channels = 0
         if 'lane_availability' in self._config:
-            raise NotImplementedError()
             num_channels += 1
         if 'lane_direction' in self._config:
             num_channels += 1

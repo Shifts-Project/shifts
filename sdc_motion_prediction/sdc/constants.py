@@ -1,7 +1,12 @@
-SPLIT_TO_DATASET_PATH = {
-    'train': '/train/',
-    'validation': '/validation/',
-    'test': '/test/'
+SPLIT_TO_PB_DATASET_PATH = {  # Protobufs (unrendered)
+    'train': '/train_pb/',
+    'validation': '/validation_pb/',
+    'test': '/test_pb/'
+}
+SPLIT_TO_RENDERED_DATASET_PATH = {  # Protobufs (unrendered)
+    'train': '/train_rendered/',
+    'validation': '/validation_rendered/',
+    'test': '/test_rendered/'
 }
 SPLIT_TO_SCENE_TAGS_PATH = {
     'train': '/train_tags.txt',
