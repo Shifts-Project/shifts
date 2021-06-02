@@ -20,6 +20,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
+from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 from sdc.oatomobile.torch.networks.sequence import AutoregressiveFlow
 
@@ -29,15 +30,21 @@ class ImitativeModel(nn.Module):
 
     def __init__(
         self,
-        in_channels: int = 16,
+        num_decoding_steps: int,
+        decoding_lr: float,
+        in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
+        **kwargs
     ) -> None:
         """Constructs a simple imitative model.
 
         Args:
           output_shape: The shape of the base and
             data distribution (a.k.a. event_shape).
+          num_decoding_steps: int, number of grad descent steps
+            for finding the mode.
+          decoding_lr: float, learning rate for finding the mode.
         """
         super(ImitativeModel, self).__init__()
         self._output_shape = output_shape
@@ -55,6 +62,10 @@ class ImitativeModel(nn.Module):
             hidden_size=dim_hidden,
         )
 
+        # Forward pass decoding args
+        self._num_decoding_steps = num_decoding_steps
+        self._decoding_lr = decoding_lr
+
     def to(self, *args, **kwargs):
         """Handles non-parameter tensors when moved to a new device."""
         self = super().to(*args, **kwargs)
@@ -63,15 +74,11 @@ class ImitativeModel(nn.Module):
 
     def forward(
         self,
-        num_steps: int,
-        lr: float = 1e-1,
-        **context: torch.Tensor) -> Union[
-        torch.Tensor, Sequence[torch.Tensor]]:
+        **context: torch.Tensor
+    ) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
         """Returns a local mode from the posterior.
 
         Args:
-          num_steps: int, number of grad descent steps for finding the mode.
-          lr: float, learning rate for finding the mode.
           context: (keyword arguments) The conditioning
             variables used for the conditional flow.
 
@@ -92,14 +99,14 @@ class ImitativeModel(nn.Module):
         z = self._params(**context)
 
         # Initialises a gradient-based optimiser.
-        optimizer = optim.Adam(params=[x], lr=lr)
+        optimizer = optim.Adam(params=[x], lr=self._decoding_lr)
 
         # Stores the best values.
         x_best = x.clone()
         loss_best = torch.ones(()).to(
             x.device) * 1000.0  # pylint: disable=no-member
 
-        for _ in range(num_steps):
+        for _ in range(self._num_decoding_steps):
             # Resets optimizer's gradients.
             optimizer.zero_grad()
 
@@ -167,7 +174,8 @@ def train_step_dim(
     _, log_prob, logabsdet = model._decoder._inverse(y=y, z=z)
 
     # Calculates loss (NLL).
-    loss = -torch.mean(log_prob - logabsdet, dim=0)  # pylint: disable=no-member
+    loss = -torch.mean(log_prob - logabsdet,
+                       dim=0)  # pylint: disable=no-member
 
     # Backward pass.
     loss.backward()
@@ -183,16 +191,29 @@ def train_step_dim(
 
 
 def evaluate_step_dim(
+    sdc_loss: SDCLoss,
     model: ImitativeModel,
     batch: Mapping[str, torch.Tensor],
-) -> torch.Tensor:
+) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
     # Forward pass from the model.
     z = model._params(**batch)
     _, log_prob, logabsdet = model._decoder._inverse(
         y=batch["ground_truth_trajectory"], z=z)
 
-    # Calculates loss (NLL).
-    loss = -torch.mean(log_prob - logabsdet, dim=0)
+    # Calculates NLL.
+    nll = -torch.mean(log_prob - logabsdet, dim=0)
 
-    return loss
+    # Decode a trajectory from the posterior.
+    predictions = model.forward(**batch)
+    ade = sdc_loss.average_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    fde = sdc_loss.final_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    loss_dict = {
+        'nll': nll,
+        'ade': ade,
+        'fde': fde}
+    return loss_dict

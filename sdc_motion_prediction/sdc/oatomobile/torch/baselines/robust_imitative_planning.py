@@ -17,24 +17,26 @@
 from typing import Mapping, Union, Sequence
 
 import numpy as np
-import scipy.interpolate
 import torch
 import torch.optim as optim
 
-from sdc.oatomobile.torch.baselines.behavioral_cloning import BehaviouralModel
-from sdc.oatomobile.torch.baselines.deep_imitative_model import ImitativeModel
+from sdc.metrics import SDCLoss
+from sdc.oatomobile.torch.baselines.behavioral_cloning import (
+    BehaviouralModel, train_step_bc)
+from sdc.oatomobile.torch.baselines.deep_imitative_model import (
+    ImitativeModel, train_step_dim)
 
 
 class RIPAgent:
     """The robust imitative planning agent."""
 
     def __init__(self,
+                 num_decoding_steps: int,
+                 decoding_lr: float,
                  algorithm: str,
                  model_name: str,
                  models: Sequence[Union[BehaviouralModel, ImitativeModel]],
                  device: str,
-                 dim_lr: float = 1e-1,
-                 dim_num_steps: int = 10,
                  **kwargs) -> None:
         """Constructs a robust imitative planning agent.
 
@@ -55,11 +57,13 @@ class RIPAgent:
         assert model_name in ("bc", "dim")
         self._model_name = model_name
 
-        self._dim_lr = dim_lr
-        self._dim_num_steps = dim_num_steps
+        self._dim_lr = decoding_lr
+        self._dim_num_steps = num_decoding_steps
 
-    def call_dim_models(self,
-                        observation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def call_dim_models(
+        self,
+        observation: Mapping[str, torch.Tensor]
+    ) -> torch.Tensor:
         # TODO(filangel) move this in `ImitativeModel.imitation_posterior`.
         lr = self._dim_lr
         num_steps = self._dim_num_steps
@@ -128,32 +132,19 @@ class RIPAgent:
                 loss_best = loss.clone()
 
         plan, _ = self._models[0]._forward(x=x_best, z=zs[0])
-
-        ######
-        plan = plan.detach().cpu().numpy()[0]  # [T, 2]
-
-        # # TODO(filangel): clean API.
-        # # Interpolates plan.
-        # player_future_length = 40
-        # increments = player_future_length // plan.shape[0]
-        # time_index = list(range(0, player_future_length, increments))  # [T]
-        # plan_interp = scipy.interpolate.interp1d(x=time_index, y=plan, axis=0)
-        # xy = plan_interp(np.arange(0, time_index[-1]))
-        #
-        # # Appends z dimension.
-        # z = np.zeros(shape=(xy.shape[0], 1))
-        # return np.c_[xy, z]
-
+        plan = plan.detach().cpu()[0]  # [T, 2]
         return plan
 
-    def call_bc_models(self,
-                       observation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def call_bc_models(
+        self,
+        observation: Mapping[str, torch.Tensor]
+    ) -> torch.Tensor:
         raise NotImplementedError
 
     def __call__(
         self,
-        observation: Mapping[str, np.ndarray],
-    ) -> np.ndarray:
+        observation: Mapping[str, torch.Tensor],
+    ) -> torch.Tensor:
         """Returns the imitative prior."""
         if self._model_name == 'dim':
             return self.call_dim_models(observation)
@@ -161,3 +152,44 @@ class RIPAgent:
             return self.call_bc_models(observation)
         else:
             raise NotImplementedError
+
+
+def train_step_rip(
+    rip_agent: RIPAgent,
+    optimizer: optim.Optimizer,
+    batch: Mapping[str, torch.Tensor],
+    noise_level: float,
+    clip: bool = False,
+) -> torch.Tensor:
+    """Performs a gradient-descent step for each constituent model."""
+    models = rip_agent._models
+
+    if rip_agent._model_name == 'dim':
+        train_step = train_step_dim
+    elif rip_agent._model_name == 'bc':
+        train_step = train_step_bc
+    else:
+        raise NotImplementedError
+    losses = [
+        train_step(
+            model=model, optimizer=optimizer, batch=batch,
+            noise_level=noise_level, clip=clip) for model in models]
+    return torch.stack(losses).mean()
+
+
+def evaluate_step_rip(
+    sdc_loss: SDCLoss,
+    rip_agent: RIPAgent,
+    batch: Mapping[str, torch.Tensor],
+) -> torch.Tensor:
+    predictions = rip_agent(**batch)
+    ade = sdc_loss.average_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    fde = sdc_loss.final_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    loss_dict = {
+        'ade': ade,
+        'fde': fde}
+    return loss_dict

@@ -61,8 +61,8 @@ def load_datasets(c, splits: Optional[List[str]] = None):
         split_scene_tags_fpath = SPLIT_TO_SCENE_TAGS_PATH[dataset_split]
         split_dataset_path = f'{c.dir_data}{split_dataset_path}'
         split_scene_tags_fpath = f'{c.dir_data}{split_scene_tags_fpath}'
-        split_prerendered_dataset_path = SPLIT_TO_RENDERED_DATASET_PATH[
-            dataset_split]
+        split_prerendered_dataset_path = (
+            f'{c.dir_data}{SPLIT_TO_RENDERED_DATASET_PATH[dataset_split]}')
 
         for dataset_key, scene_tags_filter_fn in split_dict.items():
             print(f'Loading dataset {dataset_key}.')

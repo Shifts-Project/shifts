@@ -104,11 +104,27 @@ def build_parser():
         help="The backbone model. See "
              "sdc/oatomobile/torch/baselines/__init__.py.")
     parser.add_argument(
+        '--model_rip_algorithm', type=str, default=None,
+        help="Use Robust Imitative Planning wrapper around the backbone model."
+             "`None` will disable RIP."
+             "`WCM`: worst-case model configuration."
+             "`MA`: Bayesian model averaging."
+             "`BCM`: best-case model.")
+    parser.add_argument(
+        '--model_rip_k', type=int, default=3,
+        help="Number of models in the RIP ensemble.")
+    parser.add_argument(
         '--model_dim_hidden', type=int, default=128,
         help="Number of hidden dims, generally the size "
              "of the embedding passed from the vision model "
              "(e.g., MobileNetV2) to the autoregressive "
              "decoder.")
+    parser.add_argument(
+        '--model_in_channels', type=int, default=17,
+        help="Number of feature map channels.")
+    parser.add_argument(
+        '--model_output_shape', type=tuple, default=(25, 2),
+        help="Predict position for 25 timesteps.")
     parser.add_argument('--model_weight_decay', type=float, default=0.0,
                         help="The L2 penalty (regularization) coefficient.")
     parser.add_argument(
@@ -120,7 +136,15 @@ def build_parser():
     ###########################################################################
 
     parser.add_argument('--dim_noise_level', type=float, default=1e-2,
-                        help="")
+                        help="Noise with which ground truth trajectories are "
+                             "perturbed in training DIM.")
+    parser.add_argument('--dim_num_decoding_steps', type=int, default=10,
+                        help="Number of steps to fine-tune decoder and sample "
+                             "from base distribution in generating a context-"
+                             "dependent trajectory sample.")
+    parser.add_argument('--dim_decoding_lr', type=float, default=1e-1,
+                        help="LR used in updates for generating a context-"
+                             "dependent trajectory sample.")
 
     ###########################################################################
     # #### Debug ##############################################################

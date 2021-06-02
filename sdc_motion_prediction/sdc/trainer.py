@@ -1,35 +1,20 @@
 import os
 from collections import defaultdict
 from functools import partial
+from typing import Mapping
 
 import torch
 import torch.distributions as D
-import torch.nn as nn
 import torch.optim as optim
 import tqdm as tq
-
 from transformers import get_cosine_schedule_with_warmup
+
 from sdc.dataset import load_datasets, load_dataloaders
-from sdc.oatomobile.torch.baselines import (
-    MODEL_TO_FULL_NAME, MODEL_NAME_TO_CLASS_FNS)
+from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.baselines import batch_transform
+from sdc.oatomobile.torch.baselines import init_model
 from sdc.oatomobile.torch.savers import Checkpointer
 from sdc.oatomobile.utils.loggers.wandb import WandbLogger
-
-
-class MyDataset(torch.utils.data.Dataset):
-    def __init__(self):
-        super(MyDataset, self).__init__()
-        # do stuff here?
-        self.values = torch.randn((50000, 100, 100, 16))
-        self.labels = torch.randn((50000, 2, 25))
-        # self.labels = labels
-
-    def __len__(self):
-        return len(self.values)  # number of samples in the dataset
-
-    def __getitem__(self, index):
-        return self.values[index], self.labels[index]
 
 
 def count_parameters(model):
@@ -49,33 +34,23 @@ def train(c):
     num_epochs = c.exp_num_epochs
     num_warmup_epochs = c.exp_num_lr_warmup_epochs
     checkpoint_frequency = c.exp_checkpoint_frequency
-    num_timesteps_to_keep = 25
+    output_shape = c.model_output_shape
+    num_timesteps_to_keep, _ = output_shape
     downsample_hw = (c.exp_image_downsize_hw, c.exp_image_downsize_hw)
     data_dtype = c.data_dtype
     device = c.exp_device
-    dim_hidden = c.model_dim_hidden
+    model_name = c.model_name
 
     downsize_cast_batch_transform = partial(
         batch_transform, device=device, downsample_hw=downsample_hw,
-        dtype=data_dtype, num_timesteps_to_keep=num_timesteps_to_keep)
-    output_shape = (num_timesteps_to_keep, 2)  # Predict 25 timesteps
-    # in_channels = 9
-    in_channels = 16  # TODO: speed up featurization of roads/HD map
+        dtype=data_dtype, num_timesteps_to_keep=num_timesteps_to_keep,
+        data_use_prerendered=c.data_use_prerendered)
 
-    # Initializes the model and its optimizer.
-
-    # Obtain model class (e.g., ImitativeModel or BehavioralModel)
+    # Obtain model backbone (e.g., ImitativeModel or BehavioralModel),
+    # RIP wrapper if specified (e.g., model averaging),
     # and its respective train/evaluate steps.
-    model_name = c.model_name
-    print(f'Training {MODEL_TO_FULL_NAME[model_name]}.')
-    model_class, train_step, evaluate_step = (
-        MODEL_NAME_TO_CLASS_FNS[c.model_name])
-    model = model_class(
-        in_channels=in_channels, dim_hidden=dim_hidden,
-        output_shape=output_shape).to(device=device)
-    print(f'Model has {count_parameters(model)} parameters,'
-          f'batch size {c.exp_batch_size}.')
-    criterion = nn.L1Loss(reduction="none")
+    model, full_model_name, train_step, evaluate_step = init_model(c)
+
     optimizer = optim.AdamW(
         model.parameters(), lr=lr, weight_decay=weight_decay)
     # Based on the fairseq implementation, which is based on BERT
@@ -85,7 +60,7 @@ def train(c):
         num_training_steps=num_epochs)
 
     # Create checkpoint dir, if necessary; init Checkpointer.
-    checkpoint_dir = f'{c.dir_checkpoint}/{model_name}'
+    checkpoint_dir = f'{c.dir_checkpoint}/{full_model_name}'
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpointer = Checkpointer(model=model, ckpt_dir=checkpoint_dir)
 
@@ -94,30 +69,32 @@ def train(c):
     datasets = load_datasets(c, splits=None)
     train_dataloader, eval_dataloaders = load_dataloaders(datasets, c)
 
+    # Init object for computing loss and metrics.
+    sdc_loss = SDCLoss()
+
     # Init train and evaluate args for respective model backbone.
     train_args = {
         'model': model,
         'optimizer': optimizer,
-        'clip': clip_gradients
+        'clip': clip_gradients,
+        'sdc_loss': sdc_loss
     }
-    evaluate_args = {'model': model}
-    if model_name == 'bc':
-        train_args['criterion'] = criterion
-        evaluate_args['criterion'] = criterion
-    elif model_name == 'dim':
+    evaluate_args = {
+        'model': model,
+        'sdc_loss': sdc_loss
+    }
+    if model_name == 'dim':
         noise_level = c.dim_noise_level
         train_args['noise_level'] = noise_level
 
-        # Theoretical limit of NLL.
+        # Theoretical limit of NLL, given the noise level.
         nll_limit = -torch.sum(  # pylint: disable=no-member
             D.MultivariateNormal(
                 loc=torch.zeros(output_shape[-2] * output_shape[-1]),
-                # pylint: disable=no-member
-                scale_tril=torch.eye(output_shape[-2] * output_shape[
-                    -1]) *  # pylint: disable=no-member
-                           noise_level,  # pylint: disable=no-member
-            ).log_prob(torch.zeros(output_shape[-2] * output_shape[
-                -1])))  # pylint: disable=no-member
+                scale_tril=torch.eye(
+                    output_shape[-2] * output_shape[-1]) * noise_level,
+            ).log_prob(
+                torch.zeros(output_shape[-2] * output_shape[-1])))
 
     # @profile
     def train_epoch(
@@ -140,10 +117,10 @@ def train(c):
         return loss / steps, steps
 
     def evaluate_epoch(
-      dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
+      dataloader: torch.utils.data.DataLoader) -> Mapping[str, torch.Tensor]:
         """Performs an evaluation of the `model` on the `dataloader."""
         model.eval()
-        loss = 0.0
+        eval_loss_dict = {}
         steps = 0
         with tq.tqdm(dataloader) as pbar:
             for batch in pbar:
@@ -153,11 +130,19 @@ def train(c):
 
                 # Accumulates loss in dataset.
                 with torch.no_grad():
-                    loss += evaluate_step(**evaluate_args)
+                    loss_dict = evaluate_step(**evaluate_args)
+                    for key, value in loss_dict.items():
+                        if key not in eval_loss_dict.keys():
+                            eval_loss_dict[key] = value
+                        else:
+                            eval_loss_dict[key] += value
 
                 steps += 1
 
-        return loss / steps
+        for key in eval_loss_dict:
+            eval_loss_dict[key] /= steps
+
+        return eval_loss_dict
 
     # Initialize wandb logger state
     logger = WandbLogger(optimizer)
@@ -185,8 +170,11 @@ def train(c):
 
             # Evaluates model on validation datasets
             for dataset_key, dataloader_val in validation_dataloaders.items():
-                loss_val = evaluate_epoch(dataloader_val)
-                epoch_loss_dict['validation'][dataset_key] = loss_val
+                loss_val_dict = evaluate_epoch(dataloader_val)
+                for loss_key, loss_value in loss_val_dict.items():
+                    epoch_loss_dict[
+                        'validation'][
+                        f'{dataset_key}__{loss_key}'] = loss_value
 
             # write(model, dataloader_val, writer, "val", loss_val, epoch)
 

@@ -24,6 +24,10 @@ from typing import Tuple
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.distributions as D
+import torch.nn as nn
+import torch.nn.functional as F
+from sdc.metrics import SDCLoss
 
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 
@@ -33,9 +37,10 @@ class BehaviouralModel(nn.Module):
 
     def __init__(
         self,
-        in_channels: int = 16,
+        in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
+        **kwargs
     ) -> None:
         """Constructs a simple behavioural cloning model.
 
@@ -47,22 +52,24 @@ class BehaviouralModel(nn.Module):
         self._output_shape = output_shape
 
         # The convolutional encoder model.
-        self._encoder = MobileNetV2(num_classes=dim_hidden, in_channels=in_channels)
+        self._encoder = MobileNetV2(
+            in_channels=in_channels, num_classes=dim_hidden)
 
         # No need for an MLP merger, as all inputs (including static HD map
         # features) have been converted to an image representation.
 
         # The decoder recurrent network used for the sequence generation.
-        self._decoder = nn.GRUCell(input_size=2, hidden_size=dim_hidden)
+        self._decoder = nn.GRUCell(
+            input_size=self._output_shape[-1], hidden_size=dim_hidden)
 
-        # The output head.
+        # The output head, predicts the parameters of a Gaussian.
         self._output = nn.Linear(
             in_features=dim_hidden,
-            out_features=self._output_shape[-1],
-        )
+            out_features=(self._output_shape[-1] * 2))
 
-    def forward(self, **context: torch.Tensor) -> torch.Tensor:
+    def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""
+        raise NotImplementedError('Deprecated, now sampling from a Gaussian.')
 
         # Parses context variables.
         feature_maps = context.get("feature_maps")
@@ -95,32 +102,79 @@ class BehaviouralModel(nn.Module):
 
         return torch.stack(y, dim=1)  # pylint: disable=no-member
 
+    def forward(self,
+                **context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Returns the expert plan."""
+        # Parses context variables.
+        feature_maps = context.get("feature_maps")
+
+        # Encodes the visual input.
+        z = self._encoder(feature_maps)
+
+        # z is the decoder's initial state.
+
+        # Output container.
+        y = list()
+        scales = list()
+
+        # Initial input variable.
+        y_tm1 = torch.zeros(  # pylint: disable=no-member
+            size=(z.shape[0], self._output_shape[-1]),
+            dtype=z.dtype,
+        ).to(z.device)
+
+        # Autoregressive generation of plan.
+        for _ in range(self._output_shape[0]):
+            # Unrolls the GRU.
+            z = self._decoder(y_tm1, z)
+
+            # Predicts the location and scale of the MVN distribution.
+            dloc_scale = self._output(z)
+            dloc = dloc_scale[..., :2]
+            scale = F.softplus(dloc_scale[..., 2:]) + 1e-3
+
+            # Data distribution corresponding sample from a std normal.
+            y_t = (y_tm1 + dloc) + (
+                scale * torch.normal(
+                mean=torch.zeros((z.shape[0], self._output_shape[-1])),
+                std=torch.ones((z.shape[0], self._output_shape[-1]))))
+
+            # Update containers.
+            y.append(y_t)
+            scales.append(scale)
+            y_tm1 = y_t
+
+        # Prepare tensors, reshape to [B, T, 2].
+        y = torch.stack(y, dim=-2)  # pylint: disable=no-member
+        scales = torch.stack(scales, dim=-2)  # pylint: disable=no-member
+        return y, scales
+
 
 def train_step_bc(
-  model: BehaviouralModel,
-  optimizer: optim.Optimizer,
-  criterion: torch.nn.Module,
-  batch: Mapping[str, torch.Tensor],
-  clip: bool = False,
+    sdc_loss: SDCLoss,
+    model: BehaviouralModel,
+    optimizer: optim.Optimizer,
+    batch: Mapping[str, torch.Tensor],
+    clip: bool = False,
 ) -> torch.Tensor:
     """Performs a single gradient-descent optimisation step."""
     # Resets optimizer's gradients.
     optimizer.zero_grad()
 
     # Forward pass from the model.
-    predictions = model(**batch)
+    predictions, _ = model(**batch)
 
     # Calculates loss.
-    loss = criterion(predictions, batch["ground_truth_trajectory"])
-    loss = torch.sum(loss, dim=[-2, -1])  # pylint: disable=no-member
-    loss = torch.mean(loss, dim=0)  # pylint: disable=no-member
+    loss = sdc_loss.average_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
 
     # Backward pass.
     loss.backward()
 
     # Clips gradients norm.
     if clip:
-          torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
+        torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
 
     # Performs a gradient descent step.
     optimizer.step()
@@ -128,17 +182,22 @@ def train_step_bc(
 
 
 def evaluate_step_bc(
-    criterion: torch.nn.Module,
+    sdc_loss: SDCLoss,
     model: BehaviouralModel,
     batch: Mapping[str, torch.Tensor],
-) -> torch.Tensor:
+) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
     # Forward pass from the model.
-    predictions = model(**batch)
+    predictions, _ = model(**batch)
 
     # Calculates loss on mini-batch.
-    loss = criterion(predictions, batch["ground_truth_trajectory"])
-    loss = torch.sum(loss, dim=[-2, -1])  # pylint: disable=no-member
-    loss = torch.mean(loss, dim=0)  # pylint: disable=no-member
-
-    return loss
+    ade = sdc_loss.average_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    fde = sdc_loss.final_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    loss_dict = {
+        'ade': ade,
+        'fde': fde}
+    return loss_dict

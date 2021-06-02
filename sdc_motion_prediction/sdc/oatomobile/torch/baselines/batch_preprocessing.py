@@ -29,7 +29,8 @@ def batch_transform(
     device: str = 'cpu',
     downsample_hw: Tuple[int, int] = (100, 100),
     dtype: str = 'float32',
-    num_timesteps_to_keep: int = 25
+    num_timesteps_to_keep: int = 25,
+    data_use_prerendered: bool = False
 ) -> Mapping[str, torch.Tensor]:
     """Prepares variables for the interface of the model.
 
@@ -52,12 +53,16 @@ def batch_transform(
             torch_cast_to_dtype(
                 sample["ground_truth_trajectory"], dtype).to(device=device))
 
+    feature_map_key = (
+        "prerendered_feature_map" if data_use_prerendered
+        else "feature_maps")
+
     # Preprocesses the visual features.
-    if "feature_maps" in sample.keys():
-        sample["feature_maps"] = torch_cast_to_dtype(
+    if feature_map_key in sample.keys():
+        sample['feature_maps'] = torch_cast_to_dtype(
                 transforms.transpose_visual_features(
                     transforms.downsample_visual_features(
-                        visual_features=sample["feature_maps"],
+                        visual_features=sample[feature_map_key],
                         output_shape=downsample_hw,
                     )), dtype).to(device=device)
 
