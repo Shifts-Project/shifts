@@ -53,8 +53,6 @@ def get_dim_kwargs(c):
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
         'device': c.exp_device,
-        'num_decoding_steps': c.dim_num_decoding_steps,
-        'decoding_lr': c.dim_decoding_lr
     }
 
 
@@ -99,8 +97,6 @@ def get_rip_kwargs(c):
         'k': c.model_rip_k,
         'model_name': c.model_name,
         'device': c.exp_device,
-        'num_decoding_steps': c.dim_num_decoding_steps,
-        'decoding_lr': c.dim_decoding_lr
     }
 
 
