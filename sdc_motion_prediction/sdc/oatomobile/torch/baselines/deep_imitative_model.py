@@ -148,6 +148,7 @@ def train_step_dim(
     batch: Mapping[str, torch.Tensor],
     noise_level: float,
     clip: bool = False,
+    **kwargs
 ) -> torch.Tensor:
     """Performs a single gradient-descent optimisation step."""
     # Resets optimizer's gradients.
