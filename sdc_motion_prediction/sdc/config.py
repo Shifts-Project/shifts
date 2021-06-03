@@ -50,6 +50,9 @@ def build_parser():
         '--data_num_workers', type=int, default=4,
         help='Number of workers to use in PyTorch data loading.')
     parser.add_argument(
+        '--data_prefetch_factor', type=int, default=2,
+        help='Number of samples loaded in advance by each worker.')
+    parser.add_argument(
         '--data_dtype',
         default='float32',
         type=str, help='Data type (supported for float32, float64) '
