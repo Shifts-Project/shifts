@@ -142,13 +142,6 @@ def build_parser():
     parser.add_argument('--dim_noise_level', type=float, default=1e-2,
                         help="Noise with which ground truth trajectories are "
                              "perturbed in training DIM.")
-    parser.add_argument('--dim_num_decoding_steps', type=int, default=10,
-                        help="Number of steps to fine-tune decoder and sample "
-                             "from base distribution in generating a context-"
-                             "dependent trajectory sample.")
-    parser.add_argument('--dim_decoding_lr', type=float, default=1e-1,
-                        help="LR used in updates for generating a context-"
-                             "dependent trajectory sample.")
 
     ###########################################################################
     # #### Debug ##############################################################
