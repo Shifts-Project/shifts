@@ -40,8 +40,6 @@ def load_overfit_set_file_paths(
 def load_datasets(c, splits: Optional[List[str]] = None):
     if c.debug_overfit_test_data_only:
         splits = ['test']
-    elif c.data_use_prerendered:
-        splits = ['train', 'test']
     if splits is not None:
         print(f'Loading datasets for splits {splits}.')
 
@@ -98,6 +96,8 @@ def load_dataloaders(datasets, c):
     batch_size = c.exp_batch_size
     num_workers = c.data_num_workers
     prefetch_factor = c.data_prefetch_factor
+    print(f'Building dataloaders with num_workers={num_workers}, '
+          f'prefetch_factor={prefetch_factor}.')
 
     if c.debug_overfit_test_data_only:
         train_dataloader = torch.utils.data.DataLoader(

@@ -40,9 +40,6 @@ class ImitativeModel(nn.Module):
         Args:
           output_shape: The shape of the base and
             data distribution (a.k.a. event_shape).
-          num_decoding_steps: int, number of grad descent steps
-            for finding the mode.
-          decoding_lr: float, learning rate for finding the mode.
         """
         super(ImitativeModel, self).__init__()
         self._output_shape = output_shape
