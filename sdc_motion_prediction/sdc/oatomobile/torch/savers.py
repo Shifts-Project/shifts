@@ -28,10 +28,12 @@ class Checkpointer:
   def __init__(
       self,
       model: nn.Module,
+      torch_seed: int,
       ckpt_dir: str,
   ) -> None:
     """Constructs a simple load/save checkpointer."""
     self._model = model
+    self._torch_seed = torch_seed
     self._ckpt_dir = ckpt_dir
     os.makedirs(self._ckpt_dir, exist_ok=True)
 
@@ -40,7 +42,8 @@ class Checkpointer:
       epoch: int,
   ) -> str:
     """Saves the model to the `ckpt_dir/epoch/model.pt` file."""
-    ckpt_path = os.path.join(self._ckpt_dir, "model-{}.pt".format(epoch))
+    model_file_name = f'model-seed-{self._torch_seed}-epoch-{epoch}.pt'
+    ckpt_path = os.path.join(self._ckpt_dir, model_file_name)
     torch.save(self._model.state_dict(), ckpt_path)
     return ckpt_path
 
@@ -49,6 +52,7 @@ class Checkpointer:
       epoch: int,
   ) -> nn.Module:
     """Loads the model from the `ckpt_dir/epoch/model.pt` file."""
-    ckpt_path = os.path.join(self._ckpt_dir, "model-{}.pt".format(epoch))
+    model_file_name = f'model-seed-{self._torch_seed}-epoch-{epoch}.pt'
+    ckpt_path = os.path.join(self._ckpt_dir, model_file_name)
     self._model.load_state_dict(torch.load(ckpt_path, map_location=device))
     return self._model

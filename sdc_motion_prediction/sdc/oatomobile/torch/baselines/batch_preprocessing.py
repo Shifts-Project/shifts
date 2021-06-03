@@ -59,11 +59,15 @@ def batch_transform(
 
     # Preprocesses the visual features.
     if feature_map_key in sample.keys():
+        if downsample_hw is not None:
+            downsampled_features = transforms.downsample_visual_features(
+                visual_features=sample[feature_map_key],
+                output_shape=downsample_hw)
+        else:
+            downsampled_features = sample[feature_map_key]
+
         sample['feature_maps'] = torch_cast_to_dtype(
-                transforms.transpose_visual_features(
-                    transforms.downsample_visual_features(
-                        visual_features=sample[feature_map_key],
-                        output_shape=downsample_hw,
-                    )), dtype).to(device=device)
+            transforms.transpose_visual_features(
+                downsampled_features), dtype).to(device=device)
 
     return sample

@@ -14,25 +14,22 @@
 # ==============================================================================
 """Implements the robust imitative planning agent."""
 
+import os
 from typing import Mapping, Union, Sequence
 
-import numpy as np
 import torch
-import torch.optim as optim
 
 from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.baselines.behavioral_cloning import (
-    BehaviouralModel, train_step_bc)
+    BehaviouralModel)
 from sdc.oatomobile.torch.baselines.deep_imitative_model import (
-    ImitativeModel, train_step_dim)
+    ImitativeModel)
 
 
 class RIPAgent:
     """The robust imitative planning agent."""
 
     def __init__(self,
-                 num_decoding_steps: int,
-                 decoding_lr: float,
                  algorithm: str,
                  model_name: str,
                  models: Sequence[Union[BehaviouralModel, ImitativeModel]],
@@ -57,132 +54,120 @@ class RIPAgent:
         assert model_name in ("bc", "dim")
         self._model_name = model_name
 
-        self._dim_lr = decoding_lr
-        self._dim_num_steps = num_decoding_steps
-
     def call_dim_models(
         self,
-        observation: Mapping[str, torch.Tensor]
+        **observation: Mapping[str, torch.Tensor]
     ) -> torch.Tensor:
         # TODO(filangel) move this in `ImitativeModel.imitation_posterior`.
-        lr = self._dim_lr
-        num_steps = self._dim_num_steps
-        batch_size = observation["feature_maps"].shape[0]
+        # Obtain a predicted plan for each of the ensemble members.
+        predictions = torch.stack(
+            [model.forward(**observation) for model in self._models], dim=0)
 
-        # Sets initial sample to base distribution's mean.
-        x = self._models[0]._decoder._base_dist.mean.clone().detach().repeat(
-            batch_size, 1).view(
-            batch_size,
-            *self._models[0]._output_shape,
-        )
-        x.requires_grad = True
+        if True:
+            a = 1
 
-        # The contextual parameters, caches for efficiency.
-        zs = [model._params(**observation) for model in self._models]
+        k = len(self._models)  # Number of ensemble members
 
-        # Initialises a gradient-based optimiser.
-        optimizer = optim.Adam(params=[x], lr=lr)
+        # For each element in the batch, we have k models and k predictions.
+        # Score each plan under the imitation prior of each model:
+        scores = []
+        for i in range(k):
+            model_i_scores = []
+            for j in range(k):
+                model_i_scores.append(
+                    self._models[i].score_plans(predictions[j, :, :, :]))
 
-        # Stores the best values.
-        x_best = x.clone()
-        loss_best = torch.ones(()).to(
-            x.device) * 1000.0  # pylint: disable=no-member
+            scores.append(torch.stack(model_i_scores, dim=0))
 
-        for _ in range(num_steps):
-            # Resets optimizer's gradients.
-            optimizer.zero_grad()
+        # These are the imitation priors.
+        # A high score at i, j corresponds to a high likelihood
+        # of plan j under the imitation prior of model i.
+        scores = torch.stack(scores, dim=0)
 
-            # Operate on `y`-space.
-            y, _ = self._models[0]._forward(x=x, z=zs[0])
+        # Aggregate scores from the `K` models.
+        if self._algorithm == 'WCM':
+            scores = torch.min(scores, dim=0).values
+        elif self._algorithm == 'BCM':
+            scores = torch.max(scores, dim=0).values
+        elif self._algorithm == 'MA':
+            scores = torch.mean(scores, dim=0)
+        else:
+            raise NotImplementedError
 
-            # No goal likelihood here, so we are just calculating the
-            # imitiation prior for each of the `K` models.
-            imitation_priors = list()
-            for model, z in zip(self._models, zs):
-                # Calculates imitation prior.
-                _, log_prob, logabsdet = model._inverse(y=y,
-                                                        z=z)  # should this be model.decoder.inverse?
-                imitation_prior = torch.mean(
-                    log_prob - logabsdet)  # pylint: disable=no-member
-                imitation_priors.append(imitation_prior)
+        # Get indices of the plan with highest imitation prior
+        # for each example in the batch
+        best_plan_indices = torch.argmax(scores, dim=0)
+        best_plans = [
+            predictions[best_plan_indices[b], b, :, :]
+            for b in range(predictions.size(1))]
+        best_plans = torch.stack(best_plans, dim=0)
+        best_plans = best_plans.detach().cpu()
+        return best_plans
 
-            # Aggregate scores from the `K` models.
-            imitation_priors = torch.stack(imitation_priors,
-                                           dim=0)  # pylint: disable=no-member
-
-            if self._algorithm == "WCM":
-                loss, _ = torch.min(-imitation_priors,
-                                    dim=0)  # pylint: disable=no-member
-            elif self._algorithm == "BCM":
-                loss, _ = torch.max(-imitation_priors,
-                                    dim=0)  # pylint: disable=no-member
-            else:
-                loss = torch.mean(-imitation_priors,
-                                  dim=0)  # pylint: disable=no-member
-
-            # Backward pass.
-            loss.backward(retain_graph=True)
-
-            # Performs a gradient descent step.
-            optimizer.step()
-
-            # Book-keeping
-            if loss < loss_best:
-                x_best = x.clone()
-                loss_best = loss.clone()
-
-        plan, _ = self._models[0]._forward(x=x_best, z=zs[0])
-        plan = plan.detach().cpu()[0]  # [T, 2]
-        return plan
+        #
+        #
+        #
+        #     # imitation_priors = torch.stack(imitation_priors,
+        # #                                    dim=0)  # pylint: disable=no-member
+        #
+        #     if self._algorithm == "WCM":
+        #         loss, _ = torch.min(-imitation_priors,
+        #                             dim=0)  # pylint: disable=no-member
+        #     elif self._algorithm == "BCM":
+        #         loss, _ = torch.max(-imitation_priors,
+        #                             dim=0)  # pylint: disable=no-member
+        #     else:
+        #         loss = torch.mean(-imitation_priors,
+        #                           dim=0)  # pylint: disable=no-member
+        #
+        #     # Backward pass.
+        #     loss.backward(retain_graph=True)
+        #
+        #     # Performs a gradient descent step.
+        #     optimizer.step()
+        #
+        #     # Book-keeping
+        #     if loss < loss_best:
+        #         x_best = x.clone()
+        #         loss_best = loss.clone()
+        #
+        # plan, _ = self._models[0]._forward(x=x_best, z=zs[0])
+        # plan = plan.detach().cpu()[0]  # [T, 2]
+        # return plan
 
     def call_bc_models(
         self,
-        observation: Mapping[str, torch.Tensor]
+        **observation: Mapping[str, torch.Tensor]
     ) -> torch.Tensor:
         raise NotImplementedError
 
     def __call__(
         self,
-        observation: Mapping[str, torch.Tensor],
+        **observation: Mapping[str, torch.Tensor],
     ) -> torch.Tensor:
         """Returns the imitative prior."""
         if self._model_name == 'dim':
-            return self.call_dim_models(observation)
+            return self.call_dim_models(**observation)
         elif self._model_name == 'bc':
-            return self.call_bc_models(observation)
+            return self.call_bc_models(**observation)
         else:
             raise NotImplementedError
 
+    def train(self):
+        for model in self._models:
+            model.train()
 
-def train_step_rip(
-    rip_agent: RIPAgent,
-    optimizer: optim.Optimizer,
-    batch: Mapping[str, torch.Tensor],
-    noise_level: float,
-    clip: bool = False,
-) -> torch.Tensor:
-    """Performs a gradient-descent step for each constituent model."""
-    models = rip_agent._models
-
-    if rip_agent._model_name == 'dim':
-        train_step = train_step_dim
-    elif rip_agent._model_name == 'bc':
-        train_step = train_step_bc
-    else:
-        raise NotImplementedError
-    losses = [
-        train_step(
-            model=model, optimizer=optimizer, batch=batch,
-            noise_level=noise_level, clip=clip) for model in models]
-    return torch.stack(losses).mean()
+    def eval(self):
+        for model in self._models:
+            model.eval()
 
 
 def evaluate_step_rip(
     sdc_loss: SDCLoss,
-    rip_agent: RIPAgent,
+    model: RIPAgent,
     batch: Mapping[str, torch.Tensor],
-) -> torch.Tensor:
-    predictions = rip_agent(**batch)
+) -> Mapping[str, torch.Tensor]:
+    predictions = model(**batch)
     ade = sdc_loss.average_displacement_error(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
@@ -193,3 +178,44 @@ def evaluate_step_rip(
         'ade': ade,
         'fde': fde}
     return loss_dict
+
+
+def load_rip_checkpoints(
+    model: RIPAgent,
+    device: str,
+    k: int,
+    checkpoint_dir: str
+) -> RIPAgent:
+    if not os.path.isdir(checkpoint_dir):
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        raise ValueError(
+            f'Expected trained model checkpoints for RIP at '
+            f'checkpoint_dir {checkpoint_dir}. The directory was created '
+            f'for your convenience.\n.')
+
+    # Load RIP ensemble members from checkpoint dir
+
+    checkpoint_file_names = os.listdir(checkpoint_dir)
+
+    models_loaded = 0
+    for file_name in checkpoint_file_names:
+        ckpt_path = os.path.join(checkpoint_dir, file_name)
+        try:
+            model._models[
+                models_loaded].load_state_dict(
+                torch.load(ckpt_path, map_location=device))
+            models_loaded += 1
+            print(f'Loaded ensemble member {models_loaded} '
+                  f'from path {ckpt_path}')
+        except Exception as e:
+            raise Exception(
+                f"Failed in loading checkpoint at path "
+                f"{ckpt_path} with exception:\n{e}")
+
+    assert models_loaded == len(model._models), (
+        f'Failed to load all {k} ensemble members. '
+        f'Does the checkpoint directory at {checkpoint_dir} '
+        f'contain all of them?')
+
+    print(f'Successfully loaded all {k} ensemble members.')
+    return model

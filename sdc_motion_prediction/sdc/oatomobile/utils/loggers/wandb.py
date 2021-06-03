@@ -26,7 +26,7 @@ class WandbLogger:
     Logs to a `wandb` dashboard.
     Credit to Jannik Kossen @jlko, OATML Group
     """
-    def __init__(self, optimizer):
+    def __init__(self, optimizer=None):
         self.optimizer = optimizer
 
     def start_counting(self):
@@ -41,7 +41,10 @@ class WandbLogger:
             dataset_split_to_loss_dict)
         wandb_loss_dict['step'] = steps
         wandb_loss_dict['epoch'] = epoch
-        wandb_loss_dict['lr'] = self.optimizer.param_groups[0]['lr']
+
+        if self.optimizer is not None:
+            wandb_loss_dict['lr'] = self.optimizer.param_groups[0]['lr']
+
         wandb_loss_dict['checkpoint_time'] = (
             f'{time.time() - self.checkpoint_start:.3f}')
         self.checkpoint_start = time.time()

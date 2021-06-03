@@ -15,6 +15,8 @@ from sdc.oatomobile.torch.baselines import batch_transform
 from sdc.oatomobile.torch.baselines import init_model
 from sdc.oatomobile.torch.savers import Checkpointer
 from sdc.oatomobile.utils.loggers.wandb import WandbLogger
+from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
+    load_rip_checkpoints)
 
 
 def count_parameters(model):
@@ -36,10 +38,15 @@ def train(c):
     checkpoint_frequency = c.exp_checkpoint_frequency
     output_shape = c.model_output_shape
     num_timesteps_to_keep, _ = output_shape
-    downsample_hw = (c.exp_image_downsize_hw, c.exp_image_downsize_hw)
     data_dtype = c.data_dtype
     device = c.exp_device
     model_name = c.model_name
+    is_rip = (c.model_rip_algorithm is not None)
+    if c.exp_image_downsize_hw is None:
+        downsample_hw = None
+    else:
+        downsample_hw = (c.exp_image_downsize_hw, c.exp_image_downsize_hw)
+
 
     downsize_cast_batch_transform = partial(
         batch_transform, device=device, downsample_hw=downsample_hw,
@@ -51,18 +58,29 @@ def train(c):
     # and its respective train/evaluate steps.
     model, full_model_name, train_step, evaluate_step = init_model(c)
 
-    optimizer = optim.AdamW(
-        model.parameters(), lr=lr, weight_decay=weight_decay)
-    # Based on the fairseq implementation, which is based on BERT
-    scheduler = get_cosine_schedule_with_warmup(
-        optimizer=optimizer,
-        num_warmup_steps=num_warmup_epochs,
-        num_training_steps=num_epochs)
+    if is_rip:
+        # Should just be loading trained ensemble members
+        # from checkpoint for RIP.
+        optimizer, scheduler = None, None
+    else:
+        optimizer = optim.AdamW(
+            model.parameters(), lr=lr, weight_decay=weight_decay)
+        scheduler = get_cosine_schedule_with_warmup(
+            optimizer=optimizer,
+            num_warmup_steps=num_warmup_epochs,
+            num_training_steps=num_epochs)
 
     # Create checkpoint dir, if necessary; init Checkpointer.
     checkpoint_dir = f'{c.dir_checkpoint}/{full_model_name}'
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpointer = Checkpointer(model=model, ckpt_dir=checkpoint_dir)
+
+    if c.model_rip_algorithm:
+        model = load_rip_checkpoints(
+            model=model, device=device, k=c.model_rip_k,
+            checkpoint_dir=checkpoint_dir)
+    else:
+        os.makedirs(checkpoint_dir, exist_ok=True)
+        checkpointer = Checkpointer(
+            model=model, ckpt_dir=checkpoint_dir, torch_seed=c.torch_seed)
 
     # Init dataloaders.
     # Split = None loads train, validation, and test.
@@ -158,15 +176,19 @@ def train(c):
             validation_dataloaders = eval_dataloaders['test']
             print(validation_dataloaders.keys())
 
+    if is_rip:
+        print('Running RIP evaluation. Setting num_epochs to 1.')
+        num_epochs = 1
+
     with tq.tqdm(range(num_epochs)) as pbar_epoch:
         for epoch in pbar_epoch:
-            # Trains model on whole training dataset
             epoch_loss_dict = defaultdict(dict)
 
-            loss_train, epoch_steps = train_epoch(train_dataloader)
-            epoch_loss_dict['train']['moscow__train'] = loss_train
-            steps += epoch_steps
-            # write(model, dataloader_train, writer, "train", loss_train, epoch)
+            if not is_rip:
+                loss_train, epoch_steps = train_epoch(train_dataloader)
+                epoch_loss_dict['train']['moscow__train'] = loss_train
+                steps += epoch_steps
+                # write(model, dataloader_train, writer, "train", loss_train, epoch)
 
             # Evaluates model on validation datasets
             for dataset_key, dataloader_val in validation_dataloaders.items():
@@ -179,17 +201,20 @@ def train(c):
             # write(model, dataloader_val, writer, "val", loss_val, epoch)
 
             # Checkpoints model weights.
-            if epoch % checkpoint_frequency == 0:
+            if (not is_rip) and (epoch % checkpoint_frequency == 0):
                 checkpointer.save(epoch)
 
             # Updates progress bar description.
-            pbar_string = (
-               'TL: {:.2f} | '.format(
-                   epoch_loss_dict['train'][
-                       'moscow__train'].detach().cpu().numpy().item()))
+            if is_rip:
+                pbar_string = ''
+            else:
+                pbar_string = (
+                   'TL: {:.2f} | '.format(
+                       epoch_loss_dict['train'][
+                           'moscow__train'].detach().cpu().numpy().item()))
 
             if c.model_name == 'dim':
-                pbar_string += 'THEORYMIN: {:.2f}'.format(nll_limit)
+                pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
 
             for dataset_key, loss_val in epoch_loss_dict['validation'].items():
                 pbar_string += 'VL {} {:.2f} | '.format(
@@ -201,8 +226,8 @@ def train(c):
             # Log to wandb
             logger.log(epoch_loss_dict, steps, epoch)
 
-            scheduler.step()
-
+            if not is_rip:
+                scheduler.step()
 
 # def write(
 #     model: Union[BehaviouralModel, ImitativeModel],

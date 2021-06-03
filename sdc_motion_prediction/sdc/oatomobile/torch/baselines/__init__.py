@@ -13,13 +13,15 @@
 # limitations under the License.
 # ==============================================================================
 
-from .batch_preprocessing import batch_transform
-from .behavioral_cloning import (
-    BehaviouralModel, train_step_bc, evaluate_step_bc)
-from .deep_imitative_model import (
-    ImitativeModel, train_step_dim, evaluate_step_dim)
-from .robust_imitative_planning import RIPAgent
 from pprint import pprint
+
+from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
+    evaluate_step_rip, RIPAgent)
+from sdc.oatomobile.torch.baselines.batch_preprocessing import batch_transform
+from sdc.oatomobile.torch.baselines.behavioral_cloning import (
+    BehaviouralModel, train_step_bc, evaluate_step_bc)
+from sdc.oatomobile.torch.baselines.deep_imitative_model import (
+    ImitativeModel, train_step_dim, evaluate_step_dim)
 
 
 def init_behavioral_model(c):
@@ -68,14 +70,14 @@ def init_rip(c):
     model_name = ensemble_kwargs['model_name']
 
     # Init models
-    backbone_init_fn, train_step, eval_step = BACKBONE_NAME_TO_CLASS_FNS[
+    backbone_init_fn, _, _ = BACKBONE_NAME_TO_CLASS_FNS[
         model_name]
     models = [backbone_init_fn(c) for _ in range(k)]
     print(f'Building RIP agent with algorithm {algorithm}, '
           f'backbone model {model_name}, {k} ensemble members.')
     return (
         RIPAgent(models=models, **ensemble_kwargs), full_model_name,
-        train_step, eval_step)
+        None, evaluate_step_rip)
 
 
 def init_model(c):

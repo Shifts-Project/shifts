@@ -30,8 +30,6 @@ class ImitativeModel(nn.Module):
 
     def __init__(
         self,
-        num_decoding_steps: int,
-        decoding_lr: float,
         in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
@@ -56,83 +54,76 @@ class ImitativeModel(nn.Module):
         # No need for an MLP merger, as all inputs (including static HD map
         # features) have been converted to an image representation.
 
-        # The decoder recurrent network used for the sequence generation.
-        self._decoder = AutoregressiveFlow(
+        # The autoregressive flow used for the sequence generation.
+        self._flow = AutoregressiveFlow(
             output_shape=self._output_shape,
             hidden_size=dim_hidden,
         )
 
-        # Forward pass decoding args
-        self._num_decoding_steps = num_decoding_steps
-        self._decoding_lr = decoding_lr
-
     def to(self, *args, **kwargs):
         """Handles non-parameter tensors when moved to a new device."""
         self = super().to(*args, **kwargs)
-        self._decoder = self._decoder.to(*args, **kwargs)
+        self._flow = self._flow.to(*args, **kwargs)
         return self
 
     def forward(
         self,
         **context: torch.Tensor
-    ) -> Union[torch.Tensor, Sequence[torch.Tensor]]:
-        """Returns a local mode from the posterior.
+    ) -> torch.Tensor:
+        """Sample a local mode from the posterior.
 
         Args:
           context: (keyword arguments) The conditioning
             variables used for the conditional flow.
 
         Returns:
-          A mode from the posterior, with shape `[D, 2]`.
+          A batch of trajectories with shape `[B, T, 2]`.
         """
-        batch_size = context["feature_maps"].shape[0]
+        # batch_size = context["feature_maps"].shape[0]
 
-        # Sets initial sample to base distribution's mean.
-        x = self._decoder._base_dist.sample().clone().detach().repeat(
-            batch_size, 1).view(
-            batch_size,
-            *self._output_shape,
-        )
-        x.requires_grad = True
+        # Don't use this -- we want the latent sample to different for each
+        # # Latent sample from the base distribution.
+        # x = self._flow._base_dist.sample().clone().detach().repeat(
+        #     batch_size, 1).view(
+        #     batch_size,
+        #     *self._output_shape,
+        # )
 
-        # The contextual parameters, caches for efficiency.
-        z = self._params(**context)
+        # The contextual parameters.
+        # Cache them, because we may use them to score plans from
+        # other DIM models in RIP.
+        self._z = self._params(**context)
 
-        # Initialises a gradient-based optimiser.
-        optimizer = optim.Adam(params=[x], lr=self._decoding_lr)
+        # if True:
+        #     a = 1
 
-        # Stores the best values.
-        x_best = x.clone()
-        loss_best = torch.ones(()).to(
-            x.device) * 1000.0  # pylint: disable=no-member
-
-        for _ in range(self._num_decoding_steps):
-            # Resets optimizer's gradients.
-            optimizer.zero_grad()
-
-            # Operate on `y`-space.
-            y, _ = self._decoder._forward(x=x, z=z)
-
-            # Calculates imitation prior.
-            _, log_prob, logabsdet = self._decoder._inverse(y=y, z=z)
-            imitation_prior = torch.mean(
-                log_prob - logabsdet)  # pylint: disable=no-member
-            loss = -imitation_prior
-
-            # Backward pass.
-            loss.backward(retain_graph=True)
-
-            # Performs a gradient descent step.
-            optimizer.step()
-
-            # Book-keeping
-            if loss < loss_best:
-                x_best = x.clone()
-                loss_best = loss.clone()
-
-        y, _ = self._decoder._forward(x=x_best, z=z)
+        # Operate on `y`-space.
+        y = self._flow.forward(z=self._z)
+        # if True:
+        #     a = 1
 
         return y
+
+    def score_plans(
+        self,
+        y: torch.Tensor
+    ) -> torch.Tensor:
+        """Scores plans given a context.
+        NOTE: Context encoding is assumed to be stored in self._z,
+            via execution of `forward`.
+        Args:
+            self._z: context encodings, shape `[B, K]`
+            y: modes from the posterior of a DIM model, with shape `[B, T, 2]`.
+        Returns:
+            imitation_prior = log_prob - logabsdet
+            for each plan in the batch, i.e., shape [B]
+        """
+        # Calculates imitation prior for each prediction in the batch.
+        _, log_prob, logabsdet = self._flow._inverse(y=y, z=self._z)
+        if True:
+            a = 1
+        imitation_priors = log_prob - logabsdet
+        return imitation_priors
 
     def _params(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the contextual parameters of the conditional density estimator.
@@ -171,7 +162,7 @@ def train_step_dim(
 
     # Forward pass from the model.
     z = model._params(**batch)
-    _, log_prob, logabsdet = model._decoder._inverse(y=y, z=z)
+    _, log_prob, logabsdet = model._flow._inverse(y=y, z=z)
 
     # Calculates loss (NLL).
     loss = -torch.mean(log_prob - logabsdet,
@@ -197,15 +188,25 @@ def evaluate_step_dim(
 ) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
     # Forward pass from the model.
+    # if True:
+    #     a = 1
+
     z = model._params(**batch)
-    _, log_prob, logabsdet = model._decoder._inverse(
+    _, log_prob, logabsdet = model._flow._inverse(
         y=batch["ground_truth_trajectory"], z=z)
 
     # Calculates NLL.
     nll = -torch.mean(log_prob - logabsdet, dim=0)
 
+    # if True:
+    #     a = 1
+
     # Decode a trajectory from the posterior.
     predictions = model.forward(**batch)
+
+    # if True:
+    #     a = 1
+
     ade = sdc_loss.average_displacement_error(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])

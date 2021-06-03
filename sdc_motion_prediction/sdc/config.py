@@ -84,13 +84,14 @@ def build_parser():
     parser.add_argument(
         '--exp_num_lr_warmup_epochs', type=int, default=10)
     parser.add_argument(
-        '--exp_batch_size', type=int, default=16)
+        '--exp_batch_size', type=int, default=512)
     parser.add_argument(
         '--exp_num_epochs', type=int, default=100)
     parser.add_argument(
-        '--exp_image_downsize_hw', type=int, default=100,
+        '--exp_image_downsize_hw', type=int, default=None,
         help='Downsize image input to '
-             '(exp_image_downsize, exp_image_downsize).')
+             '(exp_image_downsize, exp_image_downsize). '
+             'Do not downsize if None.')
     parser.add_argument(
         '--exp_checkpoint_frequency', type=int, default=25,
         help='Model checkpoint frequency.')
