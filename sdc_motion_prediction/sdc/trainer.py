@@ -120,6 +120,7 @@ def train(c):
         """
         Performs an epoch of gradient descent optimization on `dataloader`."""
         model.train()
+        train_loss_dict = {}
         loss = 0.0
         steps = 0
         with tq.tqdm(dataloader) as pbar:
@@ -129,10 +130,19 @@ def train(c):
                 train_args['batch'] = batch
 
                 # Performs a gradient-descent step.
-                loss += train_step(**train_args)
+                loss_dict = train_step(**train_args)
+                for key, value in loss_dict.items():
+                    if key not in train_loss_dict.keys():
+                        train_loss_dict[key] = value
+                    else:
+                        train_loss_dict[key] += value
+
                 steps += 1
 
-        return loss / steps, steps
+        for key in train_loss_dict:
+            train_loss_dict[key] /= steps
+
+        return train_loss_dict, steps
 
     def evaluate_epoch(
       dataloader: torch.utils.data.DataLoader) -> Mapping[str, torch.Tensor]:
@@ -185,8 +195,11 @@ def train(c):
             epoch_loss_dict = defaultdict(dict)
 
             if not is_rip:
-                loss_train, epoch_steps = train_epoch(train_dataloader)
-                epoch_loss_dict['train']['moscow__train'] = loss_train
+                loss_train_dict, epoch_steps = train_epoch(train_dataloader)
+                dataset_key = 'moscow__train'
+                for loss_key, loss_value in loss_train_dict.items():
+                    epoch_loss_dict['train'][
+                        f'{dataset_key}__{loss_key}'] = loss_value
                 steps += epoch_steps
                 # write(model, dataloader_train, writer, "train", loss_train, epoch)
 

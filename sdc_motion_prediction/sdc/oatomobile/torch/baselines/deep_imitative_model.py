@@ -140,13 +140,14 @@ class ImitativeModel(nn.Module):
 
 
 def train_step_dim(
+    sdc_loss: SDCLoss,
     model: ImitativeModel,
     optimizer: optim.Optimizer,
     batch: Mapping[str, torch.Tensor],
     noise_level: float,
     clip: bool = False,
     **kwargs
-) -> torch.Tensor:
+) -> Mapping[str, torch.Tensor]:
     """Performs a single gradient-descent optimisation step."""
     # Resets optimizer's gradients.
     optimizer.zero_grad()
@@ -176,7 +177,20 @@ def train_step_dim(
     # Performs a gradient descent step.
     optimizer.step()
 
-    return loss
+    # Decode a trajectory from the posterior on this train example.
+    predictions = model.forward(**batch)
+    ade = sdc_loss.average_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    fde = sdc_loss.final_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    loss_dict = {
+        'nll': loss,
+        'ade': ade,
+        'fde': fde}
+
+    return loss_dict
 
 
 def evaluate_step_dim(
