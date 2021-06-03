@@ -218,13 +218,12 @@ def train(c):
                 checkpointer.save(epoch)
 
             # Updates progress bar description.
-            if is_rip:
-                pbar_string = ''
-            else:
-                pbar_string = (
-                   'TL: {:.2f} | '.format(
-                       epoch_loss_dict['train'][
-                           'moscow__train'].detach().cpu().numpy().item()))
+            pbar_string = ''
+
+            if not is_rip:
+                for dataset_key, loss_val in epoch_loss_dict['train'].items():
+                    pbar_string += 'TL {} {:.2f} | '.format(
+                        dataset_key, loss_val.detach().cpu().numpy().item())
 
             if c.model_name == 'dim':
                 pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
