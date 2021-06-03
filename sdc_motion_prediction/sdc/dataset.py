@@ -97,16 +97,19 @@ def load_datasets(c, splits: Optional[List[str]] = None):
 def load_dataloaders(datasets, c):
     batch_size = c.exp_batch_size
     num_workers = c.data_num_workers
+    prefetch_factor = c.data_prefetch_factor
 
     if c.debug_overfit_test_data_only:
         train_dataloader = torch.utils.data.DataLoader(
             datasets['test']['moscow__test'], batch_size=batch_size,
-            num_workers=num_workers, pin_memory=True)
+            num_workers=num_workers, pin_memory=True,
+            prefetch_factor=prefetch_factor)
         eval_dataloaders = {}
     else:
         train_dataloader = torch.utils.data.DataLoader(
             datasets['train']['moscow__train'], batch_size=batch_size,
-            num_workers=num_workers, pin_memory=True)
+            num_workers=num_workers, pin_memory=True,
+            prefetch_factor=prefetch_factor)
 
         # Load dataloaders for in- and out-of-domain
         # validation and test datasets.
@@ -120,7 +123,7 @@ def load_dataloaders(datasets, c):
                 eval_dataloaders[
                     eval_mode][dataset_key] = torch.utils.data.DataLoader(
                     dataset, batch_size=batch_size, num_workers=num_workers,
-                    pin_memory=True)
+                    pin_memory=True, prefetch_factor=prefetch_factor)
 
     return train_dataloader, eval_dataloaders
 
