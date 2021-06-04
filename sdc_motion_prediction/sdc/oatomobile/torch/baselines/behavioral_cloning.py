@@ -140,8 +140,8 @@ class BehaviouralModel(nn.Module):
             y_t = (y_tm1 + dloc) + (
                 scale * torch.normal(
                 mean=torch.zeros((z.shape[0], self._output_shape[-1])),
-                std=torch.ones((z.shape[0], self._output_shape[-1])),
-                device=self._device))
+                std=torch.ones((z.shape[0], self._output_shape[-1]))).to(
+                    device=self._device))
 
             # Update containers.
             y.append(y_t)
