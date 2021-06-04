@@ -40,6 +40,7 @@ class BehaviouralModel(nn.Module):
         in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
+        device: str = 'cpu',
         **kwargs
     ) -> None:
         """Constructs a simple behavioural cloning model.
@@ -66,6 +67,8 @@ class BehaviouralModel(nn.Module):
         self._output = nn.Linear(
             in_features=dim_hidden,
             out_features=(self._output_shape[-1] * 2))
+
+        self._device = device
 
     def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""
@@ -137,7 +140,8 @@ class BehaviouralModel(nn.Module):
             y_t = (y_tm1 + dloc) + (
                 scale * torch.normal(
                 mean=torch.zeros((z.shape[0], self._output_shape[-1])),
-                std=torch.ones((z.shape[0], self._output_shape[-1]))))
+                std=torch.ones((z.shape[0], self._output_shape[-1])),
+                device=self._device))
 
             # Update containers.
             y.append(y_t)
