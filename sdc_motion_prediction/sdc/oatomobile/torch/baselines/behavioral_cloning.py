@@ -160,7 +160,7 @@ def train_step_bc(
     optimizer: optim.Optimizer,
     batch: Mapping[str, torch.Tensor],
     clip: bool = False,
-) -> torch.Tensor:
+) -> Mapping[str, torch.Tensor]:
     """Performs a single gradient-descent optimisation step."""
     # Resets optimizer's gradients.
     optimizer.zero_grad()
@@ -182,7 +182,14 @@ def train_step_bc(
 
     # Performs a gradient descent step.
     optimizer.step()
-    return loss
+
+    fde = sdc_loss.final_displacement_error(
+        predictions=predictions,
+        ground_truth=batch["ground_truth_trajectory"])
+    loss_dict = {
+        'ade': loss,
+        'fde': fde}
+    return loss_dict
 
 
 def evaluate_step_bc(
