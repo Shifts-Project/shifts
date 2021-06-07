@@ -187,8 +187,8 @@ def train_step_bc(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
-        'ade': loss,
-        'fde': fde}
+        'ade': loss.detach(),
+        'fde': fde.detach()}
     return loss_dict
 
 
@@ -209,6 +209,6 @@ def evaluate_step_bc(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
-        'ade': ade,
-        'fde': fde}
+        'ade': ade.detach(),
+        'fde': fde.detach()}
     return loss_dict

@@ -186,9 +186,9 @@ def train_step_dim(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
-        'nll': loss,
-        'ade': ade,
-        'fde': fde}
+        'nll': loss.detach(),
+        'ade': ade.detach(),
+        'fde': fde.detach()}
 
     return loss_dict
 
@@ -226,7 +226,7 @@ def evaluate_step_dim(
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
-        'nll': nll,
-        'ade': ade,
-        'fde': fde}
+        'nll': nll.detach(),
+        'ade': ade.detach(),
+        'fde': fde.detach()}
     return loss_dict
