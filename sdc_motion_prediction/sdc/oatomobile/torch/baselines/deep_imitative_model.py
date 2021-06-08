@@ -179,10 +179,12 @@ def train_step_dim(
 
     # Decode a trajectory from the posterior on this train example.
     predictions = model.forward(**batch)
-    ade = sdc_loss.average_displacement_error(
+    ade = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.average_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.final_displacement_error(
+    fde = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
@@ -219,10 +221,12 @@ def evaluate_step_dim(
     # if True:
     #     a = 1
 
-    ade = sdc_loss.average_displacement_error(
+    ade = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.average_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.final_displacement_error(
+    fde = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {

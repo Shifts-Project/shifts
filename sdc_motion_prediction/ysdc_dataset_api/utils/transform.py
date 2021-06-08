@@ -50,7 +50,6 @@ def get_to_track_frame_transform(track):
     transform = np.linalg.inv(transform).astype(np.float32)
     return transform
 
-# @profile
 @numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
 def transform2dpoints(points, transform):
     ph = np.zeros((4, points.shape[0]), dtype=np.float32)

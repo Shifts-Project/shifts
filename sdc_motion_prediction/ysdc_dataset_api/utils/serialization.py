@@ -20,6 +20,7 @@ def serialize_numpy(arr, compress=False):
     return maybe_compress(result, compress)
 
 
+# @profile
 def deserialize_numpy(str, decompress=False):
     str = maybe_decompress(str, decompress)
     buf = io.BytesIO(str)

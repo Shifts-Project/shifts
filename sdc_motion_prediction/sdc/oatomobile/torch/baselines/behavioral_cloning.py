@@ -23,12 +23,10 @@ from typing import Tuple
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torch.distributions as D
-import torch.nn as nn
 import torch.nn.functional as F
-from sdc.metrics import SDCLoss
+import torch.optim as optim
 
+from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 
 
@@ -169,7 +167,8 @@ def train_step_bc(
     predictions, _ = model(**batch)
 
     # Calculates loss.
-    loss = sdc_loss.average_displacement_error(
+    loss = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.average_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
 
@@ -183,7 +182,8 @@ def train_step_bc(
     # Performs a gradient descent step.
     optimizer.step()
 
-    fde = sdc_loss.final_displacement_error(
+    fde = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
@@ -202,10 +202,12 @@ def evaluate_step_bc(
     predictions, _ = model(**batch)
 
     # Calculates loss on mini-batch.
-    ade = sdc_loss.average_displacement_error(
+    ade = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.average_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.final_displacement_error(
+    fde = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
         ground_truth=batch["ground_truth_trajectory"])
     loss_dict = {
