@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\tmap.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\"a\n\x10TrafficLightRule\x12\x36\n\x08sections\x18\x01 \x03(\x0b\x32$.neurips_dataset.TrafficLightSection\x12\x15\n\rmovement_type\x18\x02 \x01(\r\"q\n\tCrosswalk\x12*\n\x08geometry\x18\x01 \x01(\x0b\x32\x18.neurips_dataset.Polygon\x12\x38\n\rcontrol_rules\x18\x02 \x03(\x0b\x32!.neurips_dataset.TrafficLightRule\"9\n\x0bRoadPolygon\x12*\n\x08geometry\x18\x01 \x01(\x0b\x32\x18.neurips_dataset.Polygon\"g\n\x04Lane\x12)\n\x07\x63\x65nters\x18\x01 \x03(\x0b\x32\x18.neurips_dataset.Vector3\x12\x14\n\x0cmax_velocity\x18\x02 \x01(\x02\x12\x1e\n\x16gives_way_to_some_lane\x18\x03 \x01(\x08\"\x96\x01\n\tPathGraph\x12$\n\x05lanes\x18\x01 \x03(\x0b\x32\x15.neurips_dataset.Lane\x12.\n\ncrosswalks\x18\x02 \x03(\x0b\x32\x1a.neurips_dataset.Crosswalk\x12\x33\n\rroad_polygons\x18\x03 \x03(\x0b\x32\x1c.neurips_dataset.RoadPolygon\"T\n\x13TrafficLightSection\x12\n\n\x02id\x18\x01 \x01(\r\x12\x31\n\x05state\x18\x02 \x01(\x0e\x32\".neurips_dataset.TrafficLightState\"N\n\x14TrafficLightSections\x12\x36\n\x08sections\x18\x01 \x03(\x0b\x32$.neurips_dataset.TrafficLightSection*l\n\x0cMovementType\x12\x16\n\x12MOVEMENT_FORBIDDEN\x10\x00\x12 \n\x1cMOVEMENT_ALLOWED_NO_PRIORITY\x10\x01\x12\"\n\x1eMOVEMENT_ALLOWED_WITH_PRIORITY\x10\x02*\x8f\x02\n\x11TrafficLightState\x12\x11\n\rSTATE_UNKNOWN\x10\x00\x12\x0f\n\x0bSTATE_GREEN\x10\x01\x12\x18\n\x14STATE_BLINKING_GREEN\x10\x02\x12\x10\n\x0cSTATE_YELLOW\x10\x03\x12\r\n\tSTATE_RED\x10\x04\x12\x14\n\x10STATE_RED_YELLOW\x10\x05\x12\x15\n\x11STATE_NOT_WORKING\x10\x06\x12\x11\n\rSTATE_ENABLED\x10\x07\x12\x1a\n\x16STATE_BLINKING_ENABLED\x10\x08\x12\x12\n\x0eSTATE_DISABLED\x10\t\x12\x13\n\x0fSTATE_INVISIBLE\x10\n\x12\x16\n\x12STATE_BLINKING_RED\x10\x0b\x62\x06proto3'
+  serialized_pb=b'\n\tmap.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\"a\n\x10TrafficLightRule\x12\x36\n\x08sections\x18\x01 \x03(\x0b\x32$.neurips_dataset.TrafficLightSection\x12\x15\n\rmovement_type\x18\x02 \x01(\r\"q\n\tCrosswalk\x12*\n\x08geometry\x18\x01 \x01(\x0b\x32\x18.neurips_dataset.Polygon\x12\x38\n\rcontrol_rules\x18\x02 \x03(\x0b\x32!.neurips_dataset.TrafficLightRule\"9\n\x0bRoadPolygon\x12*\n\x08geometry\x18\x01 \x01(\x0b\x32\x18.neurips_dataset.Polygon\"\xb3\x01\n\x04Lane\x12)\n\x07\x63\x65nters\x18\x01 \x03(\x0b\x32\x18.neurips_dataset.Vector3\x12\x14\n\x0cmax_velocity\x18\x02 \x01(\x02\x12\x1e\n\x16gives_way_to_some_lane\x18\x03 \x01(\x08\x12J\n\x19traffic_light_section_ids\x18\x04 \x01(\x0b\x32\'.neurips_dataset.TrafficLightSectionIds\"\x96\x01\n\tPathGraph\x12$\n\x05lanes\x18\x01 \x03(\x0b\x32\x15.neurips_dataset.Lane\x12.\n\ncrosswalks\x18\x02 \x03(\x0b\x32\x1a.neurips_dataset.Crosswalk\x12\x33\n\rroad_polygons\x18\x03 \x03(\x0b\x32\x1c.neurips_dataset.RoadPolygon\"T\n\x13TrafficLightSection\x12\n\n\x02id\x18\x01 \x01(\r\x12\x31\n\x05state\x18\x02 \x01(\x0e\x32\".neurips_dataset.TrafficLightState\"N\n\x14TrafficLightSections\x12\x36\n\x08sections\x18\x01 \x03(\x0b\x32$.neurips_dataset.TrafficLightSection\"d\n\x16TrafficLightSectionIds\x12\x17\n\x0fleft_section_id\x18\x01 \x01(\r\x12\x17\n\x0fmain_section_id\x18\x02 \x01(\r\x12\x18\n\x10right_section_id\x18\x03 \x01(\r*l\n\x0cMovementType\x12\x16\n\x12MOVEMENT_FORBIDDEN\x10\x00\x12 \n\x1cMOVEMENT_ALLOWED_NO_PRIORITY\x10\x01\x12\"\n\x1eMOVEMENT_ALLOWED_WITH_PRIORITY\x10\x02*\x8f\x02\n\x11TrafficLightState\x12\x11\n\rSTATE_UNKNOWN\x10\x00\x12\x0f\n\x0bSTATE_GREEN\x10\x01\x12\x18\n\x14STATE_BLINKING_GREEN\x10\x02\x12\x10\n\x0cSTATE_YELLOW\x10\x03\x12\r\n\tSTATE_RED\x10\x04\x12\x14\n\x10STATE_RED_YELLOW\x10\x05\x12\x15\n\x11STATE_NOT_WORKING\x10\x06\x12\x11\n\rSTATE_ENABLED\x10\x07\x12\x1a\n\x16STATE_BLINKING_ENABLED\x10\x08\x12\x12\n\x0eSTATE_DISABLED\x10\t\x12\x13\n\x0fSTATE_INVISIBLE\x10\n\x12\x16\n\x12STATE_BLINKING_RED\x10\x0b\x62\x06proto3'
   ,
   dependencies=[geom__pb2.DESCRIPTOR,])
 
@@ -50,8 +50,8 @@ _MOVEMENTTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=739,
-  serialized_end=847,
+  serialized_start=918,
+  serialized_end=1026,
 )
 _sym_db.RegisterEnumDescriptor(_MOVEMENTTYPE)
 
@@ -126,8 +126,8 @@ _TRAFFICLIGHTSTATE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=850,
-  serialized_end=1121,
+  serialized_start=1029,
+  serialized_end=1300,
 )
 _sym_db.RegisterEnumDescriptor(_TRAFFICLIGHTSTATE)
 
@@ -289,6 +289,13 @@ _LANE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='traffic_light_section_ids', full_name='neurips_dataset.Lane.traffic_light_section_ids', index=3,
+      number=4, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -301,8 +308,8 @@ _LANE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=315,
-  serialized_end=418,
+  serialized_start=316,
+  serialized_end=495,
 )
 
 
@@ -347,8 +354,8 @@ _PATHGRAPH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=421,
-  serialized_end=571,
+  serialized_start=498,
+  serialized_end=648,
 )
 
 
@@ -386,8 +393,8 @@ _TRAFFICLIGHTSECTION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=573,
-  serialized_end=657,
+  serialized_start=650,
+  serialized_end=734,
 )
 
 
@@ -418,8 +425,54 @@ _TRAFFICLIGHTSECTIONS = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=659,
-  serialized_end=737,
+  serialized_start=736,
+  serialized_end=814,
+)
+
+
+_TRAFFICLIGHTSECTIONIDS = _descriptor.Descriptor(
+  name='TrafficLightSectionIds',
+  full_name='neurips_dataset.TrafficLightSectionIds',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='left_section_id', full_name='neurips_dataset.TrafficLightSectionIds.left_section_id', index=0,
+      number=1, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='main_section_id', full_name='neurips_dataset.TrafficLightSectionIds.main_section_id', index=1,
+      number=2, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='right_section_id', full_name='neurips_dataset.TrafficLightSectionIds.right_section_id', index=2,
+      number=3, type=13, cpp_type=3, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=816,
+  serialized_end=916,
 )
 
 _TRAFFICLIGHTRULE.fields_by_name['sections'].message_type = _TRAFFICLIGHTSECTION
@@ -427,6 +480,7 @@ _CROSSWALK.fields_by_name['geometry'].message_type = geom__pb2._POLYGON
 _CROSSWALK.fields_by_name['control_rules'].message_type = _TRAFFICLIGHTRULE
 _ROADPOLYGON.fields_by_name['geometry'].message_type = geom__pb2._POLYGON
 _LANE.fields_by_name['centers'].message_type = geom__pb2._VECTOR3
+_LANE.fields_by_name['traffic_light_section_ids'].message_type = _TRAFFICLIGHTSECTIONIDS
 _PATHGRAPH.fields_by_name['lanes'].message_type = _LANE
 _PATHGRAPH.fields_by_name['crosswalks'].message_type = _CROSSWALK
 _PATHGRAPH.fields_by_name['road_polygons'].message_type = _ROADPOLYGON
@@ -439,6 +493,7 @@ DESCRIPTOR.message_types_by_name['Lane'] = _LANE
 DESCRIPTOR.message_types_by_name['PathGraph'] = _PATHGRAPH
 DESCRIPTOR.message_types_by_name['TrafficLightSection'] = _TRAFFICLIGHTSECTION
 DESCRIPTOR.message_types_by_name['TrafficLightSections'] = _TRAFFICLIGHTSECTIONS
+DESCRIPTOR.message_types_by_name['TrafficLightSectionIds'] = _TRAFFICLIGHTSECTIONIDS
 DESCRIPTOR.enum_types_by_name['MovementType'] = _MOVEMENTTYPE
 DESCRIPTOR.enum_types_by_name['TrafficLightState'] = _TRAFFICLIGHTSTATE
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
@@ -491,6 +546,13 @@ TrafficLightSections = _reflection.GeneratedProtocolMessageType('TrafficLightSec
   # @@protoc_insertion_point(class_scope:neurips_dataset.TrafficLightSections)
   })
 _sym_db.RegisterMessage(TrafficLightSections)
+
+TrafficLightSectionIds = _reflection.GeneratedProtocolMessageType('TrafficLightSectionIds', (_message.Message,), {
+  'DESCRIPTOR' : _TRAFFICLIGHTSECTIONIDS,
+  '__module__' : 'map_pb2'
+  # @@protoc_insertion_point(class_scope:neurips_dataset.TrafficLightSectionIds)
+  })
+_sym_db.RegisterMessage(TrafficLightSectionIds)
 
 
 # @@protoc_insertion_point(module_scope)
