@@ -53,3 +53,61 @@ All protobuf message definitions can be found at [ysdc_dataset_api/proto](ysdc_d
 - CoverNet: https://arxiv.org/abs/1911.10298
 - TNT: https://arxiv.org/abs/2008.08294
 - LaneRCNN: https://arxiv.org/abs/2101.06653
+
+## Training RIP ensemble members
+
+RIP ensemble members are trained independently, similar to in Deep Ensembles \cite{balaji}
+
+Here we use the Deep Imitative Model as a backbone density estimator, and sweep over x \in {1, ..., K} different seeds:
+
+```
+python run.py --model_name dim --data_use_prerendered True --torch_seed x
+```
+
+## Evaluating RIP with trained ensemble members
+
+Run RIP to create a directory in which you should store the ensemble member checkpoints created by the above command.
+
+For example, with the Worst Case Model algorithm, and 5 ensemble members.
+
+Here, the torch seed will affect the batching used at evaluation time. 
+# TODO: nband -> confirm that it actually does change things if we are not shuffling?
+
+```
+python run.py --model_name dim --data_use_prerendered True --torch_seed 1 --rip_algorithm WCM --rip_k 5
+```
+
+The above command will create a directory in which the RIP ensemble member checkpoints are expected.
+Place them there, and re-run the command to evaluate the RIP ensemble.
+
+Other parameters in RIP include:
+* `--rip_eval_samples_per_model`: number of stochastic trajectory generations per RIP ensemble member
+* `--rip_num_preds`: number of plan predictions that are actually made by the RIP model for a given prediction request input. 
+We select these as the top samples from all stochastic generations from the ensemble members.
+
+See `sdc/config.py` for descriptions of all parameters.
+
+
+## Plotting Retention Curves
+
+This evaluation will generate data for area under retention curve plots with various pertinent metrics, such as minADE and minFDE.
+
+These are logged to wandb, and also stored as a pd.DataFrame in `{--dir_data}/metrics/{model_name}/results.tsv`.
+
+We use these to generate retention curve plots. 
+
+You can generate plots for a particular model with
+
+```
+python plot_retention_curves.py --results_dir {--dir_metrics}/{model_name} --plot_dir '.' --model_name {model_name}
+```
+
+where the --results_dir should point to the subdirectory of a particular model name (e.g., 'rip-wcm-dim-k_5' corresponding to a RIP ensemble with the WCM algorithm, DIM backbone density models, and 5 ensemble members).
+
+You can generate plots comparing several models with
+
+```
+python plot_retention_curves.py --results_dir {--dir_metrics} --plot_dir='.'
+```
+
+where the --results_dir should point to the metrics directory containing all model_name subdirectories.
