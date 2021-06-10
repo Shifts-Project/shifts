@@ -15,7 +15,7 @@
 """Implements the robust imitative planning agent."""
 
 import os
-from typing import Mapping, Union, Sequence
+from typing import Mapping, Union, Sequence, Tuple
 
 import torch
 
@@ -34,6 +34,8 @@ class RIPAgent:
                  model_name: str,
                  models: Sequence[Union[BehaviouralModel, ImitativeModel]],
                  device: str,
+                 eval_samples_per_model: int,
+                 num_preds: int,
                  **kwargs) -> None:
         """Constructs a robust imitative planning agent.
 
@@ -46,6 +48,12 @@ class RIPAgent:
         assert algorithm in ("WCM", "MA", "BCM")
         self._algorithm = algorithm
 
+        # Number of generated trajectories per ensemble member.
+        self._eval_samples_per_model = eval_samples_per_model
+
+        # After applying RIP algorithm, report this number of trajectories.
+        self._num_preds = num_preds
+
         # Determines device, accelerator.
         self._device = device
         self._models = [model.to(self._device) for model in models]
@@ -57,23 +65,30 @@ class RIPAgent:
     def call_dim_models(
         self,
         **observation: Mapping[str, torch.Tensor]
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # TODO(filangel) move this in `ImitativeModel.imitation_posterior`.
-        # Obtain a predicted plan for each of the ensemble members.
-        predictions = torch.stack(
-            [model.forward(**observation) for model in self._models], dim=0)
+        Q = self._eval_samples_per_model
+        K = len(self._models)  # Number of ensemble members
 
-        if True:
-            a = 1
+        # Obtain Q predicted plans for each of the K ensemble members.
+        predictions = []
+        for model in self._models:
+            for _ in range(Q):
+                predictions.append(model.forward(**observation))
 
-        k = len(self._models)  # Number of ensemble members
+        # Shape (D=K*Q, B, T, 2)
+        # D: total number of plans
+        # B: batch size
+        # T: number of predicted timesteps (default: 25)
+        predictions = torch.stack(predictions, dim=0)
+        D, B, T, _ = predictions.size()
 
-        # For each element in the batch, we have k models and k predictions.
+        # For each element in the batch, we have K models and Q predictions.
         # Score each plan under the imitation prior of each model:
         scores = []
-        for i in range(k):
+        for i in range(K):
             model_i_scores = []
-            for j in range(k):
+            for j in range(D):
                 model_i_scores.append(
                     self._models[i].score_plans(predictions[j, :, :, :]))
 
@@ -83,6 +98,11 @@ class RIPAgent:
         # A high score at i, j corresponds to a high likelihood
         # of plan j under the imitation prior of model i.
         scores = torch.stack(scores, dim=0)
+
+        # NO LONGER DO THIS; just use RIP aggregators
+        # # Get per-plan confidence scores by computing the variance over the
+        # # K model scores for each plan, and negating
+        # plan_confidence_scores = -torch.var(scores, dim=0)  # shape: (D, B)
 
         # Aggregate scores from the `K` models.
         if self._algorithm == 'WCM':
@@ -94,19 +114,33 @@ class RIPAgent:
         else:
             raise NotImplementedError
 
-        # Get indices of the plan with highest imitation prior
-        # for each example in the batch
-        best_plan_indices = torch.argmax(scores, dim=0)
-        best_plans = [
-            predictions[best_plan_indices[b], b, :, :]
-            for b in range(predictions.size(1))]
-        best_plans = torch.stack(best_plans, dim=0)
-        best_plans = best_plans.detach().cpu()
-        return best_plans
+        # Get per--prediction request confidence scores by taking the mean
+        # over all plans
+        # TODO: maybe we should only take the mean over the topk plans instead?
+        pred_request_confidence_scores = torch.mean(scores, dim=0)
 
-        #
-        #
-        #
+        # Get indices of the plans with highest RIP-aggregated imitation priors
+        # for each prediction request (scene input) in the batch
+        best_plan_indices = torch.topk(scores, k=self._num_preds, dim=0).indices
+        best_plans = [
+            predictions[best_plan_indices[:, b], b, :, :]
+            for b in range(B)]
+
+        # Shape (B, num_preds, T, 2)
+        best_plans = torch.stack(best_plans, dim=0)
+        best_plans = best_plans.detach()
+
+        # Report the confidence scores corresponding to our top num_preds plans
+        plan_confidence_scores = [
+            scores[best_plan_indices[:, b], b]
+            for b in range(B)]
+
+        # Shape (B, num_preds)
+        plan_confidence_scores = torch.stack(plan_confidence_scores, dim=0)
+        plan_confidence_scores = plan_confidence_scores.detach()
+        return (best_plans, plan_confidence_scores,
+                pred_request_confidence_scores)
+
         #     # imitation_priors = torch.stack(imitation_priors,
         # #                                    dim=0)  # pylint: disable=no-member
         #
@@ -138,13 +172,13 @@ class RIPAgent:
     def call_bc_models(
         self,
         **observation: Mapping[str, torch.Tensor]
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def __call__(
         self,
         **observation: Mapping[str, torch.Tensor],
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Returns the imitative prior."""
         if self._model_name == 'dim':
             return self.call_dim_models(**observation)
@@ -166,18 +200,16 @@ def evaluate_step_rip(
     sdc_loss: SDCLoss,
     model: RIPAgent,
     batch: Mapping[str, torch.Tensor],
-) -> Mapping[str, torch.Tensor]:
-    predictions = model(**batch)
-    ade = sdc_loss.average_displacement_error(
-        predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.final_displacement_error(
-        predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
-    loss_dict = {
-        'ade': ade,
-        'fde': fde}
-    return loss_dict
+):
+    model.eval()
+    predictions, plan_confidence_scores, pred_request_confidence_scores = model(
+        **batch)
+    ground_truth = batch['ground_truth_trajectory']
+    sdc_loss.cache_batch_losses(
+        predictions_list=predictions,
+        ground_truth_batch=ground_truth,
+        plan_confidence_scores_list=plan_confidence_scores,
+        pred_request_confidence_scores=pred_request_confidence_scores)
 
 
 def load_rip_checkpoints(

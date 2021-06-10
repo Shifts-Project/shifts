@@ -70,4 +70,7 @@ def batch_transform(
             transforms.transpose_visual_features(
                 downsampled_features), dtype).to(device=device)
 
+        if feature_map_key == 'prerendered_feature_map':
+            del sample['prerendered_feature_map']
+
     return sample

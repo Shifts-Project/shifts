@@ -4,7 +4,6 @@ from functools import partial
 from typing import Mapping
 
 import torch
-import torch.distributions as D
 import torch.optim as optim
 import tqdm as tq
 from transformers import get_cosine_schedule_with_warmup
@@ -13,10 +12,10 @@ from sdc.dataset import load_datasets, load_dataloaders
 from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.baselines import batch_transform
 from sdc.oatomobile.torch.baselines import init_model
-from sdc.oatomobile.torch.savers import Checkpointer
-from sdc.oatomobile.utils.loggers.wandb import WandbLogger
 from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
     load_rip_checkpoints)
+from sdc.oatomobile.torch.savers import Checkpointer
+from sdc.oatomobile.utils.loggers.wandb import WandbLogger
 
 
 def count_parameters(model):
@@ -35,18 +34,16 @@ def train(c):
     clip_gradients = c.model_clip_gradients
     num_epochs = c.exp_num_epochs
     num_warmup_epochs = c.exp_num_lr_warmup_epochs
-    checkpoint_frequency = c.exp_checkpoint_frequency
+    # checkpoint_frequency = c.exp_checkpoint_frequency
     output_shape = c.model_output_shape
     num_timesteps_to_keep, _ = output_shape
     data_dtype = c.data_dtype
     device = c.exp_device
-    model_name = c.model_name
-    is_rip = (c.model_rip_algorithm is not None)
+    is_rip = (c.rip_algorithm is not None)
     if c.exp_image_downsize_hw is None:
         downsample_hw = None
     else:
         downsample_hw = (c.exp_image_downsize_hw, c.exp_image_downsize_hw)
-
 
     downsize_cast_batch_transform = partial(
         batch_transform, device=device, downsample_hw=downsample_hw,
@@ -70,17 +67,21 @@ def train(c):
             num_warmup_steps=num_warmup_epochs,
             num_training_steps=num_epochs)
 
-    # Create checkpoint dir, if necessary; init Checkpointer.
-    checkpoint_dir = f'{c.dir_checkpoint}/{full_model_name}'
+    if c.model_checkpoint_key is not None:
+        checkpoint_dir = f'{c.dir_checkpoint}/{c.model_checkpoint_key}'
+    else:
+        # Create checkpoint dir, if necessary; init Checkpointer.
+        checkpoint_dir = f'{c.dir_checkpoint}/{full_model_name}'
 
-    if c.model_rip_algorithm:
+    if c.rip_algorithm:
         model = load_rip_checkpoints(
-            model=model, device=device, k=c.model_rip_k,
+            model=model, device=device, k=c.rip_k,
             checkpoint_dir=checkpoint_dir)
     else:
         os.makedirs(checkpoint_dir, exist_ok=True)
         checkpointer = Checkpointer(
-            model=model, ckpt_dir=checkpoint_dir, torch_seed=c.torch_seed)
+            model=model, ckpt_dir=checkpoint_dir, torch_seed=c.torch_seed,
+            checkpoint_frequency=c.exp_checkpoint_frequency)
 
     # Init dataloaders.
     # Split = None loads train, validation, and test.
@@ -88,7 +89,13 @@ def train(c):
     train_dataloader, eval_dataloaders = load_dataloaders(datasets, c)
 
     # Init object for computing loss and metrics.
-    sdc_loss = SDCLoss()
+    metrics_dir = f'{c.dir_data}/metrics' if not c.dir_metrics else c.dir_metrics
+    os.makedirs(metrics_dir, exist_ok=True)
+    sdc_loss = SDCLoss(
+        retention_thresholds=c.metrics_retention_thresholds,
+        metrics_dir=metrics_dir,
+        full_model_name=full_model_name,
+        eval_seed=c.torch_seed)
 
     # Init train and evaluate args for respective model backbone.
     train_args = {
@@ -101,18 +108,18 @@ def train(c):
         'model': model,
         'sdc_loss': sdc_loss
     }
-    if model_name == 'dim':
-        noise_level = c.dim_noise_level
-        train_args['noise_level'] = noise_level
+    # if model_name == 'dim':
+        # noise_level = c.dim_noise_level
+        # train_args['noise_level'] = noise_level
 
-        # Theoretical limit of NLL, given the noise level.
-        nll_limit = -torch.sum(  # pylint: disable=no-member
-            D.MultivariateNormal(
-                loc=torch.zeros(output_shape[-2] * output_shape[-1]),
-                scale_tril=torch.eye(
-                    output_shape[-2] * output_shape[-1]) * noise_level,
-            ).log_prob(
-                torch.zeros(output_shape[-2] * output_shape[-1])))
+    # # Theoretical limit of NLL, given the noise level.
+    # nll_limit = -torch.sum(  # pylint: disable=no-member
+    #     D.MultivariateNormal(
+    #         loc=torch.zeros(output_shape[-2] * output_shape[-1]),
+    #         scale_tril=torch.eye(
+    #             # output_shape[-2] * output_shape[-1]) * noise_level,
+    #     ).log_prob(
+    #         torch.zeros(output_shape[-2] * output_shape[-1])))
 
     # @profile
     def train_epoch(
@@ -145,7 +152,9 @@ def train(c):
         return train_loss_dict, steps
 
     def evaluate_epoch(
-      dataloader: torch.utils.data.DataLoader) -> Mapping[str, torch.Tensor]:
+      dataloader: torch.utils.data.DataLoader,
+      dataset_key: str = None
+    ) -> Mapping[str, torch.Tensor]:
         """Performs an evaluation of the `model` on the `dataloader."""
         model.eval()
         eval_loss_dict = {}
@@ -159,16 +168,21 @@ def train(c):
                 # Accumulates loss in dataset.
                 with torch.no_grad():
                     loss_dict = evaluate_step(**evaluate_args)
-                    for key, value in loss_dict.items():
-                        if key not in eval_loss_dict.keys():
-                            eval_loss_dict[key] = value
-                        else:
-                            eval_loss_dict[key] += value
+
+                    if loss_dict is not None:
+                        for key, value in loss_dict.items():
+                            if key not in eval_loss_dict.keys():
+                                eval_loss_dict[key] = value
+                            else:
+                                eval_loss_dict[key] += value
 
                 steps += 1
 
-        for key in eval_loss_dict:
-            eval_loss_dict[key] /= steps
+        if eval_loss_dict is not None:
+            for key in eval_loss_dict:
+                eval_loss_dict[key] /= steps
+        if is_rip:
+            eval_loss_dict = sdc_loss.evaluate_dataset_losses(dataset_key)
 
         return eval_loss_dict
 
@@ -205,7 +219,7 @@ def train(c):
 
             # Evaluates model on validation datasets
             for dataset_key, dataloader_val in validation_dataloaders.items():
-                loss_val_dict = evaluate_epoch(dataloader_val)
+                loss_val_dict = evaluate_epoch(dataloader_val, dataset_key)
                 for loss_key, loss_value in loss_val_dict.items():
                     epoch_loss_dict[
                         'validation'][
@@ -213,9 +227,13 @@ def train(c):
 
             # write(model, dataloader_val, writer, "val", loss_val, epoch)
 
-            # Checkpoints model weights.
-            if (not is_rip) and (epoch % checkpoint_frequency == 0):
-                checkpointer.save(epoch)
+            # Checkpoints model weights if c.exp_checkpoint_validation_loss
+            # has improved since last checkpoint.
+            if not is_rip:
+                checkpointer.save(
+                    epoch, epoch_loss_dict[
+                        'validation'][c.exp_checkpoint_validation_loss
+                                      ].detach().cpu().numpy().item())
 
             # Updates progress bar description.
             pbar_string = ''
@@ -225,8 +243,8 @@ def train(c):
                     pbar_string += 'TL {} {:.2f} | '.format(
                         dataset_key, loss_val.detach().cpu().numpy().item())
 
-            if c.model_name == 'dim':
-                pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
+            # if c.model_name == 'dim':
+            #     pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
 
             for dataset_key, loss_val in epoch_loss_dict['validation'].items():
                 pbar_string += 'VL {} {:.2f} | '.format(
@@ -269,4 +287,3 @@ def train(c):
 #     ground_truth=batch["player_future"].detach().cpu().numpy()[:8],
 #     global_step=epoch,
 # )
-

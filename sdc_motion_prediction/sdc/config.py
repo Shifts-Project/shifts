@@ -23,6 +23,10 @@ def build_parser():
         '--dir_data', type=str, default='data',
         help='Directory where SDC data is stored. We also use this to cache '
              'torch hub models.')
+    parser.add_argument(
+        '--dir_metrics', type=str, default=None,
+        help='Directory where intermediate metrics are stored. Default will '
+             'be set to `{dir_data}/metrics`.')
     # parser.add_argument(
     #     '--dir_prerendered_data', type=str, default='data',
     #     help='Directory where pre-rendered SDC data is stored.')
@@ -96,8 +100,15 @@ def build_parser():
              '(exp_image_downsize, exp_image_downsize). '
              'Do not downsize if None.')
     parser.add_argument(
-        '--exp_checkpoint_frequency', type=int, default=25,
-        help='Model checkpoint frequency.')
+        '--exp_checkpoint_frequency', type=int, default=1,
+        help='Checkpoint every `exp_checkpoint_frequency` times the '
+             'validation loss improves.')
+    parser.add_argument(
+        '--exp_checkpoint_validation_loss', type=str,
+        default='moscow__validation__ade',
+        help='Loss to use for model checkpointing (i.e., checkpoint if model '
+             'improves this validation loss. Note that by default, this uses '
+             'the in-distribution (Moscow, no precipitation) validation set.')
 
     ###########################################################################
     # #### Model ##############################################################
@@ -108,15 +119,9 @@ def build_parser():
         help="The backbone model. See "
              "sdc/oatomobile/torch/baselines/__init__.py.")
     parser.add_argument(
-        '--model_rip_algorithm', type=str, default=None,
-        help="Use Robust Imitative Planning wrapper around the backbone model."
-             "`None` will disable RIP."
-             "`WCM`: worst-case model configuration."
-             "`MA`: Bayesian model averaging."
-             "`BCM`: best-case model.")
-    parser.add_argument(
-        '--model_rip_k', type=int, default=3,
-        help="Number of models in the RIP ensemble.")
+        '--model_checkpoint_key', type=str, default=None,
+        help="Optionally specify the name of the subdirectory to "
+             "which we checkpoint.")
     parser.add_argument(
         '--model_dim_hidden', type=int, default=128,
         help="Number of hidden dims, generally the size "
@@ -135,13 +140,53 @@ def build_parser():
         '--model_clip_gradients', type='bool', default=False,
         help='Clips gradients to 1.0.')
 
+
     ###########################################################################
     # #### Method-Specific Hypers #############################################
     ###########################################################################
 
-    parser.add_argument('--dim_noise_level', type=float, default=1e-2,
-                        help="Noise with which ground truth trajectories are "
-                             "perturbed in training DIM.")
+    # parser.add_argument(
+    #     '--dim_noise_level', type=float, default=1e-2,
+    #     help="Noise with which ground truth trajectories are perturbed in "
+    #          "training DIM.")
+    parser.add_argument(
+        '--dim_scale_eps', type=float, default=1e-7,
+        help="Additive epsilon constant to avoid a 0 or negative scale.")
+    parser.add_argument(
+        '--rip_algorithm', type=str, default=None,
+        help="Use Robust Imitative Planning wrapper around the backbone model."
+             "`None` will disable RIP."
+             "`WCM`: worst-case model configuration."
+             "`MA`: Bayesian model averaging."
+             "`BCM`: best-case model.")
+    parser.add_argument(
+        '--rip_k', type=int, default=3,
+        help="Number of models in the RIP ensemble.")
+    parser.add_argument(
+        '--rip_eval_samples_per_model', type=int, default=10,
+        help="Number of stochastic trajectory generations per RIP "
+             "ensemble member.")
+    parser.add_argument(
+        '--rip_num_preds', type=int, default=5,
+        help="Number of plan predictions that are actually made by the RIP "
+             "model for a given prediction request input. "
+             "We select these as the top samples from all stochastic "
+             "generations from the ensemble members.")
+    # parser.add_argument(
+    #     '--rip_single_prediction', type='bool', default=False,
+    #     help="If enabled, take the argmax over per-scene predicted "
+    #          "trajectories after the RIP aggregation step.")
+
+    ###########################################################################
+    # #### Metrics ############################################################
+    ###########################################################################
+
+    parser.add_argument(
+        '--metrics_retention_thresholds', type=str,
+        default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
+        help="Based on confidence scores for scenes (or plans, of which there "
+             "may be many per scene), compute other metrics when retaining "
+             "this proportion of all scenes (plans).")
 
     ###########################################################################
     # #### Debug ##############################################################

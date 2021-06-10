@@ -33,6 +33,7 @@ class ImitativeModel(nn.Module):
         in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
+        scale_eps: float = 1e-7,
         **kwargs
     ) -> None:
         """Constructs a simple imitative model.
@@ -55,6 +56,7 @@ class ImitativeModel(nn.Module):
         self._flow = AutoregressiveFlow(
             output_shape=self._output_shape,
             hidden_size=dim_hidden,
+            scale_eps=scale_eps  # Additive epsilon term for scale
         )
 
     def to(self, *args, **kwargs):
@@ -144,7 +146,6 @@ def train_step_dim(
     model: ImitativeModel,
     optimizer: optim.Optimizer,
     batch: Mapping[str, torch.Tensor],
-    noise_level: float,
     clip: bool = False,
     **kwargs
 ) -> Mapping[str, torch.Tensor]:
@@ -153,11 +154,12 @@ def train_step_dim(
     optimizer.zero_grad()
 
     # Perturb target.
-    y = torch.normal(  # pylint: disable=no-member
-        mean=batch["ground_truth_trajectory"],
-        std=torch.ones_like(batch["ground_truth_trajectory"]) * noise_level,
-        # pylint: disable=no-member
-    )
+    # y = torch.normal(  # pylint: disable=no-member
+    #     mean=batch["ground_truth_trajectory"],
+    #     std=torch.ones_like(batch["ground_truth_trajectory"]) * noise_level,
+    #     # pylint: disable=no-member
+    # )
+    y = batch["ground_truth_trajectory"]
 
     # Forward pass from the model.
     z = model._params(**batch)

@@ -30,22 +30,46 @@ class Checkpointer:
       model: nn.Module,
       torch_seed: int,
       ckpt_dir: str,
+      checkpoint_frequency: int
   ) -> None:
     """Constructs a simple load/save checkpointer."""
     self._model = model
     self._torch_seed = torch_seed
     self._ckpt_dir = ckpt_dir
+    self._best_validation_loss = float('inf')
+
+    # The number of times validation loss must improve prior to our
+    # checkpointing of the model
+    if checkpoint_frequency == -1:
+      self.checkpoint_frequency = float('inf')  # We will never checkpoint
+    else:
+      self.checkpoint_frequency = checkpoint_frequency
+
+    self._num_improvements_since_last_ckpt = 0
+
     os.makedirs(self._ckpt_dir, exist_ok=True)
 
   def save(
       self,
       epoch: int,
+      new_validation_loss: float
   ) -> str:
     """Saves the model to the `ckpt_dir/epoch/model.pt` file."""
     model_file_name = f'model-seed-{self._torch_seed}-epoch-{epoch}.pt'
-    ckpt_path = os.path.join(self._ckpt_dir, model_file_name)
-    torch.save(self._model.state_dict(), ckpt_path)
-    return ckpt_path
+
+    if new_validation_loss < self._best_validation_loss:
+      self._num_improvements_since_last_ckpt += 1
+      self._best_validation_loss = new_validation_loss
+
+      if self._num_improvements_since_last_ckpt >= self.checkpoint_frequency:
+        print(
+          f'Validation loss has improved '
+          f'{self._num_improvements_since_last_ckpt} times since last ckpt, '
+          f'storing checkpoint {model_file_name}.')
+        ckpt_path = os.path.join(self._ckpt_dir, model_file_name)
+        torch.save(self._model.state_dict(), ckpt_path)
+        self._num_improvements_since_last_ckpt = 0
+        return ckpt_path
 
   def load(
       self,

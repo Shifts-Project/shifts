@@ -53,6 +53,7 @@ def get_dim_kwargs(c):
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
         'device': c.exp_device,
+        'scale_eps': c.dim_scale_eps
     }
 
 
@@ -62,25 +63,23 @@ def init_rip(c):
     k = ensemble_kwargs['k']
     print('RIP kwargs:')
     pprint(ensemble_kwargs)
-    algorithm = c.model_rip_algorithm
+    algorithm = c.rip_algorithm
     model_name = c.model_name
-    full_model_name = f'rip-{algorithm}-{model_name}-k_{k}'
-    model_name = ensemble_kwargs['model_name']
+    print(f'Building RIP agent with backbone model {model_name}, '
+          f'algorithm {algorithm}, {k} ensemble members.')
+    full_model_name = f'rip-{algorithm}-{model_name}-k_{k}'.lower()
 
     # Init models
     backbone_init_fn, _, _ = BACKBONE_NAME_TO_CLASS_FNS[
         model_name]
     models = [backbone_init_fn(c) for _ in range(k)]
-    print(f'Building RIP agent with algorithm {algorithm}, '
-          f'backbone model {model_name}, {k} ensemble members.')
-    return (
-        RIPAgent(models=models, **ensemble_kwargs), full_model_name,
-        None, evaluate_step_rip)
+    return (RIPAgent(models=models, **ensemble_kwargs), full_model_name,
+            None, evaluate_step_rip)
 
 
 def init_model(c):
     model_name = c.model_name
-    rip_algorithm = c.model_rip_algorithm
+    rip_algorithm = c.rip_algorithm
     if rip_algorithm is None:
         print(f'Training {BACKBONE_NAME_TO_FULL_NAME[model_name]}')
         init_fn, train_step, test_step = (
@@ -93,10 +92,12 @@ def init_model(c):
 
 def get_rip_kwargs(c):
     return {
-        'algorithm': c.model_rip_algorithm,
-        'k': c.model_rip_k,
+        'algorithm': c.rip_algorithm,
+        'k': c.rip_k,
         'model_name': c.model_name,
         'device': c.exp_device,
+        'eval_samples_per_model': c.rip_eval_samples_per_model,
+        'num_preds': c.rip_num_preds
     }
 
 
