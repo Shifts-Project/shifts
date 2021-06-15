@@ -20,6 +20,9 @@ def build_parser():
         '--dir_wandb', type=str, default='./',
         help='Directory to which wandb logs.')
     parser.add_argument(
+        '--dir_tensorboard', type=str, default='tb',
+        help='Directory to which TensorBoard logs.')
+    parser.add_argument(
         '--dir_data', type=str, default='data',
         help='Directory where SDC data is stored. We also use this to cache '
              'torch hub models.')
@@ -40,6 +43,9 @@ def build_parser():
     parser.add_argument(
         '--verbose', type='bool', default=False,
         help='Extra logging, sanity checks.')
+    parser.add_argument(
+        '--tb_logging', type='bool', default=False,
+        help='Use TensorBoard logging for losses and visualizations.')
     parser.add_argument(
         '--np_seed', type=int, default=42,
         help='NumPy seed (data processing, train/test splits, etc.).')
@@ -119,6 +125,11 @@ def build_parser():
         help="The backbone model. See "
              "sdc/oatomobile/torch/baselines/__init__.py.")
     parser.add_argument(
+        '--model_prefix', type=str, default=None,
+        help="Used for logging/plotting purposes for RIP. Specify a prefix "
+             "which will appear before the model (e.g., "
+             "`Trained on Partial Data`).")
+    parser.add_argument(
         '--model_checkpoint_key', type=str, default=None,
         help="Optionally specify the name of the subdirectory to "
              "which we checkpoint.")
@@ -153,17 +164,25 @@ def build_parser():
         '--dim_scale_eps', type=float, default=1e-7,
         help="Additive epsilon constant to avoid a 0 or negative scale.")
     parser.add_argument(
-        '--rip_algorithm', type=str, default=None,
-        help="Use Robust Imitative Planning wrapper around the backbone model."
+        '--rip_per_plan_algorithm', type=str, default=None,
+        help="Use Robust Imitative Planning wrapper to select a robust "
+             "log-likelihood estimate for each generated plan."
              "`None` will disable RIP."
-             "`WCM`: worst-case model configuration."
+             "`WCM`: worst-case model."
              "`MA`: Bayesian model averaging."
-             "`BCM`: best-case model.")
+             "`BCM`: best-case model."
+             "`UQ`: upper quartile."
+             "`LQ`: lower quartile.")
+    parser.add_argument(
+        '--rip_per_scene_algorithm', type=str, default=None,
+        help="Use Robust Imitative Planning wrapper to aggregate a per-scene "
+             "confidence based on the aggregated per-plan log-likelihoods. "
+             "Same settings as above.")
     parser.add_argument(
         '--rip_k', type=int, default=3,
         help="Number of models in the RIP ensemble.")
     parser.add_argument(
-        '--rip_eval_samples_per_model', type=int, default=10,
+        '--rip_samples_per_model', type=int, default=10,
         help="Number of stochastic trajectory generations per RIP "
              "ensemble member.")
     parser.add_argument(
@@ -176,6 +195,10 @@ def build_parser():
     #     '--rip_single_prediction', type='bool', default=False,
     #     help="If enabled, take the argmax over per-scene predicted "
     #          "trajectories after the RIP aggregation step.")
+    parser.add_argument(
+        '--rip_cache_full_results', type='bool', default=False,
+        help="Cache predictions, ground truth, uncertainty estimates, "
+             "scene ID, and trajectory tags for every evaluated datapoint.")
 
     ###########################################################################
     # #### Metrics ############################################################
@@ -187,6 +210,13 @@ def build_parser():
         help="Based on confidence scores for scenes (or plans, of which there "
              "may be many per scene), compute other metrics when retaining "
              "this proportion of all scenes (plans).")
+    parser.add_argument(
+        '--metrics_retention_use_oracle', type='bool',
+        default=True,
+        help='If enabled, will compute retention scores with 0 loss on all '
+             'non-retained points. This is analogous to the AV agent working '
+             'with a human that can perform optimally when given control. '
+             'Also reduces variance issues for low retention thresholds.')
 
     ###########################################################################
     # #### Debug ##############################################################
@@ -201,6 +231,10 @@ def build_parser():
     parser.add_argument(
         '--debug_overfit_n_examples', type=int, default=10,
         help='Size of the subset of train on which we try to overfit.')
+    parser.add_argument(
+        '--debug_collect_eval_statistics', type='bool', default=False,
+        help='When enabled, '
+    )
 
     return parser
 

@@ -63,15 +63,23 @@ def init_rip(c):
     k = ensemble_kwargs['k']
     print('RIP kwargs:')
     pprint(ensemble_kwargs)
-    algorithm = c.rip_algorithm
+    per_plan_algorithm = c.rip_per_plan_algorithm
+    per_scene_algorithm = c.rip_per_scene_algorithm
     model_name = c.model_name
+
+    if model_name != 'dim':
+        raise NotImplementedError
+
     print(f'Building RIP agent with backbone model {model_name}, '
-          f'algorithm {algorithm}, {k} ensemble members.')
-    full_model_name = f'rip-{algorithm}-{model_name}-k_{k}'.lower()
+          f'per-plan algorithm {per_plan_algorithm}, '
+          f'per-scene algorithm {per_scene_algorithm}, '
+          f'{k} ensemble members.')
+    full_model_name = (
+        f'rip-{model_name}-k_{k}-plan_{per_plan_algorithm}-scene'
+        f'_{per_scene_algorithm}').lower()
 
     # Init models
-    backbone_init_fn, _, _ = BACKBONE_NAME_TO_CLASS_FNS[
-        model_name]
+    backbone_init_fn, _, _ = BACKBONE_NAME_TO_CLASS_FNS[model_name]
     models = [backbone_init_fn(c) for _ in range(k)]
     return (RIPAgent(models=models, **ensemble_kwargs), full_model_name,
             None, evaluate_step_rip)
@@ -79,8 +87,9 @@ def init_rip(c):
 
 def init_model(c):
     model_name = c.model_name
-    rip_algorithm = c.rip_algorithm
-    if rip_algorithm is None:
+    per_plan_algorithm = c.rip_per_plan_algorithm
+    per_scene_algorithm = c.rip_per_scene_algorithm
+    if per_plan_algorithm is None or per_scene_algorithm is None:
         print(f'Training {BACKBONE_NAME_TO_FULL_NAME[model_name]}')
         init_fn, train_step, test_step = (
             BACKBONE_NAME_TO_CLASS_FNS[model_name])
@@ -92,11 +101,12 @@ def init_model(c):
 
 def get_rip_kwargs(c):
     return {
-        'algorithm': c.rip_algorithm,
+        'per_plan_algorithm': c.rip_per_plan_algorithm,
+        'per_scene_algorithm': c.rip_per_scene_algorithm,
         'k': c.rip_k,
         'model_name': c.model_name,
         'device': c.exp_device,
-        'eval_samples_per_model': c.rip_eval_samples_per_model,
+        'samples_per_model': c.rip_samples_per_model,
         'num_preds': c.rip_num_preds
     }
 

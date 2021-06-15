@@ -17,3 +17,4 @@ wandb
 scikit-learn
 line-profiler
 transformers
+tensorflow
