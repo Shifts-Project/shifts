@@ -235,6 +235,10 @@ def build_parser():
         '--debug_collect_eval_statistics', type='bool', default=False,
         help='When enabled, '
     )
+    parser.add_argument(
+        '--debug_eval_mode', type='bool', default=False,
+        help='Only run evaluation. Can be manually triggered to evaluate '
+             'a trained BC/DIM model.')
 
     return parser
 

@@ -42,6 +42,7 @@ def train(c):
     device = c.exp_device
     is_rip = (c.rip_per_plan_algorithm is not None and
               c.rip_per_scene_algorithm is not None)
+    eval_mode = (c.debug_eval_mode or is_rip)
     if c.exp_image_downsize_hw is None:
         downsample_hw = None
     else:
@@ -79,7 +80,8 @@ def train(c):
         model = load_rip_checkpoints(
             model=model, device=device, k=c.rip_k,
             checkpoint_dir=checkpoint_dir)
-    else:
+
+    if not eval_mode:
         os.makedirs(checkpoint_dir, exist_ok=True)
         checkpointer = Checkpointer(
             model=model, ckpt_dir=checkpoint_dir, torch_seed=c.torch_seed,
@@ -108,9 +110,8 @@ def train(c):
     if c.tb_logging:
         dataset_names = ['moscow__train'] + list(
             set(eval_dataloaders['validation'].keys()))
-        # TODO: remove
-        # RIP eval on test set
-        if is_rip:
+        # TODO: remove eval on test set
+        if eval_mode:
             dataset_names += list(set(eval_dataloaders['test'].keys()))
         print(f'TensorBoard logging for datasets {dataset_names}.')
         writer = TensorBoardLogger(
@@ -244,8 +245,8 @@ def train(c):
             validation_dataloaders = eval_dataloaders['test']
             print(validation_dataloaders.keys())
 
-    if is_rip:
-        print('Running RIP evaluation. Setting num_epochs to 1.')
+    if eval_mode:
+        print('Running evaluation. Setting num_epochs to 1.')
         num_epochs = 1
         test_dataloaders = eval_dataloaders['test']
 
@@ -253,7 +254,7 @@ def train(c):
         for epoch in pbar_epoch:
             epoch_loss_dict = defaultdict(dict)
 
-            if not is_rip:
+            if not eval_mode:
                 loss_train_dict, epoch_steps = train_epoch(train_dataloader)
                 dataset_key = 'moscow__train'
                 for loss_key, loss_value in loss_train_dict.items():
@@ -278,9 +279,9 @@ def train(c):
                     write(model, dataloader_val, writer, dataset_key,
                         loss_val_dict, epoch)
 
-            if is_rip:
+            if eval_mode:
                 # TODO: remove in final code
-                # For RIP, evaluate on the test sets.
+                # Evaluate on the test sets.
                 for dataset_key, dataloader_test in test_dataloaders.items():
                     loss_test_dict = evaluate_epoch(
                         dataloader_test, dataset_key)
@@ -301,7 +302,7 @@ def train(c):
             # Updates progress bar description.
             pbar_string = ''
 
-            if not is_rip:
+            if not eval_mode:
                 pbar_string += 'Train Losses: '
                 for dataset_key, loss_train in epoch_loss_dict['train'].items():
                     pbar_string += '{} {:.2f} | '.format(
@@ -314,7 +315,7 @@ def train(c):
             for dataset_key, loss_val in epoch_loss_dict['validation'].items():
                 pbar_string += '{} {:.2f} | '.format(dataset_key, loss_val)
 
-            if is_rip:
+            if eval_mode:
                 pbar_string += 'Test Losses: '
                 for dataset_key, loss_test in epoch_loss_dict['test'].items():
                     pbar_string += '{} {:.2f} | '.format(
@@ -326,5 +327,5 @@ def train(c):
             # Log to wandb
             logger.log(epoch_loss_dict, steps, epoch)
 
-            if not is_rip:
+            if not eval_mode:
                 scheduler.step()
