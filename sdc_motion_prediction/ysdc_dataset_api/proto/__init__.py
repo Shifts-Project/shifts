@@ -3,7 +3,7 @@ from google.protobuf.json_format import MessageToDict
 from .dataset_pb2 import *
 from .geom_pb2 import *
 from .map_pb2 import *
-from .submission_pb2 import Submission
+from .submission_pb2 import *
 from .tags_pb2 import *
 
 

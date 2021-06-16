@@ -2,7 +2,7 @@ import numpy as np
 
 
 def average_displacement_error(ground_truth, predicted):
-    """Calcultates average displacement error.
+    """Calculates average displacement error.
     Does not perform any mode aggregation.
 
     Args:
@@ -16,7 +16,7 @@ def average_displacement_error(ground_truth, predicted):
 
 
 def final_displacement_error(ground_truth, predicted):
-    """Calculates final displacement error
+    """Calculates final displacement error.
     Does not performs any mode aggregation
 
     Args:
