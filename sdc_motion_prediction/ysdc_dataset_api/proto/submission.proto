@@ -1,0 +1,24 @@
+syntax = "proto3";
+import "geom.proto";
+
+package neurips_dataset;
+
+message Trajectory {
+    repeated Vector3 points = 1;
+}
+
+message WeightedTrajectory {
+    Trajectory trajectory = 1;
+    float weight = 2;
+}
+
+message ObjectPrediction {
+    uint64 track_id = 1;
+    string scene_id = 2;
+    repeated WeightedTrajectory weighted_trajectories = 3;
+    float uncertainty_measure = 4;
+}
+
+message Submission {
+    repeated ObjectPrediction predictions = 1;
+}

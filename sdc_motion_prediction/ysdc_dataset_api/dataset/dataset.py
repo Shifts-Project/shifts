@@ -28,9 +28,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             trajectory_tags_filter=None,
     ):
         super(MotionPredictionDataset, self).__init__()
-        if not (feature_producer or prerendered_dataset_path):
-            raise ValueError(
-                'You must specify either feature_producer or prerendered_dataset_path')
 
         self._feature_producer = feature_producer
         self._prerendered_dataset_path = prerendered_dataset_path
@@ -69,7 +66,9 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         ground_truth_trajectory = transform2dpoints(
                             ground_truth_trajectory, to_track_frame_tf)
                     result = {
-                        'ground_truth_trajectory': ground_truth_trajectory
+                        'ground_truth_trajectory': ground_truth_trajectory,
+                        'scene_id': scene.id,
+                        'track_id': request.track_id,
                     }
 
                     if self._prerendered_dataset_path:
