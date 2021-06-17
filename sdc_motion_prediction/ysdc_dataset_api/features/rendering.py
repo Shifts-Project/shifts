@@ -1,14 +1,16 @@
 import math
 from collections import defaultdict
+from typing import Any, Dict, List, Union
 
 import cv2
 import numpy as np
 
 from .producing import FeatureProducerBase
+from ..proto import Scene
 from ..utils import (
     get_tracks_polygons,
-    transform2dpoints,
-    transform2dvectors,
+    transform_2d_points,
+    transform_2d_vectors,
 )
 from ..utils.map import (
     get_crosswalk_availability,
@@ -32,18 +34,40 @@ class FeatureMapRendererBase:
 
     def __init__(
             self,
-            config,
-            feature_map_params,
-            time_grid_params,
-            to_feature_map_tf,
+            config: List[str],
+            feature_map_params: Dict[str, Union[int, float]],
+            time_grid_params: Dict[str, int],
+            to_feature_map_tf: np.ndarray,
     ):
+        """A base class for feature renderers.
+
+        Args:
+            config (List[str]): list of channels to render
+            feature_map_params (Dict[str, Union[int, float]]): feature map parameters dict
+              specifying pixel height, width and resolution in meters
+            time_grid_params (Dict[str, int]): time grid parameters dict
+              specifying number of historical steps to render
+            to_feature_map_tf (np.ndarray): transform to feature map coordinate system
+        """
         self._config = config
         self._feature_map_params = feature_map_params
         self._history_indices = self._get_history_indices(time_grid_params)
         self._num_channels = self._get_num_channels()
         self._to_feature_map_tf = to_feature_map_tf
 
-    def render(self, feature_map, scene, to_track_transform):
+    def render(self, feature_map: np.ndarray, scene: Scene, to_track_transform: np.ndarray):
+        """Renders objects from scene to the feature map using OpenCV.
+        All object coordinates are transformed from global coordinates system to feature map system
+        using to_track_transform and self._to_feature_map_transform.
+
+        Args:
+            feature_map (np.ndarray): input feature map for rendering
+            scene (Scene): input scene proto message
+            to_track_transform (np.ndarray): transform to agent-centric coordinates
+
+        Raises:
+            NotImplementedError: to overload in child classes
+        """
         raise NotImplementedError()
 
     def _get_num_channels(self):
@@ -57,29 +81,49 @@ class FeatureMapRendererBase:
         ))
 
     @property
-    def n_history_steps(self):
+    def n_history_steps(self) -> int:
+        """Number of history steps in the resulting feature map
+
+        Returns:
+            int:
+        """
         return len(self._history_indices)
 
     @property
-    def num_channels(self):
+    def num_channels(self) -> int:
+        """Number of channels in the resulting feature map
+
+        Returns:
+            int:
+        """
         return self._num_channels
 
 
 class TrackRendererBase(FeatureMapRendererBase):
+    """A base class for pedestrian and vehicle tracks renderers.
+
+    """
     def _get_tracks_at_timestamp(self, scene, ts_ind):
         raise NotImplementedError
 
     def _get_fm_values(self, tracks, transform):
         raise NotImplementedError
 
-    def render(self, feature_map, scene, to_track_transform):
+    def render(self, feature_map: np.ndarray, scene: Scene, to_track_transform: np.ndarray):
+        """Renders tracks as polygons on the feature map.
+
+        Args:
+            feature_map (np.ndarray): input feature map for rendering
+            scene (Scene): input scene proto message
+            to_track_transform (np.ndarray): transform to agent-centric coordinates
+        """
         transform = self._to_feature_map_tf @ to_track_transform
         for ts_ind in self._history_indices:
             tracks_at_frame = self._get_tracks_at_timestamp(scene, ts_ind)
             if not tracks_at_frame:
                 continue
             polygons = get_tracks_polygons(tracks_at_frame)
-            polygons = transform2dpoints(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
+            polygons = transform_2d_points(polygons.reshape(-1, 2), transform).reshape(-1, 4, 2)
             polygons = np.around(polygons - 0.5).astype(np.int32)
 
             fm_values = self._get_fm_values(tracks_at_frame, to_track_transform)
@@ -93,7 +137,6 @@ class TrackRendererBase(FeatureMapRendererBase):
                         fm_values[track_idx, channel_idx],
                         lineType=self.LINE_TYPE,
                     )
-        return feature_map
 
     def _get_occupancy_values(self, tracks):
         return np.ones((len(tracks), 1), dtype=np.float32)
@@ -102,14 +145,14 @@ class TrackRendererBase(FeatureMapRendererBase):
         velocities = np.asarray(
             [[track.linear_velocity.x, track.linear_velocity.y] for track in tracks],
             dtype=np.float32)
-        velocities = transform2dvectors(velocities, transform)
+        velocities = transform_2d_vectors(velocities, transform)
         return velocities
 
     def _get_acceleration_values(self, tracks, transform):
         accelerations = np.asarray(
             [[track.linear_acceleration.x, track.linear_acceleration.y] for track in tracks],
             dtype=np.float32)
-        accelerations = transform2dvectors(accelerations, transform)
+        accelerations = transform_2d_vectors(accelerations, transform)
         return accelerations
 
     def _get_yaw_values(self, tracks):
@@ -171,7 +214,15 @@ class PedestrianTracksRenderer(TrackRendererBase):
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):
-    def render(self, feature_map, scene, to_track_transform):
+    def render(self, feature_map: np.ndarray, scene: Scene, to_track_transform: np.ndarray):
+        """Render path graph elements, such as lanes, crosswalks, road polygons,
+        as well as its properties (geometry, occupancy, etc.)
+
+        Args:
+            feature_map (np.ndarray): input feature map for rendering
+            scene (Scene): input scene proto message
+            to_track_transform (np.ndarray): transform to agent-centric coordinates
+        """
         transform = self._to_feature_map_tf @ to_track_transform
         path_graph = scene.path_graph
         for channel_ind in range(len(self._history_indices)):
@@ -196,13 +247,12 @@ class RoadGraphRenderer(FeatureMapRendererBase):
                     path_graph,
                     transform,
                 )
-        return feature_map
 
     def _render_crosswalks(self, feature_map, path_graph, traffic_light_sections, transform):
         crosswalk_polygons = []
         for crosswalk in path_graph.crosswalks:
             polygon = repeated_points_to_array(crosswalk.geometry)
-            polygon = transform2dpoints(polygon, transform)
+            polygon = transform_2d_points(polygon, transform)
             polygon = np.around(polygon - 0.5).astype(np.int32)
             crosswalk_polygons.append(polygon)
 
@@ -236,7 +286,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
             for p in lane.centers:
                 lane_centers_concatenated.append([p.x, p.y])
         lane_centers_concatenated = np.array(lane_centers_concatenated, dtype=np.float32)
-        lane_centers_concatenated = transform2dpoints(lane_centers_concatenated, transform)
+        lane_centers_concatenated = transform_2d_points(lane_centers_concatenated, transform)
         lane_centers_concatenated = np.around(lane_centers_concatenated - 0.5).astype(np.int32)
 
         lane_centers = []
@@ -335,7 +385,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
         road_polygons = []
         for road_polygon in path_graph.road_polygons:
             polygon = repeated_points_to_array(road_polygon.geometry)
-            polygon = transform2dpoints(polygon, transform)
+            polygon = transform_2d_points(polygon, transform)
             polygon = np.around(polygon - 0.5).astype(np.int32)
             road_polygons.append(polygon)
         cv2.fillPoly(
@@ -417,14 +467,32 @@ class RoadGraphRenderer(FeatureMapRendererBase):
 
 
 class FeatureRenderer(FeatureProducerBase):
-    def __init__(self, config):
+    def __init__(self, config: Any):
+        """A class implementing FeatureProducerBase interface for individual feature renderers.
+
+        Args:
+            config (Any): dict with feature map params and renderer groups params.
+              Find an example in the example.ipynb.
+        """
         self._feature_map_params = config['feature_map_params']
         self._to_feature_map_tf = self._get_to_feature_map_transform()
 
         self._renderers = self._create_renderers_list(config)
         self._num_channels = self._get_num_channels()
 
-    def produce_features(self, scene, to_track_frame_tf):
+    def produce_features(
+            self, scene: Scene, to_track_frame_tf: np.ndarray) -> Dict[str, np.ndarray]:
+        """Produces feature maps given the scene and the transform from global coordinates to
+        an actor-centric coordinates.
+
+        Args:
+            scene (Scene): current scene to render
+            to_track_frame_tf (np.ndarray): transform from global coordinated to actor-centric
+              system.
+
+        Returns:
+            Dict[str, np.ndarray]: dict with structure {'feature_maps': np.ndarray}
+        """
         feature_maps = self._create_feature_maps()
         slice_start = 0
         for renderer in self._renderers:
@@ -436,7 +504,13 @@ class FeatureRenderer(FeatureProducerBase):
         }
 
     @property
-    def to_feature_map_tf(self):
+    def to_feature_map_tf(self) -> np.ndarray:
+        """Transform to feature map coordinate system.
+        Origin (0, 0) is located at feature map center.
+
+        Returns:
+            np.ndarray: np.ndarray of shape (4, 4)
+        """
         return self._to_feature_map_tf
 
     def _get_to_feature_map_transform(self):

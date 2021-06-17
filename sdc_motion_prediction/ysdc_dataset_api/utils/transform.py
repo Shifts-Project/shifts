@@ -2,19 +2,31 @@ import numba
 import numpy as np
 import transforms3d as tf
 
-from ..proto import VehicleTrack
+from ..proto import Scene, VehicleTrack
 
 
-def get_track_for_transform(scene, track_id, timestamp=-1):
-    track, offset = get_last_track_offset(scene, track_id)
+def get_latest_track_state_by_id(scene: Scene, track_id: int) -> VehicleTrack:
+    """Returns a VehicleTrack instance with corresponding track_id at the last history timestamp.
+    If track with track_id is not present at the last history timestamp
+    then it is linearly interpolated to this timestamp from the closest past state
+    and the first future state.
+
+    Args:
+        scene (Scene): scene to look for the track in
+        track_id (int): track_id to look for
+
+    Returns:
+        VehicleTrack: Resulting track instance.
+    """
+    track, offset = _get_last_known_track_state_and_offset(scene, track_id)
     if offset < -1:
-        gt_track = get_first_gt_track_value(scene, track_id)
+        gt_track = _get_first_gt_track_value(scene, track_id)
         ratio = -offset / (1 - offset)
-        track = linear_interpolate_vehicle_track(track, gt_track, ratio)
+        track = _linear_interpolate_vehicle_track(track, gt_track, ratio)
     return track
 
 
-def get_last_track_offset(scene, track_id):
+def _get_last_known_track_state_and_offset(scene, track_id):
     for i in range(-1, -len(scene.past_vehicle_tracks), -1):
         trackid2track = {t.track_id: t for t in scene.past_vehicle_tracks[i].tracks}
         if track_id in trackid2track:
@@ -23,7 +35,7 @@ def get_last_track_offset(scene, track_id):
         f'past track track_id {track_id} was not found in scene {scene.id}')
 
 
-def get_first_gt_track_value(scene, track_id):
+def _get_first_gt_track_value(scene, track_id):
     for track in scene.future_vehicle_tracks[0].tracks:
         if track.track_id == track_id:
             return track
@@ -31,7 +43,17 @@ def get_first_gt_track_value(scene, track_id):
         f'future track for track_id {track_id} was not found in scene {scene.id}')
 
 
-def get_to_track_frame_transform(track):
+def get_to_track_frame_transform(track: VehicleTrack) -> np.ndarray:
+    """Produces transform from global coordinates to actor-centric coordinate system.
+    So that origin is located at the vehicle center and the vehicle is headed towards positive
+    direction of x axis.
+
+    Args:
+        track (VehicleTrack): Vehicle track to get transform for.
+
+    Returns:
+        np.ndarray: transformation matrix, shape (4, 4).
+    """
     position = np.array([
         track.position.x,
         track.position.y,
@@ -52,7 +74,16 @@ def get_to_track_frame_transform(track):
 
 
 @numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
-def transform2dpoints(points, transform):
+def transform_2d_points(points: np.ndarray, transform: np.ndarray) -> np.ndarray:
+    """Transforms a bunch of 2D points stored in numpy array with transform matrix.
+
+    Args:
+        points (np.ndarray): array, shape (N, 2)
+        transform (np.ndarray): transformation matrix, shape (4, 4)
+
+    Returns:
+        np.ndarray: transformed points, shape (N, 2)
+    """
     ph = np.zeros((4, points.shape[0]), dtype=np.float32)
     ph[:2, :] = points.transpose()
     ph[3, :] = np.ones(points.shape[0])
@@ -61,50 +92,49 @@ def transform2dpoints(points, transform):
 
 
 @numba.jit(numba.float32[:, :](numba.float32[:, :], numba.float32[:, :]), nopython=True)
-def transform2dvectors(vectors, transform):
-    vectors = transform2dpoints(vectors, transform)
+def transform_2d_vectors(vectors: np.ndarray, transform: np.ndarray) -> np.ndarray:
+    """Transforms a bunch of 2D vectors stored in numpy array with transform matrix.
+
+    Args:
+        vectors (np.ndarray): array, shape (N, 2)
+        transform (np.ndarray): transformation matrix, shape (4, 4)
+
+    Returns:
+        np.ndarray: transformed vectors, shape (N, 2)
+    """
+    vectors = transform_2d_points(vectors, transform)
     vectors = vectors - np.asarray([[transform[0, 3], transform[1, 3]]])
     return vectors
 
 
-def linear_interpolate_vehicle_track(first, second, ratio):
+def _linear_interpolate_vehicle_track(first, second, ratio):
     track = VehicleTrack()
     track.track_id = first.track_id
     track.dimensions.x = first.dimensions.x
     track.dimensions.y = first.dimensions.y
     track.dimensions.z = first.dimensions.z
 
-    track.position.x = interpolate(first.position.x, second.position.x, ratio)
-    track.position.y = interpolate(first.position.y, second.position.y, ratio)
-    track.position.z = interpolate(first.position.z, second.position.z, ratio)
+    track.position.x = _linear_interpolate(first.position.x, second.position.x, ratio)
+    track.position.y = _linear_interpolate(first.position.y, second.position.y, ratio)
+    track.position.z = _linear_interpolate(first.position.z, second.position.z, ratio)
 
-    track.linear_velocity.x = interpolate(
+    track.linear_velocity.x = _linear_interpolate(
         first.linear_velocity.x, second.linear_velocity.x, ratio)
-    track.linear_velocity.y = interpolate(
+    track.linear_velocity.y = _linear_interpolate(
         first.linear_velocity.y, second.linear_velocity.y, ratio)
-    track.linear_velocity.z = interpolate(
+    track.linear_velocity.z = _linear_interpolate(
         first.linear_velocity.z, second.linear_velocity.z, ratio)
 
-    track.linear_acceleration.x = interpolate(
+    track.linear_acceleration.x = _linear_interpolate(
         first.linear_acceleration.x, second.linear_acceleration.x, ratio)
-    track.linear_acceleration.y = interpolate(
+    track.linear_acceleration.y = _linear_interpolate(
         first.linear_acceleration.y, second.linear_acceleration.y, ratio)
-    track.linear_acceleration.z = interpolate(
+    track.linear_acceleration.z = _linear_interpolate(
         first.linear_acceleration.z, second.linear_acceleration.z, ratio)
 
-    track.yaw = interpolate(first.yaw, second.yaw, ratio)
+    track.yaw = _linear_interpolate(first.yaw, second.yaw, ratio)
     return track
 
 
-def interpolate(v1, v2, ratio):
+def _linear_interpolate(v1, v2, ratio):
     return v1 + (v2 - v1) * ratio
-
-
-def get_transformed_velocity(track, transform):
-    vel_vec = np.array([track.linear_velocity.x, track.linear_velocity.y, 0, 1])
-    return (transform @ vel_vec - transform[:, 3])[:2]
-
-
-def get_transformed_acceleration(track, transform):
-    acc_vec = np.array([track.linear_acceleration.x, track.linear_acceleration.y, 0, 1])
-    return (transform @ acc_vec - transform[:, 3])[:2]

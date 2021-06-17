@@ -96,14 +96,14 @@ def test_evaluate_submission():
 
     metrics = evaluate_submission_with_proto(pred, gt)
 
-    assert metrics['avg_ade'] == pytest.approx(2 ** 0.5 / 2 / 2)
-    assert metrics['avg_fde'] == pytest.approx(2 ** 0.5 / 2)
-    assert metrics['min_ade'] == pytest.approx(0.)
-    assert metrics['min_fde'] == pytest.approx(0.)
-    assert metrics['top1_ade'] == pytest.approx(0.)
-    assert metrics['top1_fde'] == pytest.approx(0.)
-    assert metrics['weighted_ade'] == pytest.approx(2 ** 0.5 / 2 / 2 * mode1_weight)
-    assert metrics['weighted_fde'] == pytest.approx(2 ** 0.5 / 2 * mode1_weight)
+    assert metrics['avg_ade'][0] == pytest.approx(2 ** 0.5 / 2 / 2)
+    assert metrics['avg_fde'][0] == pytest.approx(2 ** 0.5 / 2)
+    assert metrics['min_ade'][0] == pytest.approx(0.)
+    assert metrics['min_fde'][0] == pytest.approx(0.)
+    assert metrics['top1_ade'][0] == pytest.approx(0.)
+    assert metrics['top1_fde'][0] == pytest.approx(0.)
+    assert metrics['weighted_ade'][0] == pytest.approx(2 ** 0.5 / 2 / 2 * mode1_weight)
+    assert metrics['weighted_fde'][0] == pytest.approx(2 ** 0.5 / 2 * mode1_weight)
 
 
 def test_trajectory_array_to_proto():
