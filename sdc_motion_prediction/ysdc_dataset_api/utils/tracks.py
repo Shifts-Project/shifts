@@ -1,27 +1,21 @@
 import math
+from typing import List, Union
 
 import numpy as np
-import transforms3d as tf
 
-from ..proto import PedestrianTrack, VehicleTrack
+from ..proto import PedestrianTrack, Scene, VehicleTrack
 
 
-def get_track_polygon(track):
-    position = np.array([track.position.x, track.position.y])
-    yaw = track_yaw(track)
-    orientation = tf.euler.euler2mat(0, 0, yaw)
-    front = (orientation @ np.array([track.dimensions.x / 2, 0, 0]))[:2]
-    left = (orientation @ np.array([0, track.dimensions.y / 2, 0]))[:2]
-    poly = []
-    poly.append(position + front + left)
-    poly.append(position + front - left)
-    poly.append(position - front - left)
-    poly.append(position - front + left)
-    poly.append(position + front + left)
-    return np.array(poly)
+def get_gt_trajectory(scene: Scene, track_id: int) -> np.ndarray:
+    """Extracts a ground truth trajectory from scene for an object with track_id.
 
-# @profile
-def get_gt_trajectory(scene, track_id):
+    Args:
+        scene (Scene): scene to extract trajectory from
+        track_id (int): track id to extract trajectory for
+
+    Returns:
+        np.ndarray: array of shape (N, 2), where N is specified by dataset
+    """
     horizon = len(scene.future_vehicle_tracks)
     ph = np.zeros((horizon, 2), dtype=np.float32)
     for t in range(horizon):
@@ -32,7 +26,17 @@ def get_gt_trajectory(scene, track_id):
     return ph
 
 
-def get_tracks_polygons(tracks):
+def get_tracks_polygons(tracks: List[Union[PedestrianTrack, VehicleTrack]]) -> np.ndarray:
+    """Returns a numpy array with polygons for a list of tracks.
+    Each polygon represent area occupied by the respective object.
+    Polygons coordinates are in global coordinate system.
+
+    Args:
+        tracks (List[Union[PedestrianTrack, VehicleTrack]]): list of tracks
+
+    Returns:
+        np.ndarray: numpy array of shape (n_tracks, 4, 2)
+    """
     box_base = (np.asarray([[1, 1], [1, -1], [-1, -1], [-1, 1]]) * 0.5)[np.newaxis, ...]
     dims = np.asarray(
         [[track.dimensions.x, track.dimensions.y] for track in tracks]
@@ -51,16 +55,16 @@ def get_tracks_polygons(tracks):
     return (boxes @ rotation_matrices + origins).astype(np.float32)
 
 
-def track_box(track):
-    return np.array([
-        [track.dimensions.x, track.dimensions.y],
-        [track.dimensions.x, -track.dimensions.y],
-        [-track.dimensions.x, -track.dimensions.y],
-        [-track.dimensions.x, track.dimensions.y],
-    ]) / 2.
+def track_yaw(track: Union[PedestrianTrack, VehicleTrack]) -> float:
+    """Return orientation in radians for a given track.
+    Since orientation for pedestrians is not available we derive it from velocity vector.
 
+    Args:
+        track (Union[PedestrianTrack, VehicleTrack]): track to get orientation for
 
-def track_yaw(track):
+    Returns:
+        float: orientation in radians
+    """
     if isinstance(track, PedestrianTrack):
         return math.atan2(track.linear_velocity.y, track.linear_velocity.x)
     elif isinstance(track, VehicleTrack):

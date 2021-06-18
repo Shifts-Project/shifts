@@ -47,12 +47,24 @@ Scene message includes the following fields:
 - traffic_lights: repeated field with traffic light ids and states
 - scene_tags: tags characterizing current scene in different aspects, such as time of the day, season, track (city where the scene was recorded), precipitation type if any.
 
+## Submission format
+Participants are expected to submit a serialized Submission proto file.
+Submission message includes repeated field predictions. Each ObjectPrediction messages includes fields:
+- track_id: unique vehicle id in scene
+- scene_id: unique scene id in dataset
+- repeated weighted_trajectories:
+    - trajectory:
+        - repeated points: trajectory points in vehicle-centered coordinate system. Note that only x and y coordinates are expected to be predicted.
+    - weight: positive trajectory weight, e.g. confidence of the predicted trajectory in multi-modal prediction. Higher weight correspond to more likely trajectory. Used to aggregate displacement metrics across modes.
+- uncertainty_measure: predicted scene-level confidence
+
 All protobuf message definitions can be found at [ysdc_dataset_api/proto](ysdc_dataset_api/proto)
 ## Reference papers for motion prediction task
 - MultiPath: https://arxiv.org/abs/1910.05449
 - CoverNet: https://arxiv.org/abs/1911.10298
 - TNT: https://arxiv.org/abs/2008.08294
 - LaneRCNN: https://arxiv.org/abs/2101.06653
+<<<<<<< HEAD
 
 ## Training RIP ensemble members
 

@@ -4,10 +4,11 @@ from typing import Dict, Sequence, Tuple
 import numpy as np
 
 from ..dataset import MotionPredictionDataset
-from ..evaluation import (avg_ade, avg_fde, min_ade, min_fde, top1_ade,
-                          top1_fde, weighted_ade, weighted_fde)
-from ..proto import Submission, WeightedTrajectory, ObjectPrediction, Trajectory, Vector3
+from ..proto import (ObjectPrediction, Submission, Trajectory, Vector3,
+                     WeightedTrajectory)
 from ..utils.map import repeated_points_to_array
+from .metrics import (avg_ade, avg_fde, min_ade, min_fde, top1_ade, top1_fde,
+                      weighted_ade, weighted_fde)
 
 
 def save_submission_proto(filepath: str, submission: Submission) -> None:
@@ -38,10 +39,11 @@ def load_submission_proto(filepath: str) -> Submission:
 
 
 def evaluate_submission_with_proto(
-    submission: Submission,
-    ground_truth: Submission,
+        submission: Submission,
+        ground_truth: Submission,
 ) -> Dict[str, float]:
-    """Calculates various motion prediction metrics given the submission and ground truth protobufs.
+    """Calculates various motion prediction metrics given
+    the submission and ground truth protobuf messages.
 
     Args:
         submission (Submission): Proto message with predicted trajectories.
@@ -77,10 +79,7 @@ def evaluate_submission_with_proto(
         metrics['top1_fde'].append(top1_fde(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_ade'].append(weighted_ade(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_fde'].append(weighted_fde(gt_trajectory, pred_trajectories, weights))
-    return {
-        metric_name: float(np.mean(metric_values))
-        for metric_name, metric_values in metrics.items()
-    }
+    return metrics
 
 
 def get_trajectories_weights_arrays(
@@ -107,6 +106,14 @@ def get_trajectories_weights_arrays(
 
 
 def ground_truth_from_dataset(dataset: MotionPredictionDataset) -> Submission:
+    """Generates a Submission protobuf instance with ground truth trajectories.
+
+    Args:
+        dataset (MotionPredictionDataset): Dataset to get trajectories from.
+
+    Returns:
+        Submission: Resulting protobuf message.
+    """
     dataset_iter = iter(dataset)
     ground_truth = Submission()
     for data_item in dataset_iter:
@@ -122,6 +129,14 @@ def ground_truth_from_dataset(dataset: MotionPredictionDataset) -> Submission:
 
 
 def trajectory_array_to_proto(trajectory: np.ndarray) -> Trajectory:
+    """Transforms a numpy array with 2D trajectory to Trajectory proto message.
+
+    Args:
+        trajectory (np.ndarray): Trajectory array, shape (N, 2)
+
+    Returns:
+        Trajectory: Resulting protobuf messsage.
+    """
     assert len(trajectory.shape) == 2
     trajectory_proto = Trajectory()
     for i in range(trajectory.shape[0]):
@@ -129,8 +144,38 @@ def trajectory_array_to_proto(trajectory: np.ndarray) -> Trajectory:
     return trajectory_proto
 
 
-def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]):
+def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]) -> int:
+    """Returns
+
+    Args:
+        trajectories (Sequence[WeightedTrajectory]): [description]
+
+    Raises:
+        ValueError: [description]
+
+    Returns:
+        int: [description]
+    """
     horizon = len(trajectories[0].trajectory.points)
     if not all(len(w.trajectory.points) == horizon for w in trajectories):
         raise ValueError('All modes must have the same prediction horizon')
     return horizon
+
+
+def object_prediction_from_model_output(
+        track_id: int,
+        scene_id: str,
+        model_output: Dict[str, np.ndarray]
+) -> ObjectPrediction:
+    object_prediction = ObjectPrediction()
+    object_prediction.track_id = track_id
+    object_prediction.scene_id = scene_id
+    assert len(model_output['predictions_list']) == len(model_output['plan_confidence_scores_list'])
+    for i in range(len(model_output['predictions_list'])):
+        weighted_trajectory = WeightedTrajectory(
+            trajectory=trajectory_array_to_proto(model_output['predictions_list'][i]),
+            weight=model_output['plan_confidence_scores_list'][i],
+        )
+        object_prediction.weighted_trajectories.append(weighted_trajectory)
+    object_prediction.uncertainty_measure = model_output['pred_request_confidence_score']
+    return object_prediction

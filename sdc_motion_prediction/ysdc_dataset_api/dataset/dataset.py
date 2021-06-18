@@ -1,18 +1,20 @@
 import json
 import os
+from typing import Callable, List, Union
 
 import torch
 
+from ..features import FeatureProducerBase
 from ..proto import get_tags_from_request
 from ..utils import (
     get_file_paths,
     get_gt_trajectory,
-    get_track_for_transform,
+    get_latest_track_state_by_id,
     get_to_track_frame_transform,
     read_feature_map_from_file,
     request_is_valid,
     scenes_generator,
-    transform2dpoints,
+    transform_2d_points,
 )
 from typing import Optional, List
 
@@ -20,15 +22,48 @@ from typing import Optional, List
 class MotionPredictionDataset(torch.utils.data.IterableDataset):
     def __init__(
             self,
-            dataset_path,
-            scene_tags_fpath,
-            feature_producer=None,
-            prerendered_dataset_path=None,
-            transform_ground_truth_to_agent_frame=True,
-            scene_tags_filter=None,
-            trajectory_tags_filter=None,
+            dataset_path: str,
+            scene_tags_fpath: str,
+            feature_producer: FeatureProducerBase = None,
+            prerendered_dataset_path: str = None,
+            transform_ground_truth_to_agent_frame: bool = True,
+            scene_tags_filter: Union[Callable, None] = None,
+            trajectory_tags_filter: Union[Callable, None] = None,
             pre_filtered_scene_file_paths: Optional[List[str]] = None,
     ):
+        """Pytorch-style dataset class for the motion prediction task.
+
+        Dataset iterator performs iteration over scenes in the dataset and individual prediction
+        requests in each scene. Iterator yields dict that can have the following structure:
+        {
+            'ground_truth_trajectory': np.ndarray,
+            'prerendered_feature_map': np.ndarray,
+            'feature_maps': np.ndarray,
+        }.
+        'ground_truth_trajectory' field is always included, it contains ground truth trajectory for
+        the current prediction request.
+        'prerendered_feature_map' field would be present if prerendered_dataset_path was specified,
+        contains pre-rendered feature maps.
+        'feature_maps' field would be present if user passes an instance of
+        ysdc_dataset_api.features.FeatureRenderer, contains feature maps rendered on the fly by
+        specified renderer instance.
+
+        Args:
+            dataset_path: path to the dataset directory
+            scene_tags_fpath: path to the tags file
+            feature_producer: instance of the FeatureProducerBase class,
+                used to generate features for a data item. Defaults to None.
+            prerendered_dataset_path: path to the pre-rendered dataset. Defaults to None.
+            transform_ground_truth_to_agent_frame: whether to transform ground truth
+                trajectory to an agent coordinate system or return global coordinates.
+                Defaults to True.
+            scene_tags_filter: function to filter dataset scenes by tags. Defaults to None.
+            trajectory_tags_filter: function to filter prediction requests by trajectory tags.
+                Defaults to None.
+
+        Raises:
+            ValueError: if none of feature_producer or prerendered_dataset_path was specified.
+        """
         super(MotionPredictionDataset, self).__init__()
 
         self._feature_producer = feature_producer
@@ -47,7 +82,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                 get_file_paths(dataset_path), scene_tags_fpath)
 
     @property
-    def num_scenes(self):
+    def num_scenes(self) -> int:
+        """Number of scenes in the dataset"""
         return len(self._scene_file_paths)
 
     # @profile
@@ -59,8 +95,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             file_paths = self._split_filepaths_by_worker(
                 worker_info.id, worker_info.num_workers)
 
-        # @profile
-        def data_gen(_file_paths):
+        def data_gen(_file_paths: List[str]):
             for scene, fpath in scenes_generator(_file_paths, yield_fpath=True):
                 for request in scene.prediction_requests:
                     if not request_is_valid(scene, request):
@@ -68,11 +103,11 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     trajectory_tags = get_tags_from_request(request)
                     if not self._trajectory_tags_filter(trajectory_tags):
                         continue
-                    track = get_track_for_transform(scene, request.track_id)
+                    track = get_latest_track_state_by_id(scene, request.track_id)
                     to_track_frame_tf = get_to_track_frame_transform(track)
                     ground_truth_trajectory = get_gt_trajectory(scene, request.track_id)
                     if self._transform_ground_truth_to_agent_frame:
-                        ground_truth_trajectory = transform2dpoints(
+                        ground_truth_trajectory = transform_2d_points(
                             ground_truth_trajectory, to_track_frame_tf)
                     result = {
                         'ground_truth_trajectory': ground_truth_trajectory,
@@ -83,7 +118,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     if self._prerendered_dataset_path:
                         fm_path = self._get_serialized_fm_path(fpath, scene.id, request.track_id)
                         result['prerendered_feature_map'] = read_feature_map_from_file(fm_path)
-                        result['fm_path'] = fm_path
 
                     if self._feature_producer:
                         result.update(
