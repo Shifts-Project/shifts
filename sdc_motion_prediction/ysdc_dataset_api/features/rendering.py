@@ -13,7 +13,7 @@ from ..utils import (
 from ..utils.map import (
     get_crosswalk_availability,
     get_lane_availability,
-    get_polygon,
+    repeated_points_to_array,
     get_section_to_state,
 )
 
@@ -201,7 +201,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
     def _render_crosswalks(self, feature_map, path_graph, traffic_light_sections, transform):
         crosswalk_polygons = []
         for crosswalk in path_graph.crosswalks:
-            polygon = get_polygon(crosswalk.geometry)
+            polygon = repeated_points_to_array(crosswalk.geometry)
             polygon = transform2dpoints(polygon, transform)
             polygon = np.around(polygon - 0.5).astype(np.int32)
             crosswalk_polygons.append(polygon)
@@ -334,7 +334,7 @@ class RoadGraphRenderer(FeatureMapRendererBase):
     def _render_road_polygons(self, feature_map, path_graph, transform):
         road_polygons = []
         for road_polygon in path_graph.road_polygons:
-            polygon = get_polygon(road_polygon.geometry)
+            polygon = repeated_points_to_array(road_polygon.geometry)
             polygon = transform2dpoints(polygon, transform)
             polygon = np.around(polygon - 0.5).astype(np.int32)
             road_polygons.append(polygon)
