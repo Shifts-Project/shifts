@@ -9,10 +9,12 @@ import os
 from typing import Optional
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from absl import app
 from absl import flags
 from absl import logging
+from itertools import product
 
 # Data load / output flags.
 flags.DEFINE_string(
@@ -39,13 +41,30 @@ def get_plotting_style_metric_name(metric_name):
     return metric_name
 
 
-def get_plotting_style_model_name(model_name):
-    model_class, algorithm, backbone_name, k_details = model_name.split('-')
+def construct_model_name_helper(model_prefix, full_name, auc_mean, auc_std):
+    auc_mean = np.round_(auc_mean, 2).item()
+    auc_std = np.round_(auc_std, 2).item()
+    if model_prefix is not None:
+        full_name = f'{model_prefix} | {full_name}'
+    return f'{full_name} [AUC: {auc_mean} ± {auc_std}]'
+
+
+def get_plotting_style_model_name(model_prefix, model_name, auc_mean, auc_std):
+    if model_name in ['Optimal', 'Random']:
+        return construct_model_name_helper(
+            model_prefix, model_name, auc_mean, auc_std)
+
+    model_class, backbone_name, k_details, plan_algo, scene_algo = (
+        model_name.split('-'))
     k = k_details.split('_')[-1]
     if model_class != 'rip' or backbone_name != 'dim':
         raise NotImplementedError
-
-    return f'RIP ({algorithm.upper()}, K={k})'
+    plan_algo = plan_algo.split('_')[-1]
+    scene_algo = scene_algo.split('_')[-1]
+    return construct_model_name_helper(
+        model_prefix,
+        f'RIP (K={k}, Plan {plan_algo.upper()}, Scene {scene_algo.upper()})',
+        auc_mean, auc_std)
 
 
 def get_results_from_model_dir(model_dir: str):
@@ -63,7 +82,7 @@ def get_results_from_model_dir(model_dir: str):
     if not os.path.isfile(model_results_path):
         return None
 
-    print('Found results at %s.', model_results_path)
+    logging.info('Found results at %s.', model_results_path)
 
     with open(model_results_path, 'r') as f:
         return pd.read_csv(f, sep='\t')
@@ -100,8 +119,9 @@ def plot_retention_score_results(
                 continue
 
             model_dir = os.path.join(dir_path, model_name)
-            print('Found retention results directory for model %s at %s.',
-                  model_name, model_dir)
+            logging.info(
+                'Found retention results directory for model %s at %s.',
+                model_name, model_dir)
             model_dirs.append(model_dir)
 
         for model_dir in model_dirs:
@@ -111,7 +131,7 @@ def plot_retention_score_results(
 
         results_df = pd.concat(results_dfs, axis=0)
     else:
-        print(
+        logging.info(
             'Plotting retention results for model %s.', model_name)
         model_results_path = os.path.join(results_dir, 'results.tsv')
         try:
@@ -141,65 +161,82 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
     markers = ['o', 'D', 's', '8', '^', '*']
     dataset_keys = list(sorted(set(results_df['dataset_key'])))
     metrics = set(results_df['metric'])
-    for dataset_key in dataset_keys:
-        dataset_df = results_df[
-            results_df['dataset_key'] == dataset_key].copy()
-        for metric in metrics:
-            fig, ax = plt.subplots()
-            plotting_metric_name = get_plotting_style_metric_name(metric)
-            metric_df = dataset_df[dataset_df['metric'] == metric].copy()
-            baselines = list(sorted(set(metric_df['model_name'])))
-            for b, baseline in enumerate(baselines):
-                baseline_metric_df = metric_df[
-                    (metric_df['model_name'] == baseline) &
-                    (metric_df['dataset_key'] == dataset_key)].copy()
+    use_oracles = set(results_df['use_oracle'])
 
-                # Sort by datetime (newest first)
-                baseline_metric_df.sort_values(
-                    'run_datetime', inplace=True, ascending=False)
+    outside_loop = product(dataset_keys, use_oracles, metrics)
 
-                # For a particular baseline model and metric, drop duplicates
-                # (keeping the newest entry)
-                # if the retain proportion and eval seed are identical
-                baseline_metric_df.drop_duplicates(
-                    subset=['retention_threshold', 'eval_seed'],
-                    keep='first',
-                    inplace=True)
+    # We do a plot for each of these.
+    for dataset_key, use_oracle, metric in outside_loop:
+        metric_df = results_df[
+            (results_df['dataset_key'] == dataset_key) &
+            (results_df['use_oracle'] == use_oracle) &
+            (results_df['metric'] == metric)].copy()
 
-                # Group by retention_threshold, and
-                # compute the mean and standard deviation of the metric
-                agg_baseline_metric_df = baseline_metric_df.groupby(
-                    'retention_threshold').value.agg(['mean', 'std']).reset_index()
-                retained_data = agg_baseline_metric_df['retention_threshold']
-                mean = agg_baseline_metric_df['mean']
-                std = agg_baseline_metric_df['std']
+        fig, ax = plt.subplots()
+        plotting_metric_name = get_plotting_style_metric_name(metric)
 
-                # Visualize mean with standard error
-                ax.plot(
-                    retained_data,
-                    mean,
-                    label=get_plotting_style_model_name(baseline),
-                    color=colors[b % len(colors)],
-                    marker=markers[b % len(markers)])
-                ax.fill_between(
-                    retained_data,
-                    mean - std,
-                    mean + std,
-                    color=colors[b % len(colors)],
-                    alpha=0.25)
-                ax.set(xlabel='Proportion of Data Retained',
-                       ylabel=plotting_metric_name)
-                ax.legend()
-                fig.tight_layout()
+        model_prefixes = set(results_df['model_prefix'])
+        baselines = list(sorted(set(metric_df['model_name'])))
+        inner_loop = product(baselines, model_prefixes)
+        for b, (baseline, model_prefix) in enumerate(inner_loop):
+            baseline_metric_df = metric_df[
+                (metric_df['model_name'] == baseline) &
+                (metric_df['model_prefix'] == model_prefix)].copy()
 
-            if isinstance(plot_dir, str):
-                os.makedirs(plot_dir, exist_ok=True)
-                metric_plot_path = os.path.join(
-                    plot_dir, f'{dataset_key} {plotting_metric_name}.pdf')
-                fig.savefig(metric_plot_path, transparent=True, dpi=300,
-                            format='pdf')
-                logging.info('Saved plot for metric %s, baselines %s '
-                             'to %s.', metric, baselines, metric_plot_path)
+            # Sort by datetime (newest first)
+            baseline_metric_df.sort_values(
+                'run_datetime', inplace=True, ascending=False)
+
+            # For a particular baseline model and metric, drop duplicates
+            # (keeping the newest entry)
+            # if the retain proportion and eval seed are identical
+            baseline_metric_df.drop_duplicates(
+                subset=['retention_threshold', 'eval_seed'],
+                keep='first',
+                inplace=True)
+
+            # Group by retention_threshold, and
+            # compute the mean and standard deviation of the metric
+            agg_baseline_metric_df = baseline_metric_df.groupby(
+                'retention_threshold').value.agg(['mean', 'std']).reset_index()
+            retained_data = agg_baseline_metric_df['retention_threshold']
+            mean = agg_baseline_metric_df['mean']
+            std = agg_baseline_metric_df['std']
+
+            # Compute area under the curve
+            # We assume evenly spaced retention thresholds
+            auc_mean = np.mean(mean)
+            auc_std = np.mean(std)
+
+            # Visualize mean with standard error
+            ax.plot(
+                retained_data,
+                mean,
+                label=get_plotting_style_model_name(
+                    model_prefix, baseline, auc_mean, auc_std),
+                color=colors[b % len(colors)],
+                marker=markers[b % len(markers)])
+            ax.fill_between(
+                retained_data,
+                mean - std,
+                mean + std,
+                color=colors[b % len(colors)],
+                alpha=0.25)
+            ax.set(xlabel='Proportion of Data Retained',
+                   ylabel=plotting_metric_name)
+            ax.legend()
+            fig.tight_layout()
+
+        if isinstance(plot_dir, str):
+            os.makedirs(plot_dir, exist_ok=True)
+            metric_plot_path = os.path.join(
+                plot_dir,
+                f'{dataset_key} - Use Oracle {use_oracle} - '
+                f'{plotting_metric_name}.pdf')
+            fig.savefig(metric_plot_path, transparent=True, dpi=300,
+                        format='pdf')
+            logging.info('Saved plot for metric %s, baselines %s '
+                         'to %s.', metric, baselines, metric_plot_path)
 
 
 def main(argv):

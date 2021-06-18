@@ -15,11 +15,12 @@
 """Implements the robust imitative planning agent."""
 
 import os
-from typing import Mapping, Union, Sequence, Tuple
+from typing import Mapping, Union, Sequence, Tuple, Optional
 
 import torch
 
 from sdc.metrics import SDCLoss
+from sdc.cache_metadata import MetadataCache
 from sdc.oatomobile.torch.baselines.behavioral_cloning import (
     BehaviouralModel)
 from sdc.oatomobile.torch.baselines.deep_imitative_model import (
@@ -82,15 +83,14 @@ class RIPAgent:
         else:
             raise NotImplementedError
 
-    def call_dim_models(
+    def call_ensemble_members(
         self,
         **observation: Mapping[str, torch.Tensor]
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # TODO(filangel) move this in `ImitativeModel.imitation_posterior`.
         Q = self._samples_per_model
         K = len(self._models)  # Number of ensemble members
 
-        # Obtain Q predicted plans for each of the K ensemble members.
+        # Obtain Q predicted plans from each of the K ensemble members.
         predictions = []
         for model in self._models:
             for _ in range(Q):
@@ -104,7 +104,8 @@ class RIPAgent:
         D, B, T, _ = predictions.size()
 
         # For each element in the batch, we have K models and Q predictions.
-        # Score each plan under the imitation prior of each model:
+        # Score each plan under each model.
+        # (MC sampling over the model posterior)
         scores = []
         for i in range(K):
             model_i_scores = []
@@ -114,9 +115,8 @@ class RIPAgent:
 
             scores.append(torch.stack(model_i_scores, dim=0))
 
-        # These are the imitation priors.
-        # A high score at i, j corresponds to a high likelihood
-        # of plan j under the imitation prior of model i.
+        # A high score at i, j denotes a high log probability
+        # of plan j under the likelihood of model i.
         scores = torch.stack(scores, dim=0)
 
         # Aggregate scores from the `K` models.
@@ -126,17 +126,16 @@ class RIPAgent:
 
         # Get per--prediction request (per-scene) confidence scores by
         # aggregating per-plan
-        # TODO: maybe we should only aggregate over the topk plans instead?
+        # TODO: We could choose to aggregate over the topk plans instead
         pred_request_confidence_scores = self.run_rip_aggregation(
             algorithm=self._per_scene_algorithm,
             scores_to_aggregate=scores)
 
-        # Get indices of the plans with highest RIP-aggregated imitation priors
+        # Get indices of the plans with highest RIP-aggregated scores
         # for each prediction request (scene input) in the batch
         best_plan_indices = torch.topk(scores, k=self._num_preds, dim=0).indices
         best_plans = [
-            predictions[best_plan_indices[:, b], b, :, :]
-            for b in range(B)]
+            predictions[best_plan_indices[:, b], b, :, :] for b in range(B)]
 
         # Shape (B, num_preds, T, 2)
         best_plans = torch.stack(best_plans, dim=0)
@@ -144,8 +143,7 @@ class RIPAgent:
 
         # Report the confidence scores corresponding to our top num_preds plans
         plan_confidence_scores = [
-            scores[best_plan_indices[:, b], b]
-            for b in range(B)]
+            scores[best_plan_indices[:, b], b] for b in range(B)]
 
         # Shape (B, num_preds)
         plan_confidence_scores = torch.stack(plan_confidence_scores, dim=0)
@@ -153,23 +151,14 @@ class RIPAgent:
         return (best_plans, plan_confidence_scores,
                 pred_request_confidence_scores)
 
-    def call_bc_models(
-        self,
-        **observation: Mapping[str, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        raise NotImplementedError
-
     def __call__(
         self,
         **observation: Mapping[str, torch.Tensor],
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Returns the imitative prior."""
-        if self._model_name == 'dim':
-            return self.call_dim_models(**observation)
-        elif self._model_name == 'bc':
-            return self.call_bc_models(**observation)
-        else:
+        if self._model_name not in {'bc', 'dim'}:
             raise NotImplementedError
+
+        return self.call_ensemble_members(**observation)
 
     def train(self):
         for model in self._models:
@@ -184,24 +173,27 @@ def evaluate_step_rip(
     sdc_loss: SDCLoss,
     model: RIPAgent,
     batch: Mapping[str, torch.Tensor],
-    cache_full_results: bool,
+    metadata_cache: Optional[MetadataCache],
+    **kwargs
 ):
     model.eval()
-    predictions, plan_confidence_scores, pred_request_confidence_scores = model(
-        **batch)
+    predictions, plan_confidence_scores, pred_request_confidence_scores = (
+        model(**batch))
     ground_truth = batch['ground_truth_trajectory']
 
-    if cache_full_results:
+    if metadata_cache is not None:
         # Just store predictions and ground truths, we will later load these
         # and evaluate loss manually
-        sdc_loss.cache_full_results(
-            predictions=predictions, batch=batch)
-    else:
-        sdc_loss.cache_batch_losses(
-            predictions_list=predictions,
-            ground_truth_batch=ground_truth,
-            plan_confidence_scores_list=plan_confidence_scores,
+        metadata_cache.collect_batch_stats(
+            predictions=predictions, batch=batch,
+            plan_confidence_scores=plan_confidence_scores,
             pred_request_confidence_scores=pred_request_confidence_scores)
+
+    sdc_loss.cache_batch_losses(
+        predictions_list=predictions,
+        ground_truth_batch=ground_truth,
+        plan_confidence_scores_list=plan_confidence_scores,
+        pred_request_confidence_scores=pred_request_confidence_scores)
 
 
 def load_rip_checkpoints(

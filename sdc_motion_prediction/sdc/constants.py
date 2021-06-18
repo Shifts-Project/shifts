@@ -1,9 +1,23 @@
+VALID_TRAJECTORY_TAGS = [
+    'kMoveLeft', 'kMoveRight', 'kMoveForward', 'kMoveBack',
+    'kAcceleration', 'kDeceleration', 'kUniform',
+    'kStopping', 'kStarting', 'kStationary']
+SCENE_TAG_TYPE_TO_OPTIONS = {
+    'day_time': ['kNight', 'kMorning', 'kAfternoon', 'kEvening'],
+    'season': ['kWinter', 'kSpring', 'kSummer', 'kAutumn'],
+    'track': [
+        'Moscow', 'Skolkovo', 'Innopolis', 'AnnArbor', 'Modiin', 'TelAviv'],
+    'sun_phase': ['kAstronomicalNight', 'kTwilight', 'kDaylight'],
+    'precipitation': ['kNoPrecipitation', 'kRain', 'kSleet', 'kSnow']
+}
+VALID_AGGREGATORS = {'min', 'mean', 'max', 'confidence-weight'}
+VALID_BASE_METRICS = {'ade', 'fde'}
 SPLIT_TO_PB_DATASET_PATH = {  # Protobufs (unrendered)
     'train': '/train_pb/',
     'validation': '/validation_pb/',
     'test': '/test_pb/'
 }
-SPLIT_TO_RENDERED_DATASET_PATH = {  # Protobufs (unrendered)
+SPLIT_TO_RENDERED_DATASET_PATH = {  # np.arrays (rendered)
     'train': '/train_rendered/',
     'validation': '/validation_rendered/',
     'test': '/test_rendered/'

@@ -79,6 +79,9 @@ def load_datasets(c, splits: Optional[List[str]] = None):
                 dataset_args['prerendered_dataset_path'] = (
                     split_prerendered_dataset_path)
 
+            if c.debug_collect_dataset_stats:
+                dataset_args['yield_metadata'] = True
+
             datasets[dataset_split][dataset_key] = MotionPredictionDataset(
                 dataset_path=split_dataset_path,
                 scene_tags_fpath=split_scene_tags_fpath,

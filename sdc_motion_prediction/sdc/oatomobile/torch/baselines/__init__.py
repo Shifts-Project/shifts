@@ -67,9 +67,6 @@ def init_rip(c):
     per_scene_algorithm = c.rip_per_scene_algorithm
     model_name = c.model_name
 
-    if model_name != 'dim':
-        raise NotImplementedError
-
     print(f'Building RIP agent with backbone model {model_name}, '
           f'per-plan algorithm {per_plan_algorithm}, '
           f'per-scene algorithm {per_scene_algorithm}, '
@@ -82,7 +79,7 @@ def init_rip(c):
     backbone_init_fn, _, _ = BACKBONE_NAME_TO_CLASS_FNS[model_name]
     models = [backbone_init_fn(c) for _ in range(k)]
     return (RIPAgent(models=models, **ensemble_kwargs), full_model_name,
-            None, evaluate_step_rip)
+            evaluate_step_rip, evaluate_step_rip)
 
 
 def init_model(c):

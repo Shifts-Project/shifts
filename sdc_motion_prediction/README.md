@@ -66,11 +66,30 @@ All protobuf message definitions can be found at [ysdc_dataset_api/proto](ysdc_d
 - LaneRCNN: https://arxiv.org/abs/2101.06653
 <<<<<<< HEAD
 
+## Robust Imitative Planning baseline
+
+In Robust Imitative Planning, we use an ensemble of Deep Imitative Models (DIM, \cite{}) to produce confidence scores at (a) the level of scenes, and (b) at the level of plans generated for each of those scenes.
+
+We use the following approach to obtain these scores and stochastically generate plan predictions:
+
+1. Given a scene input, K ensemble members generate D plans (in practice, we have each ensemble member generate the same number of plans, controlled by Q = `--rip_samples_per_model`, s.t. D = K * Q).
+2. 
+
+
+
+* `--rip_num_preds`: number of plan predictions that are actually made by the RIP model for a given prediction request input. 
+
+
+
+which are used to score D generated plans.
+
+We obtain per-plan uncertainty scores 
+
 ## Training RIP ensemble members
 
 RIP ensemble members are trained independently, similar to in Deep Ensembles \cite{balaji}
 
-Here we use the Deep Imitative Model as a backbone density estimator, and sweep over x \in {1, ..., K} different seeds:
+Here we use the Deep Imitative Model as a backbone density estimator and sweep over x \in {1, ..., K} different seeds:
 
 ```
 python run.py --model_name dim --data_use_prerendered True --torch_seed x
@@ -80,7 +99,7 @@ python run.py --model_name dim --data_use_prerendered True --torch_seed x
 
 Run RIP to create a directory in which you should store the ensemble member checkpoints created by the above command.
 
-For example, with the Worst Case Model algorithm, and 5 ensemble members.
+For example, with the Worst Case Model algorithm aggregating  and 5 ensemble members.
 
 Here, the torch seed will affect the batching used at evaluation time. 
 # TODO: nband -> confirm that it actually does change things if we are not shuffling?
@@ -93,8 +112,6 @@ The above command will create a directory in which the RIP ensemble member check
 Place them there, and re-run the command to evaluate the RIP ensemble.
 
 Other parameters in RIP include:
-* `--rip_eval_samples_per_model`: number of stochastic trajectory generations per RIP ensemble member
-* `--rip_num_preds`: number of plan predictions that are actually made by the RIP model for a given prediction request input. 
 We select these as the top samples from all stochastic generations from the ensemble members.
 
 See `sdc/config.py` for descriptions of all parameters.

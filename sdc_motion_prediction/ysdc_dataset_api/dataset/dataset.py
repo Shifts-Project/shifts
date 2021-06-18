@@ -1,11 +1,13 @@
 import json
 import os
-from typing import Callable, List, Union
+from typing import Callable, Union
+from typing import Optional, List
 
 import torch
 
+from sdc.constants import SCENE_TAG_TYPE_TO_OPTIONS, VALID_TRAJECTORY_TAGS
 from ..features import FeatureProducerBase
-from ..proto import get_tags_from_request
+from ..proto import get_tags_from_request, proto_to_dict
 from ..utils import (
     get_file_paths,
     get_gt_trajectory,
@@ -16,7 +18,6 @@ from ..utils import (
     scenes_generator,
     transform_2d_points,
 )
-from typing import Optional, List
 
 
 class MotionPredictionDataset(torch.utils.data.IterableDataset):
@@ -30,6 +31,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             scene_tags_filter: Union[Callable, None] = None,
             trajectory_tags_filter: Union[Callable, None] = None,
             pre_filtered_scene_file_paths: Optional[List[str]] = None,
+            yield_metadata=False
     ):
         """Pytorch-style dataset class for the motion prediction task.
 
@@ -72,6 +74,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
 
         self._scene_tags_filter = _callable_or_trivial_filter(scene_tags_filter)
         self._trajectory_tags_filter = _callable_or_trivial_filter(trajectory_tags_filter)
+        self._yield_metadata = yield_metadata
 
         if pre_filtered_scene_file_paths is not None:
             print('Building MotionPredictionDataset with pre-filtered '
@@ -122,9 +125,41 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                     if self._feature_producer:
                         result.update(
                             self._feature_producer.produce_features(scene, to_track_frame_tf))
+
+                    if self._yield_metadata:
+                        result = (
+                            self.add_metadata_to_batch(
+                                scene=scene, request=request,
+                                trajectory_tags=trajectory_tags,
+                                batch=result))
+
                     yield result
 
         return data_gen(file_paths)
+
+    def add_metadata_to_batch(self, scene, request, trajectory_tags, batch):
+        batch['scene_id'] = scene.id
+        batch['request_id'] = request.track_id
+
+        # Note that some will be "invalid"
+        batch['num_vehicles'] = len(scene.prediction_requests)
+
+        scene_tags_dict = proto_to_dict(scene.scene_tags)
+        for scene_tag_type in SCENE_TAG_TYPE_TO_OPTIONS.keys():
+            scene_tag_options = SCENE_TAG_TYPE_TO_OPTIONS[scene_tag_type]
+
+            for scene_tag_option in scene_tag_options:
+                try:
+                    batch[f'{scene_tag_type}__{scene_tag_option}'] = int(
+                        scene_tags_dict[scene_tag_type] == scene_tag_option)
+                except KeyError:
+                    batch[f'{scene_tag_type}__{scene_tag_option}'] = -1
+
+        trajectory_tags = set(trajectory_tags)
+        for trajectory_tag in VALID_TRAJECTORY_TAGS:
+            batch[trajectory_tag] = (trajectory_tag in trajectory_tags)
+
+        return batch
 
     def _get_serialized_fm_path(self, scene_fpath, scene_id, track_id):
         base, _ = os.path.split(scene_fpath)

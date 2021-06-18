@@ -30,6 +30,10 @@ def build_parser():
         '--dir_metrics', type=str, default=None,
         help='Directory where intermediate metrics are stored. Default will '
              'be set to `{dir_data}/metrics`.')
+    parser.add_argument(
+        '--dir_metadata_cache', type=str, default=None,
+        help='Directory where dataset stats are stored (controlled by '
+             '`debug_collect_dataset_stats` attribute).')
     # parser.add_argument(
     #     '--dir_prerendered_data', type=str, default='data',
     #     help='Directory where pre-rendered SDC data is stored.')
@@ -195,10 +199,6 @@ def build_parser():
     #     '--rip_single_prediction', type='bool', default=False,
     #     help="If enabled, take the argmax over per-scene predicted "
     #          "trajectories after the RIP aggregation step.")
-    parser.add_argument(
-        '--rip_cache_full_results', type='bool', default=False,
-        help="Cache predictions, ground truth, uncertainty estimates, "
-             "scene ID, and trajectory tags for every evaluated datapoint.")
 
     ###########################################################################
     # #### Metrics ############################################################
@@ -232,9 +232,10 @@ def build_parser():
         '--debug_overfit_n_examples', type=int, default=10,
         help='Size of the subset of train on which we try to overfit.')
     parser.add_argument(
-        '--debug_collect_eval_statistics', type='bool', default=False,
-        help='When enabled, '
-    )
+        '--debug_collect_dataset_stats', type='bool', default=False,
+        help='When enabled, collect dataset statistics on train/val/test. '
+             'Caches predictions, ground truth, uncertainty estimates, '
+             'scene ID, and trajectory tags for every evaluated datapoint.')
     parser.add_argument(
         '--debug_eval_mode', type='bool', default=False,
         help='Only run evaluation. Can be manually triggered to evaluate '

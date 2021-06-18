@@ -22,11 +22,13 @@ from typing import Mapping
 from typing import Tuple
 
 import torch
+import torch.distributions as D
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
 from sdc.metrics import SDCLoss
+from sdc.oatomobile.torch.networks.mlp import MLP
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 
 
@@ -39,6 +41,7 @@ class BehaviouralModel(nn.Module):
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
         device: str = 'cpu',
+        scale_eps: float = 1e-7,
         **kwargs
     ) -> None:
         """Constructs a simple behavioural cloning model.
@@ -61,12 +64,22 @@ class BehaviouralModel(nn.Module):
         self._decoder = nn.GRUCell(
             input_size=self._output_shape[-1], hidden_size=dim_hidden)
 
-        # The output head, predicts the parameters of a Gaussian.
+        # # The output head, predicts the parameters of a Gaussian.
         self._output = nn.Linear(
             in_features=dim_hidden,
             out_features=(self._output_shape[-1] * 2))
 
+        # The output head.
+        # self._locscale = MLP(
+        #     input_size=dim_hidden,
+        #     output_sizes=[32, self._output_shape[-1] * 2],
+        #     activation_fn=nn.ReLU,
+        #     dropout_rate=None,
+        #     activate_final=False,
+        # )
+
         self._device = device
+        self._scale_eps = scale_eps
 
     def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""
@@ -103,17 +116,11 @@ class BehaviouralModel(nn.Module):
 
         return torch.stack(y, dim=1)  # pylint: disable=no-member
 
-    def forward(self,
-                **context: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def decode(
+        self,
+        z: torch.Tensor,
+    ):
         """Returns the expert plan."""
-        # Parses context variables.
-        feature_maps = context.get("feature_maps")
-
-        # Encodes the visual input.
-        z = self._encoder(feature_maps)
-
-        # z is the decoder's initial state.
-
         # Output container.
         y = list()
         scales = list()
@@ -132,13 +139,13 @@ class BehaviouralModel(nn.Module):
             # Predicts the location and scale of the MVN distribution.
             dloc_scale = self._output(z)
             dloc = dloc_scale[..., :2]
-            scale = F.softplus(dloc_scale[..., 2:]) + 1e-3
+            scale = F.softplus(dloc_scale[..., 2:]) + self._scale_eps
 
             # Data distribution corresponding sample from a std normal.
             y_t = (y_tm1 + dloc) + (
                 scale * torch.normal(
-                mean=torch.zeros((z.shape[0], self._output_shape[-1])),
-                std=torch.ones((z.shape[0], self._output_shape[-1]))).to(
+                    mean=torch.zeros((z.shape[0], self._output_shape[-1])),
+                    std=torch.ones((z.shape[0], self._output_shape[-1]))).to(
                     device=self._device))
 
             # Update containers.
@@ -150,6 +157,105 @@ class BehaviouralModel(nn.Module):
         y = torch.stack(y, dim=-2)  # pylint: disable=no-member
         scales = torch.stack(scales, dim=-2)  # pylint: disable=no-member
         return y, scales
+
+    def forward(
+        self,
+        **context: torch.Tensor
+    ) -> torch.Tensor:
+        """Sample a local mode from the posterior.
+
+        Args:
+          context: (keyword arguments) The conditioning
+            variables used for the conditional flow.
+
+        Returns:
+          A batch of trajectories with shape `[B, T, 2]`.
+        """
+        # The contextual parameters.
+        # Cache them, because we may use them to score plans from
+        # other ensemble members in RIP.
+        self._z = self._params(**context)
+
+        # Decode a trajectory.
+        y, _ = self.decode(z=self._z)
+        return y
+
+    def score_plans(
+        self,
+        y: torch.Tensor
+    ) -> torch.Tensor:
+        """Scores plans given a context.
+        NOTE: Context encoding is assumed to be stored in self._z,
+            via execution of `forward`.
+        Args:
+            self._z: context encodings, shape `[B, K]`
+            y: modes from the posterior of a BC model, with shape `[B, T, 2]`.
+        Returns:
+            log likelihood for each plan in the batch, i.e., shape [B]
+        """
+        return self.log_likelihood(y=y, z=self._z)
+
+    def log_likelihood(
+        self,
+        y: torch.Tensor,
+        z: torch.Tensor
+    ):
+        """Obtain log likelihood of given sample from data distribution
+            (ground-truth).
+
+          Args:
+            y: Samples from the data distribution, with shape `[B, D]`.
+            z: The contextual parameters obtained from the CNN-based encoder,
+                with shape `[B, K]`.
+
+          Returns:
+            log_prob: The log-likelihood of the samples, with shape `[B]`.
+          """
+        # Keep track of predicted (delta) locations and scales,
+        # which will parameterize a MVN distribution.
+        dlocs = list()
+        scales = list()
+
+        # Initial input variable.
+        y_tm1 = torch.zeros(  # pylint: disable=no-member
+            size=(y.shape[0], self._output_shape[-1]),
+            dtype=y.dtype,
+        ).to(y.device)
+
+        for t in range(y.shape[-2]):
+            y_t = y[:, t, :]
+
+            # Unrolls the GRU.
+            z = self._decoder(y_tm1, z)
+
+            # Predicts the location and scale of the MVN distribution.
+            dloc_scale = self._output(z)
+            dloc = dloc_scale[..., :2]
+            scale = F.softplus(dloc_scale[..., 2:]) + self._scale_eps
+
+            # Update containers.
+            dlocs.append(dloc)
+            scales.append(scale)
+            y_tm1 = y_t
+
+        scales = torch.stack(scales, dim=1).reshape(y.shape[0], -1)
+
+        # Pred likelihood for each timestep
+        likelihood = D.MultivariateNormal(
+            loc=torch.stack(dlocs, dim=1).reshape(y.shape[0], -1),
+            # pylint: disable=no-member
+            scale_tril=torch.stack([
+                torch.diag(scales[batch_index, :])
+                for batch_index in range(scales.shape[0])], dim=0)
+            # pylint: disable=no-member
+        )
+
+        # Convert ground-truth to displacements at each time t
+        y_copy = y.clone().detach()
+        y_copy[:, 1:] = y_copy[:, 1:] - y_copy[:, :-1]
+        y_copy = y_copy.reshape(y_copy.shape[0], -1)
+
+        return likelihood.log_prob(y_copy)
 
 
 def train_step_bc(
@@ -163,17 +269,16 @@ def train_step_bc(
     # Resets optimizer's gradients.
     optimizer.zero_grad()
 
-    # Forward pass from the model.
-    predictions, _ = model(**batch)
+    # Model forward pass. Caches scene context in self._z.
+    predictions = model.forward(**batch)
 
-    # Calculates loss.
-    loss = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.average_displacement_error,
-        predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+    # Compute NLL.
+    y = batch["ground_truth_trajectory"]
+    log_likelihood = model.score_plans(y=y)
+    nll = -torch.mean(log_likelihood)
 
     # Backward pass.
-    loss.backward()
+    nll.backward()
 
     # Clips gradients norm.
     if clip:
@@ -182,12 +287,18 @@ def train_step_bc(
     # Performs a gradient descent step.
     optimizer.step()
 
+    # Calculates other losses.
+    ade = sdc_loss.batch_mean_metric(
+        base_metric=sdc_loss.average_displacement_error,
+        predictions=predictions,
+        ground_truth=y)
     fde = sdc_loss.batch_mean_metric(
         base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+        ground_truth=y)
     loss_dict = {
-        'ade': loss.detach(),
+        'nll': nll.detach(),
+        'ade': ade.detach(),
         'fde': fde.detach()}
     return loss_dict
 
@@ -198,19 +309,25 @@ def evaluate_step_bc(
     batch: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
-    # Forward pass from the model.
-    predictions, _ = model(**batch)
+    # Model forward pass. Caches scene context in self._z.
+    predictions = model.forward(**batch)
 
-    # Calculates loss on mini-batch.
+    # Compute NLL.
+    y = batch["ground_truth_trajectory"]
+    log_likelihood = model.score_plans(y=y)
+    nll = -torch.mean(log_likelihood)
+
+    # Calculates other losses.
     ade = sdc_loss.batch_mean_metric(
         base_metric=sdc_loss.average_displacement_error,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+        ground_truth=y)
     fde = sdc_loss.batch_mean_metric(
         base_metric=sdc_loss.final_displacement_error,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+        ground_truth=y)
     loss_dict = {
+        'nll': nll.detach(),
         'ade': ade.detach(),
         'fde': fde.detach()}
     return loss_dict

@@ -10,6 +10,7 @@ from transformers import get_cosine_schedule_with_warmup
 
 from sdc.dataset import load_datasets, load_dataloaders
 from sdc.metrics import SDCLoss
+from sdc.cache_metadata import MetadataCache
 from sdc.oatomobile.tf.loggers import TensorBoardLogger
 from sdc.oatomobile.torch.baselines import (
     ImitativeModel, BehaviouralModel, batch_transform, init_model)
@@ -43,6 +44,7 @@ def train(c):
     is_rip = (c.rip_per_plan_algorithm is not None and
               c.rip_per_scene_algorithm is not None)
     eval_mode = (c.debug_eval_mode or is_rip)
+    collect_dataset_stats = c.debug_collect_dataset_stats
     if c.exp_image_downsize_hw is None:
         downsample_hw = None
     else:
@@ -95,6 +97,12 @@ def train(c):
     # Init object for computing loss and metrics.
     sdc_loss = SDCLoss(full_model_name=full_model_name, c=c)
 
+    # Init metadata cache, if specified
+    if collect_dataset_stats:
+        metadata_cache = MetadataCache(full_model_name=full_model_name, c=c)
+    else:
+        metadata_cache = None
+
     # Init train and evaluate args for respective model backbone.
     train_args = {
         'model': model,
@@ -118,7 +126,8 @@ def train(c):
             log_dir=c.dir_tensorboard, dataset_names=dataset_names)
 
     if is_rip:
-        evaluate_args['cache_full_results'] = c.rip_cache_full_results
+        train_args['metadata_cache'] = metadata_cache
+        evaluate_args['metadata_cache'] = metadata_cache
 
     # if model_name == 'dim':
         # noise_level = c.dim_noise_level
@@ -195,6 +204,8 @@ def train(c):
                 eval_loss_dict[key] /= steps
         if is_rip:
             eval_loss_dict = sdc_loss.evaluate_dataset_losses(dataset_key)
+        if collect_dataset_stats:
+            metadata_cache.cache_dataset_stats(dataset_key)
 
         return eval_loss_dict
 
@@ -245,7 +256,7 @@ def train(c):
             validation_dataloaders = eval_dataloaders['test']
             print(validation_dataloaders.keys())
 
-    if eval_mode:
+    if eval_mode or collect_dataset_stats:
         print('Running evaluation. Setting num_epochs to 1.')
         num_epochs = 1
         test_dataloaders = eval_dataloaders['test']
@@ -254,14 +265,20 @@ def train(c):
         for epoch in pbar_epoch:
             epoch_loss_dict = defaultdict(dict)
 
-            if not eval_mode:
-                loss_train_dict, epoch_steps = train_epoch(train_dataloader)
+            if not eval_mode or collect_dataset_stats:
                 dataset_key = 'moscow__train'
+                if is_rip:
+                    loss_train_dict = evaluate_epoch(
+                        train_dataloader, dataset_key=dataset_key)
+                else:
+                    loss_train_dict, epoch_steps = train_epoch(
+                        train_dataloader)
+                    steps += epoch_steps
+
                 for loss_key, loss_value in loss_train_dict.items():
                     epoch_loss_dict['train'][
                         f'{dataset_key}__{loss_key}'] = (
                         loss_value.detach().cpu().numpy().item())
-                steps += epoch_steps
                 if c.tb_logging:
                     write(model, train_dataloader, writer, dataset_key,
                           loss_train_dict, epoch)

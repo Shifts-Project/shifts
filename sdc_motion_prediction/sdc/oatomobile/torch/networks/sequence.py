@@ -203,7 +203,6 @@ class AutoregressiveFlow(nn.Module):
             # Predicts the location and scale of the MVN distribution.
             dloc_scale = self._locscale(z)
             dloc = dloc_scale[..., :2]
-            # TODO eps scale
             scale = F.softplus(dloc_scale[..., 2:]) + self._scale_eps
 
             # Base distribution corresponding sample.

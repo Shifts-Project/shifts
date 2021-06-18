@@ -1,19 +1,18 @@
 import datetime
 import os
 from collections import defaultdict
-from typing import Sequence, Callable, Union, Dict, Text, Mapping
+from typing import Sequence, Callable, Union, Dict, Text, Mapping, Iterable
 
 import pandas as pd
 import torch
 import torch.nn as nn
-
+from sdc.constants import (
+    VALID_TRAJECTORY_TAGS, SCENE_TAG_TYPE_TO_OPTIONS,
+    VALID_AGGREGATORS, VALID_BASE_METRICS)
 
 class SDCLoss:
     def __init__(self, full_model_name, c):
         # self.l1_criterion = nn.L1Loss(reduction="none")
-
-        self.valid_base_metrics = {'ade', 'fde'}
-        self.valid_aggregators = {'min', 'mean', 'max', 'confidence-weight'}
         self.softmax = torch.nn.Softmax(dim=0)
 
         # Store ADE/FDE of all B * D_b preds
@@ -60,18 +59,8 @@ class SDCLoss:
         # runs trained on a subset or all of the training data
         self.model_prefix = c.model_prefix
 
-        # ** Caching Full Results **
-        # Done if we wish to perform post-hoc analyses of model predictions
-        # e.g., how does confidence correlate with various GT trajectory types?
-        #
-        # predictions: torch.Tensor,
-        # batch: Mapping[str, torch.Tensor],
-        # plan_confidence_scores: torch.Tensor = None,
-        # pred_request_confidence_scores: torch.Tensor = None,
-
-
+    @staticmethod
     def average_displacement_error(
-        self,
         predictions: torch.Tensor,
         ground_truth: torch.Tensor
     ) -> torch.Tensor:
@@ -227,27 +216,6 @@ class SDCLoss:
         self.clear_per_dataset_attributes()
         return pred_req_retention_metrics
 
-    # def cache_full_results(
-    #     self,
-    #     predictions: torch.Tensor,
-    #     batch: Mapping[str, torch.Tensor],
-    #     plan_confidence_scores: torch.Tensor = None,
-    #     pred_request_confidence_scores: torch.Tensor = None,
-    # ):
-    #     # TODO: support for varying # plans per prediction request
-    #     for obj in [predictions, plan_confidence_scores,
-    #                 pred_request_confidence_scores]:
-    #         if not isinstance(obj, torch.Tensor):
-    #             raise NotImplementedError
-    #
-    #     ground_truth = batch['ground_truth_trajectory']
-    #
-    #     # cache predictions, ground truth, uncertainty estimates,
-    #     # scene ID, and trajectory tags
-
-
-
-
     def cache_batch_losses(
         self,
         predictions_list: Union[Sequence[torch.Tensor], torch.Tensor],
@@ -293,7 +261,7 @@ class SDCLoss:
             # Tile over the first dimension
             ground_truth = torch.tile(ground_truth, (D_b, 1, 1)).to(
                 device=predictions.device)
-            for base_metric in self.valid_base_metrics:
+            for base_metric in VALID_BASE_METRICS:
                 if base_metric == 'ade':
                     base_metric_fn = self.average_displacement_error
                 elif base_metric == 'fde':
@@ -343,6 +311,54 @@ class SDCLoss:
         """
         return torch.mean(
             base_metric(predictions=predictions, ground_truth=ground_truth))
+
+    @staticmethod
+    def compute_all_aggregator_metrics(
+        per_plan_confidences: torch.Tensor,
+        predictions: torch.Tensor,
+        ground_truth: torch.Tensor
+    ):
+        """
+        Batch size B, we assume consistent number of predictions D per scene.
+
+        per_plan_confidences: torch.Tensor, shape (B, D), we assume that all
+            prediction requests have the same number of proposed plans here.
+        predictions: torch.Tensor, shape (B, D, T, 2)
+        ground_truth: torch.Tensor, shape (B, T, 2), there is only one
+            ground_truth trajectory for each prediction request.
+        """
+        metrics_dict = defaultdict(list)
+
+        for base_metric_name in VALID_BASE_METRICS:
+            if base_metric_name == 'ade':
+                base_metric = SDCLoss.average_displacement_error
+            elif base_metric_name == 'fde':
+                base_metric = SDCLoss.final_displacement_error
+            else:
+                raise NotImplementedError
+
+            # For each prediction request:
+            for index, (req_preds, req_gt, req_plan_confs) in enumerate(
+                    zip(predictions, ground_truth, per_plan_confidences)):
+                # Tile over the first dimension
+                req_gt = torch.unsqueeze(req_gt, dim=0)
+                req_gt = torch.tile(req_gt, (req_preds.size(0), 1, 1)).to(
+                    device=req_preds.device)
+                req_plan_losses = base_metric(
+                    predictions=req_preds, ground_truth=req_gt)
+
+                for aggregator in VALID_AGGREGATORS:
+                    metric_key = f'{aggregator}{base_metric_name.upper()}'
+                    metrics_dict[metric_key].append(
+                        SDCLoss.aggregate_prediction_request_losses(
+                            aggregator=aggregator,
+                            per_plan_losses=req_plan_losses,
+                            per_plan_confidences=(
+                                torch.nn.Softmax(dim=0)(req_plan_confs))))
+
+        metrics_dict = {
+            key: torch.stack(values) for key, values in metrics_dict.items()}
+        return metrics_dict
 
     def evaluate_pred_request_retention_thresholds(
         self,
@@ -396,7 +412,7 @@ class SDCLoss:
                 else:
                     counter += 1
 
-                for base_metric in self.valid_base_metrics:
+                for base_metric in VALID_BASE_METRICS:
                     assert base_metric in {'ade', 'fde'}, (
                         'This method must be updated to handle oracle use + '
                         'any metric for which perfect performance is not 0 '
@@ -412,7 +428,7 @@ class SDCLoss:
                     # particular prediction request (i.e., within this scene).
                     per_plan_confidences = self.softmax(per_plan_confidences)
 
-                    for aggregator in self.valid_aggregators:
+                    for aggregator in VALID_AGGREGATORS:
                         metric_key = (f'{aggregator}{base_metric.upper()}_'
                                       f'retain_scene')
                         agg_prediction_loss = (
@@ -488,13 +504,13 @@ class SDCLoss:
         # This allows us to sort "perfectly" based on loss -- i.e., what a
         # model with optimally calibrated uncertainty would do, to obtain
         # a performance upper bound.
-        for base_metric in self.valid_base_metrics:
+        for base_metric in VALID_BASE_METRICS:
             assert base_metric in {'ade', 'fde'}, (
                 'This method must be updated to handle oracle use + '
                 'any metric for which perfect performance is not 0 '
                 '(e.g., an accuracy).')
             per_plan_losses = self.base_metric_to_losses[base_metric]
-            for aggregator in self.valid_aggregators:
+            for aggregator in VALID_AGGREGATORS:
                 metric_key = (f'{aggregator}{base_metric.upper()}_'
                               f'retain_scene')
                 metric_agg_losses = torch.zeros(M)
@@ -617,7 +633,7 @@ class SDCLoss:
         #         if retain_bool_mask[datapoint_index] is False:
         #             continue
         #
-        #         for base_metric in self.valid_base_metrics:
+        #         for base_metric in VALID_BASE_METRICS:
         #             per_plan_losses = self.base_metric_to_losses[
         #                 base_metric][datapoint_index]
         #
@@ -628,7 +644,7 @@ class SDCLoss:
         #             # particular prediction request (i.e., within this scene).
         #             per_plan_confidences = self.softmax(per_plan_confidences)
         #
-        #             for aggregator in self.valid_aggregators:
+        #             for aggregator in VALID_AGGREGATORS:
         #                 metric_key = (f'{aggregator}{base_metric.upper()}')
         #                 if aggregator == 'min':
         #                     agg_prediction_loss = torch.min(per_plan_losses)
