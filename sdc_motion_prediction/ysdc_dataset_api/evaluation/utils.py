@@ -160,3 +160,22 @@ def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]) -> int:
     if not all(len(w.trajectory.points) == horizon for w in trajectories):
         raise ValueError('All modes must have the same prediction horizon')
     return horizon
+
+
+def object_prediction_from_model_output(
+        track_id: int,
+        scene_id: str,
+        model_output: Dict[str, np.ndarray]
+) -> ObjectPrediction:
+    object_prediction = ObjectPrediction()
+    object_prediction.track_id = track_id
+    object_prediction.scene_id = scene_id
+    assert len(model_output['predictions_list']) == len(model_output['plan_confidence_scores_list'])
+    for i in range(len(model_output['predictions_list'])):
+        weighted_trajectory = WeightedTrajectory(
+            trajectory=trajectory_array_to_proto(model_output['predictions_list'][i]),
+            weight=model_output['plan_confidence_scores_list'][i],
+        )
+        object_prediction.weighted_trajectories.append(weighted_trajectory)
+    object_prediction.uncertainty_measure = model_output['pred_request_confidence_score']
+    return object_prediction
