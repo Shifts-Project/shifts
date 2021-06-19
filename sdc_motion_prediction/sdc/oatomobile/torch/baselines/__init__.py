@@ -36,7 +36,8 @@ def get_bc_kwargs(c):
         'in_channels': c.model_in_channels,
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
-        'device': c.exp_device
+        'device': c.exp_device,
+        'debug_bc_deterministic': c.debug_bc_deterministic
     }
 
 

@@ -26,7 +26,6 @@ from matplotlib import collections as mc
 
 from sdc.dataset import load_renderer
 from sdc.oatomobile.tf import types
-from ysdc_dataset_api.utils import transform2dpoints
 
 COLORS = [
     "#0071bc",

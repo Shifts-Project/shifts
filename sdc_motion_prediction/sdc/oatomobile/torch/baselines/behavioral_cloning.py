@@ -42,6 +42,7 @@ class BehaviouralModel(nn.Module):
         output_shape: Tuple[int, int] = (25, 2),
         device: str = 'cpu',
         scale_eps: float = 1e-7,
+        debug_bc_deterministic: bool = False,
         **kwargs
     ) -> None:
         """Constructs a simple behavioural cloning model.
@@ -64,10 +65,7 @@ class BehaviouralModel(nn.Module):
         self._decoder = nn.GRUCell(
             input_size=self._output_shape[-1], hidden_size=dim_hidden)
 
-        # # The output head, predicts the parameters of a Gaussian.
-        self._output = nn.Linear(
-            in_features=dim_hidden,
-            out_features=(self._output_shape[-1] * 2))
+
 
         # The output head.
         # self._locscale = MLP(
@@ -81,10 +79,22 @@ class BehaviouralModel(nn.Module):
         self._device = device
         self._scale_eps = scale_eps
 
+        if debug_bc_deterministic:
+            print('DEBUG: using deterministic training for BC model.')
+            # The output head, predicts displacement.
+            self._output = nn.Linear(
+                in_features=dim_hidden,
+                out_features=(self._output_shape[-1]))
+        else:
+            # The output head, predicts the parameters of a Gaussian.
+            self._output = nn.Linear(
+                in_features=dim_hidden,
+                out_features=(self._output_shape[-1] * 2))
+
+        self.debug_bc_deterministic = debug_bc_deterministic
+
     def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""
-        raise NotImplementedError('Deprecated, now sampling from a Gaussian.')
-
         # Parses context variables.
         feature_maps = context.get("feature_maps")
 
@@ -269,37 +279,67 @@ def train_step_bc(
     # Resets optimizer's gradients.
     optimizer.zero_grad()
 
-    # Model forward pass. Caches scene context in self._z.
-    predictions = model.forward(**batch)
+    if model.debug_bc_deterministic:
+        predictions = model.forward_deterministic(**batch)
 
-    # Compute NLL.
-    y = batch["ground_truth_trajectory"]
-    log_likelihood = model.score_plans(y=y)
-    nll = -torch.mean(log_likelihood)
+        # Compute ADE loss
+        y = batch["ground_truth_trajectory"]
+        ade = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.average_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
 
-    # Backward pass.
-    nll.backward()
+        # Backward pass.
+        ade.backward()
 
-    # Clips gradients norm.
-    if clip:
-        torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
+        # Clips gradients norm.
+        if clip:
+            torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
 
-    # Performs a gradient descent step.
-    optimizer.step()
+        # Performs a gradient descent step.
+        optimizer.step()
 
-    # Calculates other losses.
-    ade = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.average_displacement_error,
-        predictions=predictions,
-        ground_truth=y)
-    fde = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.final_displacement_error,
-        predictions=predictions,
-        ground_truth=y)
-    loss_dict = {
-        'nll': nll.detach(),
-        'ade': ade.detach(),
-        'fde': fde.detach()}
+        # Calculates other losses.
+        fde = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.final_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        loss_dict = {
+            'ade': ade.detach(),
+            'fde': fde.detach()}
+    else:
+        # Model forward pass. Caches scene context in self._z.
+        predictions = model.forward(**batch)
+
+        # Compute NLL.
+        y = batch["ground_truth_trajectory"]
+        log_likelihood = model.score_plans(y=y)
+        nll = -torch.mean(log_likelihood)
+
+        # Backward pass.
+        nll.backward()
+
+        # Clips gradients norm.
+        if clip:
+            torch.nn.utils.clip_grad_norm(model.parameters(), 1.0)
+
+        # Performs a gradient descent step.
+        optimizer.step()
+
+        # Calculates other losses.
+        ade = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.average_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        fde = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.final_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        loss_dict = {
+            'nll': nll.detach(),
+            'ade': ade.detach(),
+            'fde': fde.detach()}
+
     return loss_dict
 
 
@@ -309,25 +349,45 @@ def evaluate_step_bc(
     batch: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
-    # Model forward pass. Caches scene context in self._z.
-    predictions = model.forward(**batch)
+    if model.debug_bc_deterministic:
+        predictions = model.forward_deterministic(**batch)
 
-    # Compute NLL.
-    y = batch["ground_truth_trajectory"]
-    log_likelihood = model.score_plans(y=y)
-    nll = -torch.mean(log_likelihood)
+        # Compute losses.
+        y = batch["ground_truth_trajectory"]
 
-    # Calculates other losses.
-    ade = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.average_displacement_error,
-        predictions=predictions,
-        ground_truth=y)
-    fde = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.final_displacement_error,
-        predictions=predictions,
-        ground_truth=y)
-    loss_dict = {
-        'nll': nll.detach(),
-        'ade': ade.detach(),
-        'fde': fde.detach()}
+        # Calculates other losses.
+        ade = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.average_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        fde = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.final_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        loss_dict = {
+            'ade': ade.detach(),
+            'fde': fde.detach()}
+    else:
+        # Model forward pass. Caches scene context in self._z.
+        predictions = model.forward(**batch)
+
+        # Compute NLL.
+        y = batch["ground_truth_trajectory"]
+        log_likelihood = model.score_plans(y=y)
+        nll = -torch.mean(log_likelihood)
+
+        # Calculates other losses.
+        ade = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.average_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        fde = sdc_loss.batch_mean_metric(
+            base_metric=sdc_loss.final_displacement_error,
+            predictions=predictions,
+            ground_truth=y)
+        loss_dict = {
+            'nll': nll.detach(),
+            'ade': ade.detach(),
+            'fde': fde.detach()}
+
     return loss_dict

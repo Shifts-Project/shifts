@@ -240,6 +240,10 @@ def build_parser():
         '--debug_eval_mode', type='bool', default=False,
         help='Only run evaluation. Can be manually triggered to evaluate '
              'a trained BC/DIM model.')
+    parser.add_argument(
+        '--debug_bc_deterministic', type='bool', default=False,
+        help='Train BC on the ADE objective. Attempting to debug low '
+             'performance with a valid likelihood model.')
 
     return parser
 

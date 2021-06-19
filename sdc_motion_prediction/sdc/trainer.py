@@ -149,7 +149,6 @@ def train(c):
         Performs an epoch of gradient descent optimization on `dataloader`."""
         model.train()
         train_loss_dict = {}
-        loss = 0.0
         steps = 0
         with tq.tqdm(dataloader) as pbar:
             for batch in pbar:
