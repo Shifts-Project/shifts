@@ -244,7 +244,10 @@ def build_parser():
         '--debug_bc_deterministic', type='bool', default=False,
         help='Train BC on the ADE objective. Attempting to debug low '
              'performance with a valid likelihood model.')
-
+    parser.add_argument(
+        '--debug_bc_teacher_forcing', type='bool', default=True,
+        help='Use teacher forcing in training the BC model (this is standard).'
+    )
     return parser
 
 

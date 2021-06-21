@@ -21,15 +21,14 @@ Training Data ('train')
 
 Validation Data ('validation')
 'moscow__validation': Moscow intersected with NO precipitation
-'ood__validation': Skolkovo, Modiin, and Tel Aviv intersected with
+'ood__validation': Skolkovo, Modiin, and Innopolis intersected with
     (No precipitation, Rain and Snow)
 
 Test Data ('test')
 'moscow__test': Moscow intersected with NO precipitation
-'ood__test': Ann-Arbor + Innopolis Intersected with
+'ood__test': Ann-Arbor + Tel Aviv intersected with
     (No precipitation, rain, snow and sleet)
-'moscow_precip__test': Moscow intersect with SLEET/SNOW/RAIN
-    (but keep in reserve for now)
+'moscow_precip__test': Moscow intersected with SLEET/SNOW/RAIN
 """
 
 
@@ -53,7 +52,7 @@ def filter_moscow_precipitation_data(scene_tags_dict):
 
 
 def filter_ood_validation_data(scene_tags_dict):
-    if (scene_tags_dict['track'] in ['Skolkovo', 'Modiin', 'TelAviv'] and
+    if (scene_tags_dict['track'] in ['Skolkovo', 'Modiin', 'Innopolis'] and
         scene_tags_dict[
             'precipitation'] in ['kNoPrecipitation', 'kRain', 'kSnow']):
         return True
@@ -62,15 +61,7 @@ def filter_ood_validation_data(scene_tags_dict):
 
 
 def filter_ood_test_data(scene_tags_dict):
-    if scene_tags_dict['track'] in ['AnnArbor', 'Innopolis']:
-        return True
-    else:
-        return False
-
-
-def filter_validation_data(scene_tags_dict):
-    if (scene_tags_dict['track'] == 'Moscow' and
-            scene_tags_dict['precipitation'] == 'kNoPrecipitation'):
+    if scene_tags_dict['track'] in ['AnnArbor', 'TelAviv']:
         return True
     else:
         return False
