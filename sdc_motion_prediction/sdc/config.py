@@ -34,9 +34,6 @@ def build_parser():
         '--dir_metadata_cache', type=str, default=None,
         help='Directory where dataset stats are stored (controlled by '
              '`debug_collect_dataset_stats` attribute).')
-    # parser.add_argument(
-    #     '--dir_prerendered_data', type=str, default='data',
-    #     help='Directory where pre-rendered SDC data is stored.')
     parser.add_argument(
         '--dir_checkpoint', type=str, default='model_checkpoints',
         help='Directory to which model checkpoints are stored.')
@@ -165,8 +162,23 @@ def build_parser():
     #     help="Noise with which ground truth trajectories are perturbed in "
     #          "training DIM.")
     parser.add_argument(
+        '--bc_deterministic', type='bool', default=False,
+        help='Train BC on the ADE objective, instead of using a valid '
+             'likelihood.')
+    parser.add_argument(
+        '--bc_generation_mode', type=str, default='sampling',
+        help='Specifies the mode used in generating trajectories from DIM/BC '
+             'at train and evaluation time. Options:'
+             'teacher-forcing: condition on ground-truth in forming the '
+             'autoregressive likelihood.'
+             'sampling: condition on samples.')
+    parser.add_argument(
         '--dim_scale_eps', type=float, default=1e-7,
         help="Additive epsilon constant to avoid a 0 or negative scale.")
+    parser.add_argument(
+        '--dim_grad_ascent', type='bool', default=False,
+        help='Perform gradient ascent on the base distribution sample `x` '
+             'when generating the plan conditioned on scene context.')
     parser.add_argument(
         '--rip_per_plan_algorithm', type=str, default=None,
         help="Use Robust Imitative Planning wrapper to select a robust "
@@ -195,10 +207,6 @@ def build_parser():
              "model for a given prediction request input. "
              "We select these as the top samples from all stochastic "
              "generations from the ensemble members.")
-    # parser.add_argument(
-    #     '--rip_single_prediction', type='bool', default=False,
-    #     help="If enabled, take the argmax over per-scene predicted "
-    #          "trajectories after the RIP aggregation step.")
 
     ###########################################################################
     # #### Metrics ############################################################
@@ -240,14 +248,6 @@ def build_parser():
         '--debug_eval_mode', type='bool', default=False,
         help='Only run evaluation. Can be manually triggered to evaluate '
              'a trained BC/DIM model.')
-    parser.add_argument(
-        '--debug_bc_deterministic', type='bool', default=False,
-        help='Train BC on the ADE objective. Attempting to debug low '
-             'performance with a valid likelihood model.')
-    parser.add_argument(
-        '--debug_bc_teacher_forcing', type='bool', default=True,
-        help='Use teacher forcing in training the BC model (this is standard).'
-    )
     return parser
 
 

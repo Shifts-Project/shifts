@@ -36,9 +36,9 @@ def get_bc_kwargs(c):
         'in_channels': c.model_in_channels,
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
-        'device': c.exp_device,
-        'debug_bc_deterministic': c.debug_bc_deterministic,
-        'debug_bc_teacher_forcing': c.debug_bc_teacher_forcing,
+        'bc_deterministic': c.bc_deterministic,
+        'generation_mode': c.bc_generation_mode,
+        'device': c.exp_device
     }
 
 
@@ -54,8 +54,9 @@ def get_dim_kwargs(c):
         'in_channels': c.model_in_channels,
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
-        'device': c.exp_device,
-        'scale_eps': c.dim_scale_eps
+        'scale_eps': c.dim_scale_eps,
+        'grad_ascent': c.dim_grad_ascent,
+        'device': c.exp_device
     }
 
 

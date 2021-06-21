@@ -227,9 +227,6 @@ def train(c):
         with torch.no_grad():
             predictions = model(**batch)
 
-        if isinstance(model, BehaviouralModel):
-            predictions, _ = predictions
-
         # Logs on `TensorBoard`.
         writer.log(
             dataset_name=dataset_name,

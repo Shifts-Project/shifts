@@ -72,7 +72,7 @@ RENDERER_CONFIG = {
                     'road_graph': [
                         'crosswalk_occupancy',
                         'crosswalk_availability',
-                        'lane_availability',  # Currently unavailable due to problem in dataset
+                        'lane_availability',
                         'lane_direction',
                         'lane_occupancy',
                         'lane_priority',

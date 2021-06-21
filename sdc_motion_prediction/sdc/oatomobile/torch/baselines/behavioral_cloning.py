@@ -28,7 +28,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from sdc.metrics import SDCLoss
-from sdc.oatomobile.torch.networks.mlp import MLP
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 
 
@@ -40,58 +39,60 @@ class BehaviouralModel(nn.Module):
         in_channels: int,
         dim_hidden: int = 128,
         output_shape: Tuple[int, int] = (25, 2),
-        device: str = 'cpu',
         scale_eps: float = 1e-7,
-        debug_bc_deterministic: bool = False,
+        bc_deterministic: bool = False,
+        generation_mode: str = 'sampling',
         **kwargs
     ) -> None:
-        """Constructs a simple behavioural cloning model.
+        """Constructs a behavioural cloning model.
 
         Args:
-          output_shape: The shape of the base and
-            data distribution (a.k.a. event_shape).
+            in_channels: Number of channels in image-featurized context
+            dim_hidden: Hidden layer size of encoder output / GRU
+            output_shape: The shape of the data distribution
+                (a.k.a. event_shape).
+            scale_eps: Epsilon term to avoid numerical instability by
+                predicting zero Gaussian scale.
+            generation_mode: one of {sampling, teacher-forcing}.
+                In the former case, the autoregressive likelihood is formed
+                    by conditioning on samples.
+                In the latter case, the likelihood is formed by conditioning
+                    on ground-truth.
         """
         super(BehaviouralModel, self).__init__()
+        assert generation_mode in {'sampling', 'teacher-forcing'}
+
         self._output_shape = output_shape
 
         # The convolutional encoder model.
         self._encoder = MobileNetV2(
             in_channels=in_channels, num_classes=dim_hidden)
 
-        # No need for an MLP merger, as all inputs (including static HD map
-        # features) have been converted to an image representation.
+        # All inputs (including static HD map features)
+        # have been converted to an image representation;
+        # No need for an MLP merger.
 
         # The decoder recurrent network used for the sequence generation.
         self._decoder = nn.GRUCell(
             input_size=self._output_shape[-1], hidden_size=dim_hidden)
 
-
-
-        # The output head.
-        # self._locscale = MLP(
-        #     input_size=dim_hidden,
-        #     output_sizes=[32, self._output_shape[-1] * 2],
-        #     activation_fn=nn.ReLU,
-        #     dropout_rate=None,
-        #     activate_final=False,
-        # )
-
-        self._device = device
         self._scale_eps = scale_eps
 
-        if debug_bc_deterministic:
-            print('DEBUG: using deterministic training for BC model.')
+        if bc_deterministic:
+            print('DEBUG: using deterministic training and eval for BC model.')
             # The output head, predicts displacement.
             self._output = nn.Linear(
                 in_features=dim_hidden,
                 out_features=(self._output_shape[-1]))
         else:
+            print('BC Model: using Gaussian likelihood.')
             # The output head, predicts the parameters of a Gaussian.
             self._output = nn.Linear(
                 in_features=dim_hidden,
                 out_features=(self._output_shape[-1] * 2))
 
-        self.debug_bc_deterministic = debug_bc_deterministic
+        self.bc_deterministic = bc_deterministic
+        self._generation_mode = generation_mode
 
     def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""
@@ -156,7 +157,7 @@ class BehaviouralModel(nn.Module):
                 scale * torch.normal(
                     mean=torch.zeros((z.shape[0], self._output_shape[-1])),
                     std=torch.ones((z.shape[0], self._output_shape[-1]))).to(
-                    device=self._device))
+                    device=z.device))
 
             # Update containers.
             y.append(y_t)
@@ -176,15 +177,18 @@ class BehaviouralModel(nn.Module):
 
         Args:
           context: (keyword arguments) The conditioning
-            variables used for the conditional flow.
+            variables used for the conditional sequence generation.
 
         Returns:
           A batch of trajectories with shape `[B, T, 2]`.
         """
         # The contextual parameters.
-        # Cache them, because we may use them to score plans from
-        # other ensemble members in RIP.
-        self._z = self._params(**context)
+        feature_maps = context.get("feature_maps")
+
+        # Encodes the visual input.
+        # Cache embedding, because we may use it in scoring plans
+        # from other ensemble members in RIP.
+        self._z = self._encoder(feature_maps)
 
         # Decode a trajectory.
         y, _ = self.decode(z=self._z)
@@ -201,7 +205,7 @@ class BehaviouralModel(nn.Module):
             self._z: context encodings, shape `[B, K]`
             y: modes from the posterior of a BC model, with shape `[B, T, 2]`.
         Returns:
-            log likelihood for each plan in the batch, i.e., shape [B]
+            log-likelihood for each plan in the batch, i.e., shape `[B]`.
         """
         return self.log_likelihood(y=y, z=self._z)
 
@@ -211,7 +215,7 @@ class BehaviouralModel(nn.Module):
         z: torch.Tensor
     ):
         """Obtain log likelihood of given sample from data distribution
-            (ground-truth).
+            (ground-truth or generated plan).
 
           Args:
             y: Samples from the data distribution, with shape `[B, D]`.
@@ -233,8 +237,6 @@ class BehaviouralModel(nn.Module):
         ).to(y.device)
 
         for t in range(y.shape[-2]):
-            y_t = y[:, t, :]
-
             # Unrolls the GRU.
             z = self._decoder(y_tm1, z)
 
@@ -246,6 +248,20 @@ class BehaviouralModel(nn.Module):
             # Update containers.
             dlocs.append(dloc)
             scales.append(scale)
+
+            # Condition on ground truth
+            if self._generation_mode == 'teacher-forcing':
+                y_t = y[:, t, :]
+            # Condition on sample
+            elif self._generation_mode == 'sampling':
+                y_t = (y_tm1 + dloc) + (
+                    scale * torch.normal(
+                        mean=torch.zeros((z.shape[0], self._output_shape[-1])),
+                        std=torch.ones((z.shape[0], self._output_shape[-1]))
+                    ).to(device=y.device))
+            else:
+                raise NotImplementedError
+
             y_tm1 = y_t
 
         scales = torch.stack(scales, dim=1).reshape(y.shape[0], -1)
@@ -253,12 +269,9 @@ class BehaviouralModel(nn.Module):
         # Pred likelihood for each timestep
         likelihood = D.MultivariateNormal(
             loc=torch.stack(dlocs, dim=1).reshape(y.shape[0], -1),
-            # pylint: disable=no-member
             scale_tril=torch.stack([
                 torch.diag(scales[batch_index, :])
-                for batch_index in range(scales.shape[0])], dim=0)
-            # pylint: disable=no-member
-        )
+                for batch_index in range(scales.shape[0])], dim=0))
 
         # Convert ground-truth to displacements at each time t
         y_copy = y.clone().detach()
@@ -275,11 +288,11 @@ def train_step_bc(
     batch: Mapping[str, torch.Tensor],
     clip: bool = False,
 ) -> Mapping[str, torch.Tensor]:
-    """Performs a single gradient-descent optimisation step."""
+    """Performs a single gradient-descent optimization step."""
     # Resets optimizer's gradients.
     optimizer.zero_grad()
 
-    if model.debug_bc_deterministic:
+    if model.bc_deterministic:
         predictions = model.forward_deterministic(**batch)
 
         # Compute ADE loss
@@ -349,7 +362,7 @@ def evaluate_step_bc(
     batch: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
     """Evaluates `model` on a `batch`."""
-    if model.debug_bc_deterministic:
+    if model.bc_deterministic:
         predictions = model.forward_deterministic(**batch)
 
         # Compute losses.

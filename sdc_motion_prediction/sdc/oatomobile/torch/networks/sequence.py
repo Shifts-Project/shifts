@@ -37,11 +37,14 @@ class AutoregressiveFlow(nn.Module):
         """Constructs a simple autoregressive flow-based sequence generator.
 
         Args:
-          output_shape: The shape of the base and
-            data distribution (a.k.a. event_shape).
+          output_shape: The shape of the base and data distribution
+            (a.k.a. event_shape).
           hidden_size: The dimensionality of the GRU hidden state.
+          scale_eps: Epsilon term to avoid numerical instability by
+            predicting zero Gaussian scale.
         """
         super(AutoregressiveFlow, self).__init__()
+
         self._output_shape = output_shape
 
         # Initialises the base distribution.
@@ -87,8 +90,8 @@ class AutoregressiveFlow(nn.Module):
         """Forward-pass, stochastic generation of a sequence.
 
         Args:
-          z: The contextual parameters of the conditional density estimator, with
-            shape `[B, K]`.
+          z: The contextual parameters of the conditional density estimator,
+            with shape `[B, K]`.
 
         Returns:
           The samples from the push-forward distribution, with shape `[B, D]`.
@@ -104,20 +107,20 @@ class AutoregressiveFlow(nn.Module):
         x: torch.Tensor,
         z: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Transforms samples from the base distribution to the data distribution.
+        """Transforms samples from the base distribution to the
+        data distribution.
 
         Args:
           x: Samples from the base distribution, with shape `[B, D]`.
-          z: The contextual parameters of the conditional density estimator, with
-            shape `[B, K]`.
+          z: The contextual parameters of the conditional density estimator,
+            with shape `[B, K]`.
 
         Returns:
-          y: The sampels from the push-forward distribution,
+          y: The samples from the push-forward distribution,
             with shape `[B, D]`.
           logabsdet: The log absolute determinant of the Jacobian,
             with shape `[B]`.
         """
-
         # Output containers.
         y = list()
         scales = list()
@@ -137,10 +140,6 @@ class AutoregressiveFlow(nn.Module):
             # Predicts the location and scale of the MVN distribution.
             dloc_scale = self._locscale(z)
             dloc = dloc_scale[..., :2]
-            # TODO: bound both low and high?
-            # TODO: log scales
-            # TODO: take all trajectories of left/right turns,
-            # TODO: transformer baselines?
             scale = F.softplus(dloc_scale[..., 2:]) + self._scale_eps
 
             # Data distribution corresponding sample.
@@ -162,28 +161,26 @@ class AutoregressiveFlow(nn.Module):
 
         return y, logabsdet
 
-
     def _inverse(
         self,
         y: torch.Tensor,
         z: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Transforms samples from the data distribution to the base distribution.
+        """Transforms samples from the data distribution to the
+            base distribution.
 
         Args:
           y: Samples from the data distribution, with shape `[B, D]`.
-          z: The contextual parameters of the conditional density estimator, with shape
-            `[B, K]`.
+          z: The contextual parameters of the conditional density estimator,
+            with shape `[B, K]`.
 
         Returns:
-          x: The sampels from the base distribution,
-            with shape `[B, D]`.
+          x: The samples from the base distribution, with shape `[B, D]`.
           log_prob: The log-likelihood of the samples under
-            the base distibution probability, with shape `[B]`.
+            the base distribution probability, with shape `[B]`.
           logabsdet: The log absolute determinant of the Jacobian,
             with shape `[B]`.
         """
-
         # Output containers.
         x = list()
         scales = list()
