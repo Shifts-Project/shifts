@@ -7,7 +7,7 @@ class Config():
     '''
     Define Configuration for partioning data
     '''
-    def __init__(self, time_splits = [0.6, 0.1, 0.15, 0.15], climate_splits = [3,1,1], in_domain_splits=[0.8, 0.1, 0.1], seed=1, eval_dev_overlap=True):
+    def __init__(self, time_splits = [0.6, 0.1, 0.15, 0.15], climate_splits = [3,1,1], in_domain_splits=[0.7, 0.15, 0.15], seed=1, eval_dev_overlap=True):
         '''
         time_splits: fractions associated with TRAIN, GAP, DEV_OUT, EVAL_OUT (split on time)
         climate_splits: number of climates kept for TRAIN, DEV_OUT, EVAL_OUT (from above time splits)
@@ -23,7 +23,7 @@ class Config():
         self.run_checks()
 
     def run_checks(self):
-        assert len(self.time_splits) == 4, "Need 3 time splits, e.g. [0.7, 0.15, 0.15]"
+        assert len(self.time_splits) == 4, "Need 4 time splits, e.g. [0.6, 0.15, 0.15, 0.15]"
         assert len(self.climate_splits) ==3, "Need 3 climate splits, e.g. [3,1,1]"
         assert np.sum(np.asarray(self.time_splits)) == 1.0, "Time split fractions should add to one"
         assert np.sum(np.asarray(self.climate_splits)) == 5, "Climate split counts should add to 5"
@@ -81,7 +81,7 @@ class Partitioner():
     def __init__(self, data_path, climate_info_path, config=Config()):
 
         # Define the 5 climate types
-        self.CLIMATES = ['A', 'B', 'C', 'D', 'E']
+        self.CLIMATES = ['tropical', 'dry', 'mild temperate', 'snow', 'polar']
         self.config = config
         # Read in the raw data
         self.df = pd.read_csv(data_path)
