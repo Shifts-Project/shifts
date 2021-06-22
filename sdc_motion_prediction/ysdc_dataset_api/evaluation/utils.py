@@ -86,6 +86,7 @@ def evaluate_submission_with_proto(
         metrics['top1_fde'].append(top1_fde(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_ade'].append(weighted_ade(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_fde'].append(weighted_fde(gt_trajectory, pred_trajectories, weights))
+        metrics['is_ood'].append(gt.is_ood)
     return metrics
 
 
