@@ -21,8 +21,8 @@ With the configuration parameters specified in the example command above, expect
  - `train.csv`: 2,618,488
  - `dev_in.csv` : 561,104
  - `eval_in.csv` : 561,105
- - `dev_out.csv` : 525,967
- - `eval_out.csv` : 576,371
+ - `dev_out.csv` : 524,896
+ - `eval_out.csv` : 576,626
 
 ### Splits
 
