@@ -1,6 +1,5 @@
 from collections import defaultdict
 from typing import Dict, Sequence, Tuple
-from ysdc_dataset_api.proto import tags_pb2
 
 import numpy as np
 
@@ -61,9 +60,13 @@ def evaluate_submission_with_proto(
     """
     _check_submission_and_ground_truth(submission, ground_truth)
     metrics = defaultdict(list)
+    gt_map = {
+        (prediction.scene_id, prediction.track_id): prediction
+        for prediction in ground_truth.predictions
+    }
     for i in range(len(submission.predictions)):
         pred = submission.predictions[i]
-        gt = ground_truth.predictions[i]
+        gt = gt_map[(pred.scene_id, pred.track_id)]
         if pred.scene_id != gt.scene_id:
             raise ValueError(f'Check scenes order: {pred.scene_id} != {gt.scene_id}')
         if pred.track_id != gt.track_id:

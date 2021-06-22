@@ -2,7 +2,6 @@ import math
 from typing import List, Union
 
 import numpy as np
-import transforms3d as tf
 
 from ..proto import PedestrianTrack, Scene, VehicleTrack
 
