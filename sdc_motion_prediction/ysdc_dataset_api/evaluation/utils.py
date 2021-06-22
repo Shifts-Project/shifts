@@ -97,7 +97,8 @@ def get_trajectories_weights_arrays(
     given the sequence of WeightedTrajectory protobuf messages.
 
     Args:
-        trajectories (Sequence[WeightedTrajectory]): [description]
+        trajectories (Sequence[WeightedTrajectory]): sequence of protobuf messsages
+            to extract array from
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: trajectories of shape (n_modes, prediction_horizon, 2) and
@@ -153,16 +154,16 @@ def trajectory_array_to_proto(trajectory: np.ndarray) -> Trajectory:
 
 
 def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]) -> int:
-    """Returns
+    """Returns a common number of timestamps for trajectories.
 
     Args:
-        trajectories (Sequence[WeightedTrajectory]): [description]
+        trajectories (Sequence[WeightedTrajectory]): sequence of weighted trajectoies.
 
     Raises:
-        ValueError: [description]
+        ValueError: If any trajectory has deviating number of timestamps.
 
     Returns:
-        int: [description]
+        int: A number of timestamps.
     """
     horizon = len(trajectories[0].trajectory.points)
     if not all(len(w.trajectory.points) == horizon for w in trajectories):
