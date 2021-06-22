@@ -26,7 +26,7 @@ With the configuration parameters specified in the example command above, expect
 
 ### Splits
 
-![alt text](https://github.com/yandex-research/uncertainty-challenge/blob/tabular_experiments/tabular_weather_prediction/data_partitioning/splits.PNG)
+![alt text](https://github.com/yandex-research/uncertainty-challenge/blob/0ee9faa49d25a484c15adc893e174f90c4728d38/tabular_weather_prediction/data_partitioning/splits.PNG)
 
 ### Description
 
