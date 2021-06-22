@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import Dict, Sequence, Tuple
+from ysdc_dataset_api.proto import tags_pb2
 
 import numpy as np
 
@@ -58,9 +59,7 @@ def evaluate_submission_with_proto(
     Returns:
         Dict[str, float]: Mapping from metric name to its aggregated value.
     """
-    if len(submission.predictions) != len(ground_truth.predictions):
-        raise ValueError(f'Check number of submitted predictions: \
-            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+    _check_submission_and_ground_truth(submission, ground_truth)
     metrics = defaultdict(list)
     for i in range(len(submission.predictions)):
         pred = submission.predictions[i]
@@ -179,3 +178,20 @@ def object_prediction_from_model_output(
         object_prediction.weighted_trajectories.append(weighted_trajectory)
     object_prediction.uncertainty_measure = model_output['pred_request_confidence_score']
     return object_prediction
+
+
+def _check_submission_and_ground_truth(
+        submission: Submission,
+        ground_truth: Submission,
+) -> None:
+    if len(submission.predictions) != len(ground_truth.predictions):
+        raise ValueError(f'Check number of submitted predictions: \
+            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+    submission_keys = {(op.scene_id, op.track_id) for op in submission.predictions}
+    gt_keys = {(op.scene_id, op.track_id) for op in ground_truth.predictions}
+    if len(submission_keys) != len(submission.predictions):
+        raise ValueError('Submission has duplicate keys.')
+    if len(gt_keys) != len(ground_truth.predictions):
+        raise ValueError('Ground truth has duplicate keys.')
+    if submission_keys != gt_keys:
+        raise ValueError('Submission and ground truth keys are not identical sets.')
