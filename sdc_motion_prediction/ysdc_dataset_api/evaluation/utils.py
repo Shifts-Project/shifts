@@ -11,6 +11,9 @@ from .metrics import (avg_ade, avg_fde, min_ade, min_fde, top1_ade, top1_fde,
                       weighted_ade, weighted_fde)
 
 
+MAX_NUM_MODES = 25
+
+
 def save_submission_proto(filepath: str, submission: Submission) -> None:
     """Save serialized submission protobuf to file.
 
@@ -72,6 +75,8 @@ def evaluate_submission_with_proto(
         if pred.track_id != gt.track_id:
             raise ValueError(f'Check objects order: {pred.track_id} != {gt.track_id}')
         pred_trajectories, weights = get_trajectories_weights_arrays(pred.weighted_trajectories)
+        pred_trajectories = pred_trajectories[np.argsort(weights)][-MAX_NUM_MODES:]
+        weights = weights[np.argsort(weights)][-MAX_NUM_MODES:]
         gt_trajectory, _ = get_trajectories_weights_arrays(gt.weighted_trajectories)
         metrics['avg_ade'].append(avg_ade(gt_trajectory, pred_trajectories))
         metrics['avg_fde'].append(avg_fde(gt_trajectory, pred_trajectories))
