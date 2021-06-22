@@ -11,6 +11,9 @@ from .metrics import (avg_ade, avg_fde, min_ade, min_fde, top1_ade, top1_fde,
                       weighted_ade, weighted_fde)
 
 
+MAX_NUM_MODES = 25
+
+
 def save_submission_proto(filepath: str, submission: Submission) -> None:
     """Save serialized submission protobuf to file.
 
@@ -58,18 +61,22 @@ def evaluate_submission_with_proto(
     Returns:
         Dict[str, float]: Mapping from metric name to its aggregated value.
     """
-    if len(submission.predictions) != len(ground_truth.predictions):
-        raise ValueError(f'Check number of submitted predictions: \
-            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+    _check_submission_and_ground_truth(submission, ground_truth)
     metrics = defaultdict(list)
+    gt_map = {
+        (prediction.scene_id, prediction.track_id): prediction
+        for prediction in ground_truth.predictions
+    }
     for i in range(len(submission.predictions)):
         pred = submission.predictions[i]
-        gt = ground_truth.predictions[i]
+        gt = gt_map[(pred.scene_id, pred.track_id)]
         if pred.scene_id != gt.scene_id:
             raise ValueError(f'Check scenes order: {pred.scene_id} != {gt.scene_id}')
         if pred.track_id != gt.track_id:
             raise ValueError(f'Check objects order: {pred.track_id} != {gt.track_id}')
         pred_trajectories, weights = get_trajectories_weights_arrays(pred.weighted_trajectories)
+        pred_trajectories = pred_trajectories[np.argsort(weights)][-MAX_NUM_MODES:]
+        weights = weights[np.argsort(weights)][-MAX_NUM_MODES:]
         gt_trajectory, _ = get_trajectories_weights_arrays(gt.weighted_trajectories)
         metrics['avg_ade'].append(avg_ade(gt_trajectory, pred_trajectories))
         metrics['avg_fde'].append(avg_fde(gt_trajectory, pred_trajectories))
@@ -79,6 +86,7 @@ def evaluate_submission_with_proto(
         metrics['top1_fde'].append(top1_fde(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_ade'].append(weighted_ade(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_fde'].append(weighted_fde(gt_trajectory, pred_trajectories, weights))
+        metrics['is_ood'].append(gt.is_ood)
     return metrics
 
 
@@ -89,7 +97,8 @@ def get_trajectories_weights_arrays(
     given the sequence of WeightedTrajectory protobuf messages.
 
     Args:
-        trajectories (Sequence[WeightedTrajectory]): [description]
+        trajectories (Sequence[WeightedTrajectory]): sequence of protobuf messsages
+            to extract array from
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: trajectories of shape (n_modes, prediction_horizon, 2) and
@@ -145,16 +154,16 @@ def trajectory_array_to_proto(trajectory: np.ndarray) -> Trajectory:
 
 
 def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]) -> int:
-    """Returns
+    """Returns a common number of timestamps for trajectories.
 
     Args:
-        trajectories (Sequence[WeightedTrajectory]): [description]
+        trajectories (Sequence[WeightedTrajectory]): sequence of weighted trajectoies.
 
     Raises:
-        ValueError: [description]
+        ValueError: If any trajectory has deviating number of timestamps.
 
     Returns:
-        int: [description]
+        int: A number of timestamps.
     """
     horizon = len(trajectories[0].trajectory.points)
     if not all(len(w.trajectory.points) == horizon for w in trajectories):
@@ -179,3 +188,20 @@ def object_prediction_from_model_output(
         object_prediction.weighted_trajectories.append(weighted_trajectory)
     object_prediction.uncertainty_measure = model_output['pred_request_confidence_score']
     return object_prediction
+
+
+def _check_submission_and_ground_truth(
+        submission: Submission,
+        ground_truth: Submission,
+) -> None:
+    if len(submission.predictions) != len(ground_truth.predictions):
+        raise ValueError(f'Check number of submitted predictions: \
+            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+    submission_keys = {(op.scene_id, op.track_id) for op in submission.predictions}
+    gt_keys = {(op.scene_id, op.track_id) for op in ground_truth.predictions}
+    if len(submission_keys) != len(submission.predictions):
+        raise ValueError('Submission has duplicate keys.')
+    if len(gt_keys) != len(ground_truth.predictions):
+        raise ValueError('Ground truth has duplicate keys.')
+    if submission_keys != gt_keys:
+        raise ValueError('Submission and ground truth keys are not identical sets.')

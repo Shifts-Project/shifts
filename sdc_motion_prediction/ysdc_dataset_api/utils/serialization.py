@@ -39,7 +39,7 @@ def deserialize_numpy(serialized_string: str, decompress: bool = False) -> np.nd
             Defaults to False.
 
     Returns:
-        np.ndarray: [description]
+        np.ndarray: deserialized numpy array
     """
     str = maybe_decompress(serialized_string, decompress)
     buf = io.BytesIO(str)

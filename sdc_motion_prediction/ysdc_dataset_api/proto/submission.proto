@@ -17,6 +17,7 @@ message ObjectPrediction {
     string scene_id = 2;
     repeated WeightedTrajectory weighted_trajectories = 3;
     float uncertainty_measure = 4;
+    bool is_ood = 5;
 }
 
 message Submission {
