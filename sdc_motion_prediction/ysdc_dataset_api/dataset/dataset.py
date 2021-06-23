@@ -38,10 +38,15 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         Dataset iterator performs iteration over scenes in the dataset and individual prediction
         requests in each scene. Iterator yields dict that can have the following structure:
         {
+            'scene_id': str,
+            'track_id': int,
+            'scene_tags': Dict[str, str],
             'ground_truth_trajectory': np.ndarray,
             'prerendered_feature_map': np.ndarray,
             'feature_maps': np.ndarray,
         }.
+        'scene_id' unique scene identifier.
+        'track_id' vehicle id of the current prediction request.
         'ground_truth_trajectory' field is always included, it contains ground truth trajectory for
         the current prediction request.
         'prerendered_feature_map' field would be present if prerendered_dataset_path was specified,
@@ -89,7 +94,6 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         """Number of scenes in the dataset"""
         return len(self._scene_file_paths)
 
-    # @profile
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
         if worker_info is None:
@@ -116,6 +120,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         'ground_truth_trajectory': ground_truth_trajectory,
                         'scene_id': scene.id,
                         'track_id': request.track_id,
+                        'scene_tags': proto_to_dict(scene.scene_tags),
                     }
 
                     if self._prerendered_dataset_path:

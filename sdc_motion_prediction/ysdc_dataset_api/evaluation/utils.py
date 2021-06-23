@@ -174,12 +174,31 @@ def get_prediction_horizon(trajectories: Sequence[WeightedTrajectory]) -> int:
 def object_prediction_from_model_output(
         track_id: int,
         scene_id: str,
-        model_output: Dict[str, np.ndarray]
+        model_output: Dict[str, np.ndarray],
+        is_ood: bool,
 ) -> ObjectPrediction:
+    """Generates an instance of ObjectPrediction proto from scene data and model predictions.
+
+    Args:
+        track_id (int): prediction request id
+        scene_id (str): unique scene id
+        model_output (Dict[str, np.ndarray]): model predictions stored in dict:
+            trajectories with associated weights and scene-level prediction confidence.
+        is_ood (bool): whether the sample is out of domain or not.
+
+    Returns:
+        ObjectPrediction: resulting message instance with fields set.
+    """
     object_prediction = ObjectPrediction()
     object_prediction.track_id = track_id
     object_prediction.scene_id = scene_id
-    assert len(model_output['predictions_list']) == len(model_output['plan_confidence_scores_list'])
+    object_prediction.is_ood = is_ood
+
+    n_trajectories = len(model_output['predictions_list'])
+    n_weights = len(model_output['plan_confidence_scores_list'])
+    if n_trajectories != n_weights:
+        raise ValueError(f'Number of predicted trajectories is not equal to number of weights:'
+                         f'{n_trajectories} != {n_weights}')
     for i in range(len(model_output['predictions_list'])):
         weighted_trajectory = WeightedTrajectory(
             trajectory=trajectory_array_to_proto(model_output['predictions_list'][i]),
@@ -195,8 +214,8 @@ def _check_submission_and_ground_truth(
         ground_truth: Submission,
 ) -> None:
     if len(submission.predictions) != len(ground_truth.predictions):
-        raise ValueError(f'Check number of submitted predictions: \
-            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+        raise ValueError(f'Check number of submitted predictions:'
+                         f'{len(submission.predictions)} != {len(ground_truth.predictions)}')
     submission_keys = {(op.scene_id, op.track_id) for op in submission.predictions}
     gt_keys = {(op.scene_id, op.track_id) for op in ground_truth.predictions}
     if len(submission_keys) != len(submission.predictions):

@@ -75,7 +75,7 @@ def aggregate_prediction_request_losses(
         # predictions of a given request, using normalized
         # per-plan confidence weights as coefficients.
         agg_prediction_loss = np.sum(
-            per_plan_weights * per_plan_losses)
+            per_plan_weights * per_plan_losses, axis=-1)
     else:
         raise NotImplementedError
 
