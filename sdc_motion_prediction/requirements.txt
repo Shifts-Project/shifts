@@ -9,13 +9,8 @@ torchvision>=0.6.0,<1.0.0
 transforms3d
 pandas
 tqdm
-imageio
-pygame
-gym
 absl-py
 wandb
-scikit-learn
-line-profiler
 transformers
 tensorflow
 seaborn
