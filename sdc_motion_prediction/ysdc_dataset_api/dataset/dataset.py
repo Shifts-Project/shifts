@@ -5,7 +5,7 @@ from typing import Callable, List, Union
 import torch
 
 from ..features import FeatureProducerBase
-from ..proto import get_tags_from_request
+from ..proto import get_tags_from_request, proto_to_dict
 from ..utils import (
     get_file_paths,
     get_gt_trajectory,
@@ -34,10 +34,15 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         Dataset iterator performs iteration over scenes in the dataset and individual prediction
         requests in each scene. Iterator yields dict that can have the following structure:
         {
+            'scene_id': str,
+            'track_id': int,
+            'scene_tags': Dict[str, str],
             'ground_truth_trajectory': np.ndarray,
             'prerendered_feature_map': np.ndarray,
             'feature_maps': np.ndarray,
         }.
+        'scene_id' unique scene identifier.
+        'track_id' vehicle id of the current prediction request.
         'ground_truth_trajectory' field is always included, it contains ground truth trajectory for
         the current prediction request.
         'prerendered_feature_map' field would be present if prerendered_dataset_path was specified,
@@ -105,6 +110,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         'ground_truth_trajectory': ground_truth_trajectory,
                         'scene_id': scene.id,
                         'track_id': request.track_id,
+                        'scene_tags': proto_to_dict(scene.scene_tags),
                     }
 
                     if self._prerendered_dataset_path:
