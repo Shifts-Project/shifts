@@ -87,7 +87,7 @@ All protobuf message definitions can be found at [ysdc_dataset_api/proto](ysdc_d
 
 ## Baselines
 
-We provide ensemble-based baselines for the Motion Prediction Task using the Robust Imitative Planning ensembling approach, and two "backbone" ensemble variants:
+We provide ensemble-based baselines for the Motion Prediction Task using the Robust Imitative Planning ensembling approach, and two "backbone" variants for ensemble members:
 * Behavioral Cloning: MobileNetV2 encoder, GRU decoder
 * Deep Imitative Model: MobileNetV2 encoder, autoregressive flow decoder
 
@@ -137,7 +137,7 @@ For example, to train a Behavioral Cloning agent with no teacher forcing (which 
 python run.py --model_name bc --data_use_prerendered True --bc_generation_mode sampling
 ```
 
-See `oatomobile.torch.baselines` for the baseline implementations.
+See [sdc/oatomobile/torch/baselines](sdc/oatomobile/torch/baselines) for the baseline implementations.
 
 We can train K different ensemble members by sweeping over the `--torch_seed` parameter.
  
