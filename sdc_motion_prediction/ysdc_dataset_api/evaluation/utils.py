@@ -1,5 +1,5 @@
 from collections import defaultdict
-from typing import Callable, Dict, NewType, Sequence, Tuple
+from typing import Dict, Sequence, Tuple
 
 import numpy as np
 
@@ -197,8 +197,8 @@ def object_prediction_from_model_output(
     n_trajectories = len(model_output['predictions_list'])
     n_weights = len(model_output['plan_confidence_scores_list'])
     if n_trajectories != n_weights:
-        raise ValueError(f'Number of predicted trajectories is not equal to number of weights: \
-            {n_trajectories} != {n_weights}')
+        raise ValueError(f'Number of predicted trajectories is not equal to number of weights:'
+                         f'{n_trajectories} != {n_weights}')
     for i in range(len(model_output['predictions_list'])):
         weighted_trajectory = WeightedTrajectory(
             trajectory=trajectory_array_to_proto(model_output['predictions_list'][i]),
@@ -214,8 +214,8 @@ def _check_submission_and_ground_truth(
         ground_truth: Submission,
 ) -> None:
     if len(submission.predictions) != len(ground_truth.predictions):
-        raise ValueError(f'Check number of submitted predictions: \
-            {len(submission.predictions)} != {len(ground_truth.predictions)}')
+        raise ValueError(f'Check number of submitted predictions:'
+                         f'{len(submission.predictions)} != {len(ground_truth.predictions)}')
     submission_keys = {(op.scene_id, op.track_id) for op in submission.predictions}
     gt_keys = {(op.scene_id, op.track_id) for op in ground_truth.predictions}
     if len(submission_keys) != len(submission.predictions):
