@@ -59,4 +59,4 @@ Same as `eval_in.csv` with meta data (first 6 features including climate type) r
 Same as `dev_out.csv` with meta data (first 6 features including climate type) removed.
 
 #### 9. `eval_out_no_meta.csv`
-Same as `eval_out.csv` with meta data (first 5 features) removed.
+Same as `eval_out.csv` with meta data (first 6 features including climate type) removed.
