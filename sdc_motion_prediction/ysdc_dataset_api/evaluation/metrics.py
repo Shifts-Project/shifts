@@ -58,13 +58,13 @@ def top1_fde(ground_truth, predicted, weights):
 def weighted_ade(ground_truth, predicted, weights):
     weights = _softmax_normalize(weights)
     ade = average_displacement_error(ground_truth, predicted) * weights
-    return np.mean(ade, axis=-1)
+    return np.sum(ade, axis=-1)
 
 
 def weighted_fde(ground_truth, predicted, weights):
     weights = _softmax_normalize(weights)
     fde = final_displacement_error(ground_truth, predicted) * weights
-    return np.mean(fde, axis=-1)
+    return np.sum(fde, axis=-1)
 
 
 def _assert_weights_non_negative(weights: np.ndarray):
