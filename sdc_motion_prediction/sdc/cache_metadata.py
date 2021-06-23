@@ -4,19 +4,22 @@ from collections import defaultdict
 from typing import Text, Mapping, List, Union
 
 import pandas as pd
-import torch
+from scipy.special import softmax
+import numpy as np
 
 from sdc.constants import (
     VALID_TRAJECTORY_TAGS, SCENE_TAG_TYPE_TO_OPTIONS,
     VALID_BASE_METRICS, VALID_AGGREGATORS)
 from sdc.metrics import SDCLoss
+from ysdc_dataset_api.evaluation.metrics import compute_all_aggregator_metrics
+from functools import partial
 
 
 class MetadataCache:
     def __init__(self, full_model_name, c):
         self.full_model_name = full_model_name
         self.c = c
-        self.softmax = torch.nn.Softmax(dim=0)
+        self.softmax = partial(softmax, dim=0)
 
         # ** Caching Full Results **
         # Done if we wish to perform post-hoc analyses of model predictions
@@ -43,6 +46,8 @@ class MetadataCache:
         self.scene_ids = []
         self.request_ids = []
 
+        # Specify per-prediction request attributes that will need to be
+        # aggregated (because they are cached per batch)
         # Don't include 'scene_ids', which is already aggregated
         self.request_attributes = [
             'pred_request_confidence_scores',
@@ -71,48 +76,41 @@ class MetadataCache:
 
     def collect_batch_stats(
         self,
-        predictions: torch.Tensor,
-        batch: Mapping[str, Union[torch.Tensor, List[Text]]],
-        pred_request_confidence_scores: torch.Tensor,
-        plan_confidence_scores: torch.Tensor,
+        predictions: np.ndarray,
+        batch: Mapping[str, Union[np.ndarray, List[Text]]],
+        pred_request_confidence_scores: np.ndarray,
+        plan_confidence_scores: np.ndarray,
     ):
         # TODO: support for varying # plans per prediction request
-        # TODO: switch all to numpy arrs
         for obj in [predictions, plan_confidence_scores,
                     pred_request_confidence_scores]:
-            if not isinstance(obj, torch.Tensor):
+            if not isinstance(obj, np.ndarray):
                 raise NotImplementedError
 
-        # Cache predictions + ground truth
-        # self.predictions.append(predictions)
-        #
-        ground_truth = batch['ground_truth_trajectory']
-        # self.ground_truth_trajectories.append(ground_truth)
-
         # Cache losses
-        metrics_dict = SDCLoss.compute_all_aggregator_metrics(
+        ground_truth = batch['ground_truth_trajectory']
+        metrics_dict = compute_all_aggregator_metrics(
             per_plan_confidences=plan_confidence_scores,
             predictions=predictions,
             ground_truth=ground_truth)
         for metrics_key, losses in metrics_dict.items():
             metric_attr = getattr(self, metrics_key)
-            metric_attr.append(losses.detach().cpu())
+            metric_attr.append(losses)
 
         # Cache confidence estimates
         self.pred_request_confidence_scores.append(
-            pred_request_confidence_scores.detach().cpu())
-        # self.plan_confidence_scores.append(plan_confidence_scores)
+            pred_request_confidence_scores)
 
         # Cache scene and request IDs
         batch_scene_ids = batch['scene_id']  # type: List[Text]
-        batch_request_ids = batch['request_id']
         self.scene_ids += batch_scene_ids
-        self.request_ids.append(batch_request_ids.detach().cpu())
+        batch_request_ids = batch['request_id']
+        self.request_ids.append(batch_request_ids)
 
         # Cache scene tags
         for batch_index, scene_id in enumerate(batch_scene_ids):
             self.scene_id_to_num_vehicles[
-                scene_id] = batch['num_vehicles'][batch_index].item()
+                scene_id] = batch['num_vehicles'][batch_index]
 
         for scene_tag_type in SCENE_TAG_TYPE_TO_OPTIONS.keys():
             scene_tag_options = SCENE_TAG_TYPE_TO_OPTIONS[scene_tag_type]
@@ -121,7 +119,7 @@ class MetadataCache:
                 scene_id_to_scene_tag_option = getattr(self, option_key)
                 for batch_index, scene_id in enumerate(batch_scene_ids):
                     scene_id_to_scene_tag_option[scene_id] = batch[
-                        option_key][batch_index].detach().cpu()
+                        option_key][batch_index]
 
         # Cache trajectory tags
         for trajectory_tag in VALID_TRAJECTORY_TAGS:
@@ -139,9 +137,8 @@ class MetadataCache:
                     f'Request attribute not found: {request_attribute}')
             assert isinstance(request_attribute, list)
             assert len(request_attribute) > 0
-            if isinstance(request_attribute[0], torch.Tensor):
-                cat_attr = torch.cat(
-                        request_attribute, dim=0).numpy()
+            if isinstance(request_attribute[0], np.ndarray):
+                cat_attr = np.concatenate(request_attribute, axis=0)
                 request_data[request_attribute_name] = cat_attr
 
         request_data['scene_ids'] = self.scene_ids
@@ -160,8 +157,7 @@ class MetadataCache:
                 attr_key = f'{scene_tag_type}__{scene_tag_option}'
                 scene_id_to_attr = getattr(self, attr_key)
                 for scene_id in sorted_scene_ids:
-                    scene_data[attr_key].append(
-                        scene_id_to_attr[scene_id].numpy())
+                    scene_data[attr_key].append(scene_id_to_attr[scene_id])
 
         scene_data['scene_ids'] = sorted_scene_ids
 

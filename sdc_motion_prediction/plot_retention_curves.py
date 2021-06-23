@@ -6,6 +6,7 @@ Script adapted from Uncertainty Baselines project,
 """
 
 import os
+from itertools import product
 from typing import Optional
 
 import matplotlib.pyplot as plt
@@ -14,7 +15,6 @@ import pandas as pd
 from absl import app
 from absl import flags
 from absl import logging
-from itertools import product
 
 # Data load / output flags.
 flags.DEFINE_string(
@@ -44,7 +44,7 @@ def get_plotting_style_metric_name(metric_name):
 def construct_model_name_helper(model_prefix, full_name, auc_mean, auc_std):
     auc_mean = np.round_(auc_mean, 2).item()
     auc_std = np.round_(auc_std, 2).item()
-    if model_prefix is not None:
+    if model_prefix != 'Default':
         full_name = f'{model_prefix} | {full_name}'
     return f'{full_name} [AUC: {auc_mean} ± {auc_std}]'
 

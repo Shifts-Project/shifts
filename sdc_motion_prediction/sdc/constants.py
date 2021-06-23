@@ -10,14 +10,14 @@ SCENE_TAG_TYPE_TO_OPTIONS = {
     'sun_phase': ['kAstronomicalNight', 'kTwilight', 'kDaylight'],
     'precipitation': ['kNoPrecipitation', 'kRain', 'kSleet', 'kSnow']
 }
-VALID_AGGREGATORS = {'min', 'mean', 'max', 'confidence-weight'}
+VALID_AGGREGATORS = {'min', 'avg', 'top1', 'weighted'}
 VALID_BASE_METRICS = {'ade', 'fde'}
 SPLIT_TO_PB_DATASET_PATH = {  # Protobufs (unrendered)
     'train': '/train_pb/',
     'validation': '/validation_pb/',
     'test': '/test_pb/'
 }
-SPLIT_TO_RENDERED_DATASET_PATH = {  # np.arrays (rendered)
+SPLIT_TO_RENDERED_DATASET_PATH = {  # np.ndarrays (rendered)
     'train': '/train_rendered/',
     'validation': '/validation_rendered/',
     'test': '/test_rendered/'

@@ -18,6 +18,8 @@ from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
     load_rip_checkpoints)
 from sdc.oatomobile.torch.savers import Checkpointer
 from sdc.oatomobile.utils.loggers.wandb import WandbLogger
+from sdc.oatomobile.torch.utils import (
+    safe_torch_to_float, safe_torch_to_numpy)
 
 
 def count_parameters(model):
@@ -108,11 +110,9 @@ def train(c):
         'model': model,
         'optimizer': optimizer,
         'clip': clip_gradients,
-        'sdc_loss': sdc_loss
     }
     evaluate_args = {
         'model': model,
-        'sdc_loss': sdc_loss
     }
 
     if c.tb_logging:
@@ -128,6 +128,7 @@ def train(c):
     if is_rip:
         train_args['metadata_cache'] = metadata_cache
         evaluate_args['metadata_cache'] = metadata_cache
+        evaluate_args['sdc_loss'] = sdc_loss
 
     # if model_name == 'dim':
         # noise_level = c.dim_noise_level
@@ -142,7 +143,6 @@ def train(c):
     #     ).log_prob(
     #         torch.zeros(output_shape[-2] * output_shape[-1])))
 
-    # @profile
     def train_epoch(
             dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
         """
@@ -231,10 +231,10 @@ def train(c):
         writer.log(
             dataset_name=dataset_name,
             loss_dict=loss_dict,
-            overhead_features=batch["feature_maps"].detach().cpu().numpy()[:8],
-            predictions=predictions.detach().cpu().numpy()[:8],
-            ground_truth=batch[
-                "ground_truth_trajectory"].detach().cpu().numpy()[:8],
+            overhead_features=safe_torch_to_numpy(batch["feature_maps"])[:8],
+            predictions=safe_torch_to_numpy(predictions)[:8],
+            ground_truth=safe_torch_to_numpy(
+                batch["ground_truth_trajectory"])[:8],
             global_step=epoch,
         )
 
@@ -273,8 +273,8 @@ def train(c):
 
                 for loss_key, loss_value in loss_train_dict.items():
                     epoch_loss_dict['train'][
-                        f'{dataset_key}__{loss_key}'] = (
-                        loss_value.detach().cpu().numpy().item())
+                        f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
+                        loss_value)
                 if c.tb_logging:
                     write(model, train_dataloader, writer, dataset_key,
                           loss_train_dict, epoch)
@@ -285,8 +285,8 @@ def train(c):
                 for loss_key, loss_value in loss_val_dict.items():
                     epoch_loss_dict[
                         'validation'][
-                        f'{dataset_key}__{loss_key}'] = (
-                        loss_value.detach().cpu().numpy().item())
+                        f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
+                        loss_value)
 
                 if c.tb_logging:
                     write(model, dataloader_val, writer, dataset_key,
@@ -301,7 +301,7 @@ def train(c):
                     for loss_key, loss_value in loss_test_dict.items():
                         epoch_loss_dict[
                             'test'][f'{dataset_key}__{loss_key}'] = (
-                            loss_value.detach().cpu().numpy().item())
+                            safe_torch_to_float(loss_value))
                     if c.tb_logging:
                         write(model, dataloader_test, writer, dataset_key,
                               loss_test_dict, epoch)

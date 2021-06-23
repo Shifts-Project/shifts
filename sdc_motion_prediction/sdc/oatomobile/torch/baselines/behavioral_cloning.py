@@ -29,7 +29,9 @@ import torch.optim as optim
 
 from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
-
+from ysdc_dataset_api.evaluation.metrics import (
+    average_displacement_error_torch, final_displacement_error_torch,
+    batch_mean_metric_torch)
 
 class BehaviouralModel(nn.Module):
     """A `PyTorch` implementation of a behavioural cloning model."""
@@ -282,7 +284,6 @@ class BehaviouralModel(nn.Module):
 
 
 def train_step_bc(
-    sdc_loss: SDCLoss,
     model: BehaviouralModel,
     optimizer: optim.Optimizer,
     batch: Mapping[str, torch.Tensor],
@@ -297,8 +298,8 @@ def train_step_bc(
 
         # Compute ADE loss
         y = batch["ground_truth_trajectory"]
-        ade = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.average_displacement_error,
+        ade = batch_mean_metric_torch(
+            base_metric=average_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
 
@@ -313,10 +314,11 @@ def train_step_bc(
         optimizer.step()
 
         # Calculates other losses.
-        fde = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.final_displacement_error,
+        fde = batch_mean_metric_torch(
+            base_metric=final_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
+
         loss_dict = {
             'ade': ade.detach(),
             'fde': fde.detach()}
@@ -340,12 +342,12 @@ def train_step_bc(
         optimizer.step()
 
         # Calculates other losses.
-        ade = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.average_displacement_error,
+        ade = batch_mean_metric_torch(
+            base_metric=average_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
-        fde = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.final_displacement_error,
+        fde = batch_mean_metric_torch(
+            base_metric=final_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
         loss_dict = {
@@ -357,7 +359,6 @@ def train_step_bc(
 
 
 def evaluate_step_bc(
-    sdc_loss: SDCLoss,
     model: BehaviouralModel,
     batch: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
@@ -369,12 +370,12 @@ def evaluate_step_bc(
         y = batch["ground_truth_trajectory"]
 
         # Calculates other losses.
-        ade = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.average_displacement_error,
+        ade = batch_mean_metric_torch(
+            base_metric=average_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
-        fde = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.final_displacement_error,
+        fde = batch_mean_metric_torch(
+            base_metric=final_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
         loss_dict = {
@@ -390,12 +391,12 @@ def evaluate_step_bc(
         nll = -torch.mean(log_likelihood)
 
         # Calculates other losses.
-        ade = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.average_displacement_error,
+        ade = batch_mean_metric_torch(
+            base_metric=average_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
-        fde = sdc_loss.batch_mean_metric(
-            base_metric=sdc_loss.final_displacement_error,
+        fde = batch_mean_metric_torch(
+            base_metric=final_displacement_error_torch,
             predictions=predictions,
             ground_truth=y)
         loss_dict = {

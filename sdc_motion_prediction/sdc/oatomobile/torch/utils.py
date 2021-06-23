@@ -15,17 +15,25 @@
 """Utilities for nested data structures involving NumPy and PyTorch."""
 
 import torch
-import torch.nn.functional as F
-import tree
-
-from oatomobile.torch import types
+import numpy as np
 
 
-def add_batch_dim(nest: types.NestedArray) -> types.NestedTensor:
-  """Adds a batch dimension to each leaf of a nested structure of Tensors."""
-  return tree.map_structure(lambda x: x.unsqueeze(dim=0), nest)
+def safe_torch_to_float(val):
+    if isinstance(val, float):
+        return val
+    elif isinstance(val, torch.Tensor):
+        return val.detach().cpu().numpy().item(0)
+    else:
+        raise ValueError(
+            f'val is neither or type `float` nor `torch.Tensor`: {type(val)}')
 
 
-def squeeze_batch_dim(nest: types.Array) -> types.NestedTensor:
-  """Squeezes out a batch dimension from each leaf of a nested structure."""
-  return tree.map_structure(lambda x: x.squeeze(dim=0), nest)
+def safe_torch_to_numpy(val):
+    if isinstance(val, np.ndarray):
+        return val
+    elif isinstance(val, torch.Tensor):
+        return val.detach().cpu().numpy()
+    else:
+        raise ValueError(
+            f'val is neither or type `np.ndarray` nor `torch.Tensor`: '
+            f'{type(val)}')

@@ -15,7 +15,7 @@
 """Implements the robust imitative planning agent."""
 
 import os
-from typing import Mapping, Union, Sequence, Tuple, Optional
+from typing import Mapping, Union, Sequence, Tuple, Optional, Dict
 
 import torch
 
@@ -172,14 +172,23 @@ class RIPAgent:
 def evaluate_step_rip(
     sdc_loss: SDCLoss,
     model: RIPAgent,
-    batch: Mapping[str, torch.Tensor],
+    batch: Dict[str, torch.Tensor],
     metadata_cache: Optional[MetadataCache],
     **kwargs
 ):
     model.eval()
     predictions, plan_confidence_scores, pred_request_confidence_scores = (
         model(**batch))
+
+    for key, attr in batch.items():
+        if isinstance(attr, torch.Tensor):
+            batch[key] = attr.detach().cpu().numpy()
+
     ground_truth = batch['ground_truth_trajectory']
+    predictions = predictions.detach().cpu().numpy()
+    plan_confidence_scores = plan_confidence_scores.detach().cpu().numpy()
+    pred_request_confidence_scores = (
+        pred_request_confidence_scores.detach().cpu().numpy())
 
     if metadata_cache is not None:
         # Just store predictions and ground truths, we will later load these
@@ -210,7 +219,6 @@ def load_rip_checkpoints(
             f'for your convenience.\n.')
 
     # Load RIP ensemble members from checkpoint dir
-
     checkpoint_file_names = os.listdir(checkpoint_dir)
 
     models_loaded = 0

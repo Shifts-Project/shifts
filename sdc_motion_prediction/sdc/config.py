@@ -96,7 +96,7 @@ def build_parser():
     parser.add_argument(
         '--exp_lr', type=float, default=1e-3)
     parser.add_argument(
-        '--exp_num_lr_warmup_epochs', type=int, default=10)
+        '--exp_num_lr_warmup_epochs', type=int, default=1)
     parser.add_argument(
         '--exp_batch_size', type=int, default=512)
     parser.add_argument(
@@ -126,7 +126,7 @@ def build_parser():
         help="The backbone model. See "
              "sdc/oatomobile/torch/baselines/__init__.py.")
     parser.add_argument(
-        '--model_prefix', type=str, default=None,
+        '--model_prefix', type=str, default='Default',
         help="Used for logging/plotting purposes for RIP. Specify a prefix "
              "which will appear before the model (e.g., "
              "`Trained on Partial Data`).")
@@ -135,7 +135,7 @@ def build_parser():
         help="Optionally specify the name of the subdirectory to "
              "which we checkpoint.")
     parser.add_argument(
-        '--model_dim_hidden', type=int, default=128,
+        '--model_dim_hidden', type=int, default=512,
         help="Number of hidden dims, generally the size "
              "of the embedding passed from the vision model "
              "(e.g., MobileNetV2) to the autoregressive "

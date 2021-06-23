@@ -20,9 +20,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.networks.perception import MobileNetV2
 from sdc.oatomobile.torch.networks.sequence import AutoregressiveFlow
+from ysdc_dataset_api.evaluation.metrics import (
+    average_displacement_error_torch, final_displacement_error_torch,
+    batch_mean_metric_torch)
 
 
 class ImitativeModel(nn.Module):
@@ -131,7 +133,6 @@ class ImitativeModel(nn.Module):
 
 
 def train_step_dim(
-    sdc_loss: SDCLoss,
     model: ImitativeModel,
     optimizer: optim.Optimizer,
     batch: Mapping[str, torch.Tensor],
@@ -164,14 +165,14 @@ def train_step_dim(
     optimizer.step()
 
     # Compute additional metrics.
-    ade = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.average_displacement_error,
+    ade = batch_mean_metric_torch(
+        base_metric=average_displacement_error_torch,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.final_displacement_error,
+        ground_truth=y)
+    fde = batch_mean_metric_torch(
+        base_metric=final_displacement_error_torch,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+        ground_truth=y)
     loss_dict = {
         'nll': loss.detach(),
         'ade': ade.detach(),
@@ -181,7 +182,6 @@ def train_step_dim(
 
 
 def evaluate_step_dim(
-    sdc_loss: SDCLoss,
     model: ImitativeModel,
     batch: Mapping[str, torch.Tensor],
 ) -> Mapping[str, torch.Tensor]:
@@ -190,21 +190,22 @@ def evaluate_step_dim(
     # Stores the contextual encoding in model._z
     predictions = model.forward(**batch)
 
-    _, log_prob, logabsdet = model._flow._inverse(
-        y=batch["ground_truth_trajectory"], z=model._z)
+    y = batch["ground_truth_trajectory"]
+
+    _, log_prob, logabsdet = model._flow._inverse(y=y, z=model._z)
 
     # Calculates NLL.
     nll = -torch.mean(log_prob - logabsdet, dim=0)
 
     # Compute additional metrics.
-    ade = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.average_displacement_error,
+    ade = batch_mean_metric_torch(
+        base_metric=average_displacement_error_torch,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
-    fde = sdc_loss.batch_mean_metric(
-        base_metric=sdc_loss.final_displacement_error,
+        ground_truth=y)
+    fde = batch_mean_metric_torch(
+        base_metric=final_displacement_error_torch,
         predictions=predictions,
-        ground_truth=batch["ground_truth_trajectory"])
+        ground_truth=y)
     loss_dict = {
         'nll': nll.detach(),
         'ade': ade.detach(),
