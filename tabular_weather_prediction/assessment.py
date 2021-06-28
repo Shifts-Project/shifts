@@ -8,7 +8,6 @@ import seaborn as sns
 sns.set()
 sns.set(font_scale=1.25)
 
-
 import numpy as np
 import seaborn as sns
 
@@ -16,6 +15,7 @@ from sklearn.metrics import *
 from sklearn.utils.multiclass import type_of_target
 from sklearn.utils import check_consistent_length, column_or_1d, check_array, assert_all_finite
 from sklearn.utils.extmath import stable_cumsum
+
 
 def calc_uncertainty_regection_curve(errors, uncertainty, group_by_uncertainty=True):
     n_objects = errors.shape[0]
@@ -133,9 +133,6 @@ def ens_rmse(target, preds, epsilon=1e-8, raw=False):
     return calc_rmse(avg_mean, target)
 
 
-
-
-
 def _check_pos_label_consistency(pos_label, y_true):
     # ensure binary classification if pos_label is not specified
     # classes.dtype.kind in ('O', 'U', 'S') is required to avoid
@@ -229,10 +226,21 @@ def acceptable_error(errors, threshold):
     return np.asarray(errors <= threshold, dtype=np.float32)
 
 
-def calc_fbeta_regection_curve(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True):
+def calc_fbeta_regection_curve(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True, eps=1e-10):
     ae = acceptable_error(errors, threshold)
     pr, rec, _ = precision_recall_curve_retention(ae, -uncertainty)
     pr = np.asarray(pr)
     rec = np.asarray(rec)
-    f_scores = (1 + beta ** 2) * pr * rec / (pr * beta ** 2 + rec)
+    f_scores = (1 + beta ** 2) * pr * rec / (pr * beta ** 2 + rec + eps)
+
     return f_scores, pr, rec
+
+
+def f_beta_metrics(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True):
+    f_scores, pr, rec = calc_fbeta_regection_curve(errors, uncertainty, threshold, beta)
+    ret = np.arange(pr.shape[0]) / pr.shape[0]
+
+    f_auc = auc(ret[::-1], f_scores)
+    f95 = f_scores[::-1][np.int(0.95 * pr.shape[0])]
+    return f_auc, f95
+
