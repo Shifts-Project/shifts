@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x10submission.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\"6\n\nTrajectory\x12(\n\x06points\x18\x01 \x03(\x0b\x32\x18.neurips_dataset.Vector3\"U\n\x12WeightedTrajectory\x12/\n\ntrajectory\x18\x01 \x01(\x0b\x32\x1b.neurips_dataset.Trajectory\x12\x0e\n\x06weight\x18\x02 \x01(\x02\"\x97\x01\n\x10ObjectPrediction\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12\x10\n\x08scene_id\x18\x02 \x01(\t\x12\x42\n\x15weighted_trajectories\x18\x03 \x03(\x0b\x32#.neurips_dataset.WeightedTrajectory\x12\x1b\n\x13uncertainty_measure\x18\x04 \x01(\x02\"D\n\nSubmission\x12\x36\n\x0bpredictions\x18\x01 \x03(\x0b\x32!.neurips_dataset.ObjectPredictionb\x06proto3'
+  serialized_pb=b'\n\x10submission.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\"6\n\nTrajectory\x12(\n\x06points\x18\x01 \x03(\x0b\x32\x18.neurips_dataset.Vector3\"U\n\x12WeightedTrajectory\x12/\n\ntrajectory\x18\x01 \x01(\x0b\x32\x1b.neurips_dataset.Trajectory\x12\x0e\n\x06weight\x18\x02 \x01(\x02\"\xa7\x01\n\x10ObjectPrediction\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12\x10\n\x08scene_id\x18\x02 \x01(\t\x12\x42\n\x15weighted_trajectories\x18\x03 \x03(\x0b\x32#.neurips_dataset.WeightedTrajectory\x12\x1b\n\x13uncertainty_measure\x18\x04 \x01(\x02\x12\x0e\n\x06is_ood\x18\x05 \x01(\x08\"D\n\nSubmission\x12\x36\n\x0bpredictions\x18\x01 \x03(\x0b\x32!.neurips_dataset.ObjectPredictionb\x06proto3'
   ,
   dependencies=[geom__pb2.DESCRIPTOR,])
 
@@ -134,6 +134,13 @@ _OBJECTPREDICTION = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='is_ood', full_name='neurips_dataset.ObjectPrediction.is_ood', index=4,
+      number=5, type=8, cpp_type=7, label=1,
+      has_default_value=False, default_value=False,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -147,7 +154,7 @@ _OBJECTPREDICTION = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=193,
-  serialized_end=344,
+  serialized_end=360,
 )
 
 
@@ -178,8 +185,8 @@ _SUBMISSION = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=346,
-  serialized_end=414,
+  serialized_start=362,
+  serialized_end=430,
 )
 
 _TRAJECTORY.fields_by_name['points'].message_type = geom__pb2._VECTOR3
