@@ -45,7 +45,7 @@ Evaluation data from the same domain in time and climate as of the `train.csv` d
 Data distributionally shifted in time and climate from `train.csv`.
 
 #### 5. `eval_out.csv`
-Data further distributionally shifted in climate and different time frame from train.csv and dev_out.csv. Can be configured to have overlap in climates with dev_out.csv. <br /><br />
+Data further distributionally shifted in climate and different time frame from `train.csv` and `dev_out.csv`. Can be configured to have overlap in climates with `dev_out.csv`. <br /><br />
 
 If `no_meta == 'yes'`, a further 4 files will be generated:
 
