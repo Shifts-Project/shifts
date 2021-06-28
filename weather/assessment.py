@@ -1,19 +1,9 @@
 import pandas as pd
-
-import matplotlib
-
-matplotlib.use('agg')
-import seaborn as sns
-
-sns.set()
-sns.set(font_scale=1.25)
-
 import numpy as np
-import seaborn as sns
 
 from sklearn.metrics import *
 from sklearn.utils.multiclass import type_of_target
-from sklearn.utils import check_consistent_length, column_or_1d, check_array, assert_all_finite
+from sklearn.utils import check_consistent_length, column_or_1d, assert_all_finite
 from sklearn.utils.extmath import stable_cumsum
 
 
@@ -243,4 +233,3 @@ def f_beta_metrics(errors, uncertainty, threshold, beta=1.0, group_by_uncertaint
     f_auc = auc(ret[::-1], f_scores)
     f95 = f_scores[::-1][np.int(0.95 * pr.shape[0])]
     return f_auc, f95
-
