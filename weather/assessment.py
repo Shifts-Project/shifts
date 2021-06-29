@@ -195,8 +195,8 @@ def _binary_clf_curve_ret(y_true, y_score, pos_label=None, sample_weight=None):
     return fps, tps, y_score  # [threshold_idxs]
 
 
-def precision_recall_curve_retention(y_true, probas_pred, *, pos_label=None,
-                                     sample_weight=None):
+def _precision_recall_curve_retention(y_true, probas_pred, *, pos_label=None,
+                                      sample_weight=None):
     fps, tps, thresholds = _binary_clf_curve_ret(y_true, probas_pred,
                                                  pos_label=pos_label,
                                                  sample_weight=sample_weight)
@@ -212,13 +212,13 @@ def precision_recall_curve_retention(y_true, probas_pred, *, pos_label=None,
     return np.r_[precision[sl], 1], np.r_[recall[sl], 0], thresholds[sl]
 
 
-def acceptable_error(errors, threshold):
+def _acceptable_error(errors, threshold):
     return np.asarray(errors <= threshold, dtype=np.float32)
 
 
-def calc_fbeta_regection_curve(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True, eps=1e-10):
-    ae = acceptable_error(errors, threshold)
-    pr, rec, _ = precision_recall_curve_retention(ae, -uncertainty)
+def _calc_fbeta_regection_curve(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True, eps=1e-10):
+    ae = _acceptable_error(errors, threshold)
+    pr, rec, _ = _precision_recall_curve_retention(ae, -uncertainty)
     pr = np.asarray(pr)
     rec = np.asarray(rec)
     f_scores = (1 + beta ** 2) * pr * rec / (pr * beta ** 2 + rec + eps)
@@ -226,10 +226,19 @@ def calc_fbeta_regection_curve(errors, uncertainty, threshold, beta=1.0, group_b
     return f_scores, pr, rec
 
 
-def f_beta_metrics(errors, uncertainty, threshold, beta=1.0, group_by_uncertainty=True):
-    f_scores, pr, rec = calc_fbeta_regection_curve(errors, uncertainty, threshold, beta)
+def f_beta_metrics(errors, uncertainty, threshold, beta=1.0):
+    """
+
+    :param errors: Per sample errors - array [n_samples]
+    :param uncertainty: Uncertainties associated with each prediction. rray [n_samples]
+    :param threshold: The error threshold below which we consider the prediction acceptable
+    :param beta: The beta value for the F_beta metric. Defaults to 1
+    :return: fbeta_auc, fbeta_95, retention
+    """
+    f_scores, pr, rec = _calc_fbeta_regection_curve(errors, uncertainty, threshold, beta)
     ret = np.arange(pr.shape[0]) / pr.shape[0]
 
     f_auc = auc(ret[::-1], f_scores)
     f95 = f_scores[::-1][np.int(0.95 * pr.shape[0])]
-    return f_auc, f95
+
+    return f_auc, f95, ret[::-1]
