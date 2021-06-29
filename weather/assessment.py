@@ -236,6 +236,7 @@ def f_beta_metrics(errors, uncertainty, threshold, beta=1.0):
     :return: fbeta_auc, fbeta_95, retention
     """
     f_scores, pr, rec = _calc_fbeta_regection_curve(errors, uncertainty, threshold, beta)
+    ret = np.arange(pr.shape[0]) / pr.shape[0]
 
     f_auc = auc(ret[::-1], f_scores)
     f95 = f_scores[::-1][np.int(0.95 * pr.shape[0])]
