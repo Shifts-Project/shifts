@@ -18,10 +18,10 @@ Generate files:
 `train.csv` `dev_in.csv` `eval_in.csv` `dev_out.csv` `eval_out.csv` `dev_in_no_meta.csv` `eval_in_no_meta.csv` `dev_out_no_meta.csv` `eval_out_no_meta.csv`
 
 With the configuration parameters specified in the example command above, expect the following file sizes:
- - `train.csv`: 2,618,488
- - `dev_in.csv` : 561,104
+ - `train.csv`: 
+ - `dev_in.csv` : 
  - `eval_in.csv` : 561,105
- - `dev_out.csv` : 524,896
+ - `dev_out.csv` : 
  - `eval_out.csv` : 576,626
 
 ### Splits
