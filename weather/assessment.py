@@ -73,7 +73,7 @@ def prr_regression(targets, preds, measure):
 
 def ood_detect(domain_labels, in_measure, out_measure, mode='ROC', pos_label=1):
     scores = np.concatenate((in_measure, out_measure), axis=0)
-    scores = np.asarray(scores, dtype=np.float128)
+    scores = np.asarray(scores)
     if pos_label != 1:
         scores *= -1.0
 
