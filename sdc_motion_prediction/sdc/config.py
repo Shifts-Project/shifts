@@ -225,6 +225,14 @@ def build_parser():
              'non-retained points. This is analogous to the AV agent working '
              'with a human that can perform optimally when given control. '
              'Also reduces variance issues for low retention thresholds.')
+    parser.add_argument(
+        '--fbeta_threshold', type=float,
+        default=1.0,
+        help='The error threshold below which we consider the prediction '
+             'acceptable.')
+    parser.add_argument(
+        '--fbeta_beta', type=float,
+        default=1.0, help='The beta value for the F_beta metric.')
 
     ###########################################################################
     # #### Debug ##############################################################

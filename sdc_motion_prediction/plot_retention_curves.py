@@ -50,21 +50,25 @@ def construct_model_name_helper(model_prefix, full_name, auc_mean, auc_std):
 
 
 def get_plotting_style_model_name(model_prefix, model_name, auc_mean, auc_std):
-    if model_name in ['Optimal', 'Random']:
-        return construct_model_name_helper(
-            model_prefix, model_name, auc_mean, auc_std)
-
-    model_class, backbone_name, k_details, plan_algo, scene_algo = (
-        model_name.split('-'))
+    (model_class, backbone_name, k_details, plan_algo,
+        scene_algo, rand_or_opt) = model_name.split('-')
     k = k_details.split('_')[-1]
-    if model_class != 'rip' or backbone_name != 'dim':
+    if model_class != 'rip':
         raise NotImplementedError
     plan_algo = plan_algo.split('_')[-1]
     scene_algo = scene_algo.split('_')[-1]
+
+    if rand_or_opt:
+        model_name = (
+            f'RIP (K={k}, Plan {plan_algo.upper()}, '
+            f'Scene {scene_algo.upper()}) {rand_or_opt}')
+    else:
+        model_name = (
+            f'RIP (K={k}, Plan {plan_algo.upper()}, '
+            f'Scene {scene_algo.upper()})')
+
     return construct_model_name_helper(
-        model_prefix,
-        f'RIP (K={k}, Plan {plan_algo.upper()}, Scene {scene_algo.upper()})',
-        auc_mean, auc_std)
+        model_prefix, model_name, auc_mean, auc_std)
 
 
 def get_results_from_model_dir(model_dir: str):

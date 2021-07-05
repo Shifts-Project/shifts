@@ -96,12 +96,12 @@ class RIPAgent:
             for _ in range(Q):
                 predictions.append(model.forward(**observation))
 
-        # Shape (D=K*Q, B, T, 2)
-        # D: total number of plans
+        # Shape (G=K*Q, B, T, 2)
+        # G: total number of plans generated
         # B: batch size
         # T: number of predicted timesteps (default: 25)
         predictions = torch.stack(predictions, dim=0)
-        D, B, T, _ = predictions.size()
+        G, B, T, _ = predictions.size()
 
         # For each element in the batch, we have K models and Q predictions.
         # Score each plan under each model.
@@ -109,7 +109,7 @@ class RIPAgent:
         scores = []
         for i in range(K):
             model_i_scores = []
-            for j in range(D):
+            for j in range(G):
                 model_i_scores.append(
                     self._models[i].score_plans(predictions[j, :, :, :]))
 

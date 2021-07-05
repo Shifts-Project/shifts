@@ -95,6 +95,7 @@ class BehaviouralModel(nn.Module):
 
         self.bc_deterministic = bc_deterministic
         self._generation_mode = generation_mode
+        print(f'BC Model: using generation mode {generation_mode}.')
 
     def forward_deterministic(self, **context: torch.Tensor) -> torch.Tensor:
         """Returns the expert plan."""

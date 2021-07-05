@@ -32,7 +32,7 @@ from sdc.constants import (
 from ysdc_dataset_api.evaluation.metrics import (
     average_displacement_error, final_displacement_error,
     aggregate_prediction_request_losses, _softmax_normalize)
-
+from tabular_weather_prediction.assessment import
 
 class SDCLoss:
     def __init__(self, full_model_name, c):
@@ -85,6 +85,10 @@ class SDCLoss:
         # Model prefix -- used for convenience to differentiate runs, e.g.,
         # those trained on a subset or all of the training data
         self.model_prefix = c.model_prefix
+
+        # The error threshold below which we consider the prediction acceptable
+        self.fbeta_threshold = c.fbeta_threshold
+        self.fbeta_beta = c.fbeta_beta
 
     def clear_per_dataset_attributes(self):
         self.base_metric_to_losses = defaultdict(list)
@@ -160,7 +164,7 @@ class SDCLoss:
             self.evaluate_pred_request_retention_thresholds(
                 random_pred_req_confs))
         self.store_retention_metrics(
-            model_name='Random',
+            model_name=f'{self.model_name}-Random',
             metrics_dict=random_retention_metrics, dataset_key=dataset_key,
             return_parsed_dict=False)
 
@@ -170,7 +174,7 @@ class SDCLoss:
         optimal_retention_metrics = (
             self.get_pred_request_retention_thresholds_optimal_perf())
         self.store_retention_metrics(
-            model_name='Optimal',
+            model_name=f'{self.model_name}-Optimal',
             metrics_dict=optimal_retention_metrics, dataset_key=dataset_key,
             return_parsed_dict=False)
 
@@ -179,6 +183,11 @@ class SDCLoss:
             for (retention_threshold, metric_key), loss in
             pred_req_retention_metrics.items()
         }
+
+        # Additional evaluation metrics:
+        #
+
+
         self.clear_per_dataset_attributes()
         return pred_req_retention_metrics
 
@@ -248,12 +257,57 @@ class SDCLoss:
             self.pred_request_confidence_scores.append(
                 pred_request_confidence_scores)
 
+    def collect_fbeta_metrics(self):
+        """Use general Shifts Challenge assessment API to compute fbeta_auc,
+        fbeta_95, and fbeta rejection curve.
+
+        Returns:
+            Dict, with
+                key: str, e.g., minADE_fbeta_auc
+                val: np.array, error metric
+        """
+        uncertainties = -np.array(self.pred_request_confidence_scores)
+        M = uncertainties.shape[0]
+        fbeta_metrics = {}
+
+        for base_metric in VALID_BASE_METRICS:
+            assert base_metric in {'ade', 'fde'}
+
+            for aggregator in VALID_AGGREGATORS:
+                metric_key_prefix = f'{aggregator}{base_metric.upper()}'
+
+                per_plan_losses = self.base_metric_to_losses[base_metric]
+
+                per_pred_req_losses = []
+
+                # Do this instead of enumerate to handle np.ndarray
+                for datapoint_index in range(M):
+                    datapoint_losses = per_plan_losses[datapoint_index]
+                    datapoint_weights = self.softmax(
+                        self.plan_confidence_scores[datapoint_index])
+                    agg_prediction_loss = (
+                        aggregate_prediction_request_losses(
+                            aggregator=aggregator,
+                            per_plan_losses=datapoint_losses,
+                            per_plan_weights=datapoint_weights))
+                    per_pred_req_losses.append(agg_prediction_loss)
+
+                per_pred_req_losses = np.array(per_pred_req_losses)
+                f_auc, f95, retention =
+                fbeta_metrics[f'{metric_key_prefix}']
+
+
+
+
+            metric_key = (f'{aggregator}{base_metric.upper()}_'
+                          f'retain_scene')
+
     def evaluate_pred_request_retention_thresholds(
         self,
         sorted_pred_request_confidences: np.ndarray,
     ) -> Dict[Tuple[float, str], np.ndarray]:
         """For various retention thresholds, evaluate all pairwise
-            combinations of aggregation (e.g., min, max, ...) and ADE/FDE.
+            combinations of aggregation (e.g., min, avg, ...) and ADE/FDE.
 
             Code based on Deferred Prediction utilities due to
                 Neil Band and Angelos Filos
