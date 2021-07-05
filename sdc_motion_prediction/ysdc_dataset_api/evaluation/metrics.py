@@ -42,6 +42,18 @@ def final_displacement_error(ground_truth, predicted):
     return np.linalg.norm(ground_truth - predicted, axis=-1)[:, -1]
 
 
+def assert_weights_non_negative(weights: np.ndarray):
+    if (weights < 0).sum() > 0:
+        raise ValueError('Weights are expected to be non-negative.')
+
+
+def assert_weights_near_one(weights: np.ndarray):
+    weights_sum = weights.sum()
+    if not np.isclose(weights_sum, 1):
+        raise ValueError(
+            f'Weights are expected to sum to 1. Sum: {weights_sum}.')
+
+
 def aggregate_prediction_request_losses(
     aggregator: str,
     per_plan_losses: np.ndarray,
@@ -74,6 +86,11 @@ def aggregate_prediction_request_losses(
         # Linear combination of the losses for the generated
         # predictions of a given request, using normalized
         # per-plan confidence weights as coefficients.
+
+        # Assert the weights form a valid distribution.
+        assert_weights_near_one(weights=per_plan_weights)
+        assert_weights_non_negative(weights=per_plan_weights)
+
         agg_prediction_loss = np.sum(
             per_plan_weights * per_plan_losses, axis=-1)
     else:
@@ -133,7 +150,6 @@ def top1_fde(ground_truth, predicted, weights):
 
 
 def weighted_ade(ground_truth, predicted, weights):
-    weights = _softmax_normalize(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=average_displacement_error(
@@ -143,18 +159,12 @@ def weighted_ade(ground_truth, predicted, weights):
 
 
 def weighted_fde(ground_truth, predicted, weights):
-    weights = _softmax_normalize(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=final_displacement_error(
             ground_truth=ground_truth,
             predicted=predicted),
         per_plan_weights=weights)
-
-
-def _assert_weights_non_negative(weights: np.ndarray):
-    if (weights < 0).sum() > 0:
-        raise ValueError('Weights are expected to be non-negative.')
 
 
 def _softmax_normalize(weights: np.ndarray) -> np.ndarray:
@@ -296,7 +306,7 @@ def compute_all_aggregator_metrics(
                     aggregate_prediction_request_losses(
                         aggregator=aggregator,
                         per_plan_losses=req_plan_losses,
-                        per_plan_weights=softmax(req_plan_confs, axis=0)))
+                        per_plan_weights=_softmax_normalize(req_plan_confs)))
 
     metrics_dict = {
         key: np.stack(values) for key, values in metrics_dict.items()}

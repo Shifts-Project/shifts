@@ -26,13 +26,14 @@ from typing import Sequence, Union, Dict, Tuple
 
 import numpy as np
 import pandas as pd
-
-from sdc.constants import (
-    VALID_AGGREGATORS, VALID_BASE_METRICS)
 from ysdc_dataset_api.evaluation.metrics import (
     average_displacement_error, final_displacement_error,
     aggregate_prediction_request_losses, _softmax_normalize)
-from tabular_weather_prediction.assessment import
+
+from sdc.constants import (
+    VALID_AGGREGATORS, VALID_BASE_METRICS)
+from sdc.assessment import f_beta_metrics
+
 
 class SDCLoss:
     def __init__(self, full_model_name, c):
@@ -185,11 +186,16 @@ class SDCLoss:
         }
 
         # Additional evaluation metrics:
-        #
+        fbeta_metrics = self.collect_fbeta_metrics()
 
+        final_metrics = {}
+
+        for res_dict in [pred_req_retention_metrics, fbeta_metrics]:
+            for key, value in res_dict.items():
+                final_metrics[key] = value
 
         self.clear_per_dataset_attributes()
-        return pred_req_retention_metrics
+        return final_metrics
 
     def cache_batch_losses(
         self,
@@ -268,7 +274,12 @@ class SDCLoss:
         """
         uncertainties = -np.array(self.pred_request_confidence_scores)
         M = uncertainties.shape[0]
-        fbeta_metrics = {}
+        fbeta_metrics_results = {}
+
+        # Create directory to store retention arrays
+        retention_dir = 'fbeta_retention'
+        retention_dir = os.path.join(self.metrics_dir, retention_dir)
+        os.makedirs(retention_dir, exist_ok=True)
 
         for base_metric in VALID_BASE_METRICS:
             assert base_metric in {'ade', 'fde'}
@@ -293,14 +304,21 @@ class SDCLoss:
                     per_pred_req_losses.append(agg_prediction_loss)
 
                 per_pred_req_losses = np.array(per_pred_req_losses)
-                f_auc, f95, retention =
-                fbeta_metrics[f'{metric_key_prefix}']
+                f_auc, f95, retention = f_beta_metrics(
+                    errors=per_pred_req_losses,
+                    uncertainty=uncertainties,
+                    threshold=self.fbeta_threshold,
+                    beta=self.fbeta_beta)
+                fbeta_metrics_results[
+                    f'{metric_key_prefix}__f_auc'] = f_auc
+                fbeta_metrics_results[
+                    f'{metric_key_prefix}__f95'] = f95
+                fbeta_retention_path = f'{retention_dir}/{metric_key_prefix}'
+                print(f'Stored fbeta retention results to '
+                      f'{fbeta_retention_path}.')
+                np.save(f'{retention_dir}/{metric_key_prefix}', arr=retention)
 
-
-
-
-            metric_key = (f'{aggregator}{base_metric.upper()}_'
-                          f'retain_scene')
+        return fbeta_metrics_results
 
     def evaluate_pred_request_retention_thresholds(
         self,
