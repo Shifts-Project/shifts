@@ -41,14 +41,14 @@ def test_metrics():
     weights = np.array([0.6, 0.4])
     assert np.allclose(top1_ade(gt, pred, weights), 0)
     assert np.allclose(top1_fde(gt, pred, weights), 0)
-    assert np.allclose(weighted_ade(gt, pred, weights), 0.22508300134376105)
-    assert np.allclose(weighted_fde(gt, pred, weights), 0.4501660026875221)
+    assert np.allclose(weighted_ade(gt, pred, weights), 0.4)
+    assert np.allclose(weighted_fde(gt, pred, weights), 0.8)
 
     weights = np.array([0.4, 0.6])
     assert np.allclose(top1_ade(gt, pred, weights), 1.)
     assert np.allclose(top1_fde(gt, pred, weights), 2.)
-    assert np.allclose(weighted_ade(gt, pred, weights), 0.2749169986562389)
-    assert np.allclose(weighted_fde(gt, pred, weights), 0.5498339973124778)
+    assert np.allclose(weighted_ade(gt, pred, weights), 0.6)
+    assert np.allclose(weighted_fde(gt, pred, weights), 1.2)
 
 
 def test_evaluate_submission():
@@ -102,9 +102,8 @@ def test_evaluate_submission():
     assert metrics['top1_ade'][0] == pytest.approx(0.)
     assert metrics['top1_fde'][0] == pytest.approx(0.)
 
-    normalized_weights = _softmax_normalize(np.array([mode1_weight, mode2_weight]))
-    assert metrics['weighted_ade'][0] == pytest.approx(2 ** 0.5 / 2 / 2 * normalized_weights[0])
-    assert metrics['weighted_fde'][0] == pytest.approx(2 ** 0.5 / 2 * normalized_weights[0])
+    assert metrics['weighted_ade'][0] == pytest.approx(2 ** 0.5 / 2 * mode1_weight)
+    assert metrics['weighted_fde'][0] == pytest.approx(2 ** 0.5 * mode1_weight)
 
 
 def test_trajectory_array_to_proto():
