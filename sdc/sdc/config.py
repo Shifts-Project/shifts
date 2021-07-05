@@ -207,6 +207,10 @@ def build_parser():
              "model for a given prediction request input. "
              "We select these as the top samples from all stochastic "
              "generations from the ensemble members.")
+    parser.add_argument(
+        '--rip_eval_subgroup', type=str, default=None,
+        help="If specified, RIP will only evaluate on either train/eval "
+             "datasets. Helpful to parallelize evaluation load across jobs.")
 
     ###########################################################################
     # #### Metrics ############################################################
@@ -223,8 +227,7 @@ def build_parser():
         default=True,
         help='If enabled, will compute retention scores with 0 loss on all '
              'non-retained points. This is analogous to the AV agent working '
-             'with a human that can perform optimally when given control. '
-             'Also reduces variance issues for low retention thresholds.')
+             'with a human that can perform optimally when given control.')
     parser.add_argument(
         '--fbeta_threshold', type=float,
         default=1.0,

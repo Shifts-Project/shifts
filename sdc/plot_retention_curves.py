@@ -35,37 +35,54 @@ FLAGS = flags.FLAGS
 
 
 def get_plotting_style_metric_name(metric_name):
-    if 'confidence-weight' in metric_name:
-        return f'Confidence Weighted ' \
-               f'{metric_name.split("confidence-weight")[-1]}'
-    return metric_name
+    # if 'confidence-weight' in metric_name:
+    #     return f'Confidence Weighted ' \
+    #            f'{metric_name.split("confidence-weight")[-1]}'
+    return metric_name.split('_')[0]
 
 
 def construct_model_name_helper(model_prefix, full_name, auc_mean, auc_std):
-    auc_mean = np.round_(auc_mean, 2).item()
-    auc_std = np.round_(auc_std, 2).item()
+    auc_mean = np.round_(auc_mean, 3).item()
+    auc_std = np.round_(auc_std, 3).item()
     if model_prefix != 'Default':
         full_name = f'{model_prefix} | {full_name}'
-    return f'{full_name} [AUC: {auc_mean} ± {auc_std}]'
+
+    name_to_print = f'{full_name} [AUC: {auc_mean}'
+    if np.isnan(auc_std):
+        name_to_print += f']'
+    else:
+        name_to_print += f'± {auc_std}]'
+
+    return name_to_print
 
 
 def get_plotting_style_model_name(model_prefix, model_name, auc_mean, auc_std):
-    (model_class, backbone_name, k_details, plan_algo,
-        scene_algo, rand_or_opt) = model_name.split('-')
+    try:
+        (model_class, backbone_name, k_details, plan_algo,
+            scene_algo, rand_or_opt) = model_name.split('-')
+    except ValueError:
+        (model_class, backbone_name, k_details, plan_algo,
+            scene_algo) = model_name.split('-')
+        rand_or_opt = None
+
     k = k_details.split('_')[-1]
     if model_class != 'rip':
         raise NotImplementedError
     plan_algo = plan_algo.split('_')[-1]
     scene_algo = scene_algo.split('_')[-1]
 
-    if rand_or_opt:
+    if rand_or_opt is not None:
+        # model_name = (
+        #     f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
+        #     f'Scene {scene_algo.upper()}) {rand_or_opt}')
         model_name = (
-            f'RIP (K={k}, Plan {plan_algo.upper()}, '
-            f'Scene {scene_algo.upper()}) {rand_or_opt}')
+            f'RIP ({backbone_name.upper()}) {rand_or_opt}')
     else:
+        # model_name = (
+        #     f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
+        #     f'Scene {scene_algo.upper()})')
         model_name = (
-            f'RIP (K={k}, Plan {plan_algo.upper()}, '
-            f'Scene {scene_algo.upper()})')
+            f'RIP ({backbone_name.upper()})')
 
     return construct_model_name_helper(
         model_prefix, model_name, auc_mean, auc_std)
@@ -226,7 +243,7 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
                 mean + std,
                 color=colors[b % len(colors)],
                 alpha=0.25)
-            ax.set(xlabel='Proportion of Data Retained',
+            ax.set(xlabel='Retention Fraction',
                    ylabel=plotting_metric_name)
             ax.legend()
             fig.tight_layout()
@@ -241,6 +258,10 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
                         format='pdf')
             logging.info('Saved plot for metric %s, baselines %s '
                          'to %s.', metric, baselines, metric_plot_path)
+        else:
+            print(f'{dataset_key} - Use Oracle {use_oracle} - '
+                  f'{plotting_metric_name}')
+            plt.show()
 
 
 def main(argv):

@@ -46,6 +46,9 @@ def train(c):
               c.rip_per_scene_algorithm is not None)
     eval_mode = (c.debug_eval_mode or is_rip)
     collect_dataset_stats = c.debug_collect_dataset_stats
+    consider_train = c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'train'
+    consider_eval = c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'eval'
+
     if c.exp_image_downsize_hw is None:
         downsample_hw = None
     else:
@@ -260,7 +263,7 @@ def train(c):
         for epoch in pbar_epoch:
             epoch_loss_dict = defaultdict(dict)
 
-            if not eval_mode or collect_dataset_stats:
+            if (not eval_mode or collect_dataset_stats) and consider_train:
                 dataset_key = 'moscow__train'
                 if is_rip:
                     loss_train_dict = evaluate_epoch(
@@ -279,19 +282,20 @@ def train(c):
                           loss_train_dict, epoch)
 
             # Evaluates model on validation datasets
-            for dataset_key, dataloader_val in validation_dataloaders.items():
-                loss_val_dict = evaluate_epoch(dataloader_val, dataset_key)
-                for loss_key, loss_value in loss_val_dict.items():
-                    epoch_loss_dict[
-                        'validation'][
-                        f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
-                        loss_value)
+            if consider_eval:
+                for dataset_key, dataloader_val in validation_dataloaders.items():
+                    loss_val_dict = evaluate_epoch(dataloader_val, dataset_key)
+                    for loss_key, loss_value in loss_val_dict.items():
+                        epoch_loss_dict[
+                            'validation'][
+                            f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
+                            loss_value)
 
-                if c.tb_logging:
-                    write(model, dataloader_val, writer, dataset_key,
-                        loss_val_dict, epoch)
+                    if c.tb_logging:
+                        write(model, dataloader_val, writer, dataset_key,
+                            loss_val_dict, epoch)
 
-            if eval_mode:
+            if eval_mode and consider_eval:
                 # TODO: remove in final code
                 # Evaluate on the test sets.
                 for dataset_key, dataloader_test in test_dataloaders.items():
@@ -304,7 +308,7 @@ def train(c):
                     if c.tb_logging:
                         write(model, dataloader_test, writer, dataset_key,
                               loss_test_dict, epoch)
-            else:
+            elif consider_eval:
                 # Checkpoints model weights if c.exp_checkpoint_validation_loss
                 # has improved since last checkpoint.
                 checkpointer.save(
@@ -314,7 +318,7 @@ def train(c):
             # Updates progress bar description.
             pbar_string = ''
 
-            if not eval_mode:
+            if not eval_mode and consider_train:
                 pbar_string += 'Train Losses: '
                 for dataset_key, loss_train in epoch_loss_dict['train'].items():
                     pbar_string += '{} {:.2f} | '.format(
@@ -323,15 +327,16 @@ def train(c):
             # if c.model_name == 'dim':
             #     pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
 
-            pbar_string += 'Val Losses: '
-            for dataset_key, loss_val in epoch_loss_dict['validation'].items():
-                pbar_string += '{} {:.2f} | '.format(dataset_key, loss_val)
+            if consider_eval:
+                pbar_string += 'Val Losses: '
+                for dataset_key, loss_val in epoch_loss_dict['validation'].items():
+                    pbar_string += '{} {:.2f} | '.format(dataset_key, loss_val)
 
-            if eval_mode:
-                pbar_string += 'Test Losses: '
-                for dataset_key, loss_test in epoch_loss_dict['test'].items():
-                    pbar_string += '{} {:.2f} | '.format(
-                        dataset_key, loss_test)
+                if eval_mode:
+                    pbar_string += 'Test Losses: '
+                    for dataset_key, loss_test in epoch_loss_dict['test'].items():
+                        pbar_string += '{} {:.2f} | '.format(
+                            dataset_key, loss_test)
 
             pbar_string += '\n'
             pbar_epoch.set_description(pbar_string)
@@ -339,5 +344,5 @@ def train(c):
             # Log to wandb
             logger.log(epoch_loss_dict, steps, epoch)
 
-            if not eval_mode:
+            if not eval_mode and consider_train:
                 scheduler.step()
