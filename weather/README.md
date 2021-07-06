@@ -4,15 +4,14 @@
 
 Predict the output temperature given a set of weather features. Refer to (cite paper) for more detail about the task.
 
-## Download Data
-
-(To Fill - give link to where the data will be downloaded from)
-
 ## Getting Started
 
 `tutorial.ipynb` walks through the steps for:
-1. Data loading
-2. Training
-3. Inference
-4. Submission 
+1. Repository download
+2. Data download
+3. Data loading
+4. Training & Saving
+5. Model loading
+6. Evaluation & Inference
+7. Submission 
 
