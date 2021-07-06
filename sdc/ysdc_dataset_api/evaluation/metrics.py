@@ -3,13 +3,12 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
-from scipy.special import softmax
 
 from sdc.constants import VALID_BASE_METRICS, VALID_AGGREGATORS
 
 
 def average_displacement_error(ground_truth, predicted):
-    """Calculates average displacement error
+    r"""Calculates average displacement error
         ADE(y) = (1/T) \sum_{t=1}^T || s_t - s^*_t ||_2
             where T = num_timesteps, y = (s_1, ..., s_T)
 
@@ -149,7 +148,12 @@ def top1_fde(ground_truth, predicted, weights):
         per_plan_weights=weights)
 
 
-def weighted_ade(ground_truth, predicted, weights):
+def weighted_ade(ground_truth, predicted, weights, normalize_weights=False):
+    if normalize_weights:
+        weights = _softmax_normalize(weights)
+    else:
+        _check_weights_are_non_negative(weights)
+        _check_weight_sum(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=average_displacement_error(
@@ -158,13 +162,28 @@ def weighted_ade(ground_truth, predicted, weights):
         per_plan_weights=weights)
 
 
-def weighted_fde(ground_truth, predicted, weights):
+def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
+    if normalize_weights:
+        weights = _softmax_normalize(weights)
+    else:
+        _check_weights_are_non_negative(weights)
+        _check_weight_sum(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=final_displacement_error(
             ground_truth=ground_truth,
             predicted=predicted),
         per_plan_weights=weights)
+
+
+def _check_weights_are_non_negative(weights: np.ndarray):
+    if (weights < 0).sum() > 0:
+        raise ValueError('Weights are expected to be non-negative.')
+
+
+def _check_weight_sum(weights: np.ndarray):
+    if abs(weights.sum() - 1) > 1e-6:
+        raise ValueError('Weights are expected to sum to 1.')
 
 
 def _softmax_normalize(weights: np.ndarray) -> np.ndarray:
@@ -203,7 +222,7 @@ def average_displacement_error_torch(
     ground_truth: torch.Tensor,
     predicted: torch.Tensor,
 ) -> torch.Tensor:
-    """Calculates average displacement error
+    r"""Calculates average displacement error
         ADE(y) = (1/T) \sum_{t=1}^T || s_t - s^*_t ||_2
         where T = num_timesteps, y = (s_1, ..., s_T)
 
