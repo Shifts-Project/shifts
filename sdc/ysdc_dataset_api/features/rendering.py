@@ -186,7 +186,7 @@ class VehicleTracksRenderer(TrackRendererBase):
             values.append(self._get_acceleration_values(tracks, transform))
         if 'yaw' in self._config:
             values.append(self._get_yaw_values(tracks))
-        return np.concatenate(values, axis=1, dtype=np.float64)
+        return np.concatenate(values, axis=1).astype(np.float64)
 
 
 class PedestrianTracksRenderer(TrackRendererBase):
@@ -209,7 +209,7 @@ class PedestrianTracksRenderer(TrackRendererBase):
             values.append(self._get_occupancy_values(tracks))
         if 'velocity' in self._config:
             values.append(self._get_velocity_values(tracks, transform))
-        return np.concatenate(values, axis=1, dtype=np.float64)
+        return np.concatenate(values, axis=1).astype(dtype=np.float64)
 
 
 class RoadGraphRenderer(FeatureMapRendererBase):

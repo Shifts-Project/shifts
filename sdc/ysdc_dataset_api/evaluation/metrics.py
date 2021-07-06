@@ -3,13 +3,12 @@ from typing import Callable, Optional
 
 import numpy as np
 import torch
-from scipy.special import softmax
 
 from sdc.constants import VALID_BASE_METRICS, VALID_AGGREGATORS
 
 
 def average_displacement_error(ground_truth, predicted):
-    """Calculates average displacement error
+    r"""Calculates average displacement error
         ADE(y) = (1/T) \sum_{t=1}^T || s_t - s^*_t ||_2
             where T = num_timesteps, y = (s_1, ..., s_T)
 
@@ -223,7 +222,7 @@ def average_displacement_error_torch(
     ground_truth: torch.Tensor,
     predicted: torch.Tensor,
 ) -> torch.Tensor:
-    """Calculates average displacement error
+    r"""Calculates average displacement error
         ADE(y) = (1/T) \sum_{t=1}^T || s_t - s^*_t ||_2
         where T = num_timesteps, y = (s_1, ..., s_T)
 

@@ -7,7 +7,6 @@ from ..evaluation import (average_displacement_error, avg_ade, avg_fde,
                           get_trajectories_weights_arrays, min_ade, min_fde,
                           top1_ade, top1_fde, trajectory_array_to_proto,
                           weighted_ade, weighted_fde)
-from ..evaluation.metrics import _softmax_normalize
 from ..proto import ObjectPrediction, Submission, WeightedTrajectory
 
 
