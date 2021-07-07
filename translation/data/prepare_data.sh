@@ -31,7 +31,7 @@ URLS=(
   "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.gz"
   "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.translatedto.en.gz"
   "http://data.statmt.org/wmt19/translation-task/dev.tgz"
-  "https://storage.yandexcloud.net/yandex-research/shifts/translation/canonical-dev-out-data.tar"
+  "https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar"
 )
 FILES=(
   "paracrawl-release1.en-ru.zipporah0-dedup-clean.tgz"
@@ -44,7 +44,7 @@ FILES=(
   "news.ru.gz"
   "news.ru.translatedto.en.gz"
   "dev.tgz"
-  "reddit-dev.tar"
+  "dev-data.tar"
 )
 
 CORPORA=(
@@ -104,9 +104,9 @@ done
 
 awk -F "\t" 'BEGIN {OFS=FS} {print $1}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.en
 awk -F "\t" 'BEGIN {OFS=FS} {print $2}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.ru
+
 cd ..
 
-exit
 
 echo "pre-processing train data..."
 for l in $src $tgt; do
@@ -151,11 +151,12 @@ for l in $src $tgt; do
   echo ""
 done
 
+
 for l in $src $tgt; do
-  cat $orig/reddit_dev.${l} |
+  cat $orig/dev-data/reddit_dev.${l} |
     perl $NORM_PUNC ${l} |
     perl $REM_NON_PRINT_CHAR |
-    perl $TOKENIZER -threads 24 -a -l ${l} >>$tmp/reddit_valid.$l
+    perl $TOKENIZER -threads 24 -a -l ${l} >>$tmp/reddit_dev.$l
 done
 
 exit

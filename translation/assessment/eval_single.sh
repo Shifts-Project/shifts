@@ -28,7 +28,7 @@ output_dir=single
 )
 
 #Evaluate submission
-python shifts/translate/assessment/evaluate.py single/test1 single/test3 --beam_width 5 --nbest 5
+python shifts/translation/assessment/evaluate.py single/test single/test1 --save_path ./results-single.txt --beam_width 5 --nbest 5
 
 # Prepare submission
-python shifts/translate/assessment/create_submission.py single/test1 single/test3 / --beam_width 5 --nbest 5 --uncertainty_metric NLL
+python shifts/translation/assessment/create_submission.py single/test single/test1 --save_path ./submission-single.json --beam_width 5 --nbest 5 --uncertainty_metric NLL

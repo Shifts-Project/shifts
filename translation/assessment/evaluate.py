@@ -350,18 +350,17 @@ def main():
 
     egleus = np.mean(np.sum(gleus * weights, axis=1))
     mgleus = np.mean(np.max(gleus, axis=1))
-    print(np.mean(gleu_errors), np.median(gleu_errors), np.std(gleu_errors))
 
     with open(args.save_path, 'a') as f:
         f.write('BLEU dev-in: ' + str(np.round(bleu_in, 2)) + '\n')
-    f.write('BLEU dev-out: ' + str(np.round(bleu_out, 2)) + '\n')
-    f.write('BLEU dev: ' + str(np.round(bleu, 2)) + '\n')
-    f.write('eGLEU dev-in: ' + str(np.round(np.mean(np.sum(gleus_in * weights_in, axis=1)), 2)) + '\n')
-    f.write('eGLEU dev-out: ' + str(np.round(np.mean(np.sum(gleus_out * weights_out, axis=1)), 2)) + '\n')
-    f.write('mGLEU dev-in: ' + str(np.round(np.mean(np.max(gleus_in, axis=1)), 2)) + '\n')
-    f.write('mGLEU dev-out: ' + str(np.round(np.mean(np.max(gleus_out, axis=1)), 2)) + '\n')
-    f.write('eGLEU dev: ' + str(np.round(egleus, 2)) + '\n')
-    f.write('mGLEU dev: ' + str(np.round(mgleus, 2)) + '\n')
+        f.write('BLEU dev-out: ' + str(np.round(bleu_out, 2)) + '\n')
+        f.write('BLEU dev: ' + str(np.round(bleu, 2)) + '\n')
+        f.write('eGLEU dev-in: ' + str(np.round(np.mean(np.sum(gleus_in * weights_in, axis=1)), 2)) + '\n')
+        f.write('eGLEU dev-out: ' + str(np.round(np.mean(np.sum(gleus_out * weights_out, axis=1)), 2)) + '\n')
+        f.write('mGLEU dev-in: ' + str(np.round(np.mean(np.max(gleus_in, axis=1)), 2)) + '\n')
+        f.write('mGLEU dev-out: ' + str(np.round(np.mean(np.max(gleus_out, axis=1)), 2)) + '\n')
+        f.write('eGLEU dev: ' + str(np.round(egleus, 2)) + '\n')
+        f.write('mGLEU dev: ' + str(np.round(mgleus, 2)) + '\n')
 
     # Load uncertainties
     if args.ensemble:

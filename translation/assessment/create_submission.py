@@ -124,7 +124,6 @@ def main():
     encoder = json.JSONEncoder(ensure_ascii=False)
     with open(args.save_path, 'w') as jp, open('refs.json', 'w') as jr:
         for idx, ref, hypo, un, dl, weight in zip(ids, refs, hypos, uncertainties, domain_labels, weights):
-            print(np.sum(weight))
             hypo = [{'text': t, 'confidence': float(c)} for t, c in zip(hypo, weight)]
             dct = {'id': int(idx), 'uncertainty': float(un), 'hypos': hypo}
             jsn = encoder.encode(dct)

@@ -6,7 +6,8 @@ Welcome to the Shifts Challenge Translation track!
 To download the training and development data run the preprocess script:
 
 ```
-./data/preprocess.sh
+chmod +x ./shifts/translation/data/prepare_data.sh 
+./shifts/translation/data/prepare_data.sh 
 ```
 
 
@@ -18,7 +19,15 @@ First clone a Fairseq fork which contains...
 clone MY COOL Set
 ```
 
-Next, download the baselines models
+Next process the data into Fairseq format
+
+```
+python3 ~/fairseq-py/fairseq-preprocess.py  --source-lang en --target-lang ru \\
+--trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
+--destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
+```
+
+Download the baselines models
 
 ```
 wget https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline-models.tar
@@ -27,20 +36,31 @@ tar -xf baseline-models.tar
 
 ### Running the baselines
 
+Run single model baseline:
 ```
-python3 ~/fairseq-py/generate.py wmt20_en_ru_eval/ --path baseline-models/model1.pt:baseline-models/model2.pt:baseline-models/model3.pt  \\
---max-tokens 4096 --remove-bpe --nbest 5 --gen-subset test >&
+mkdir single 
+for i in test test1; do 
+    python3 ~/fairseq-py/generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results_${i}.txt
+done
+```
 
-python3 ~/fairseq-py/generate.py wmt20_en_ru_eval/ --path ens_enru/model1.pt:ens_enru/model2.pt:ens_enru/model3.pt  --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset test --compute-uncertainty >& ensemble/results-test.txt
-for j in $(seq 1 2); do 
-    python3 ~/fairseq-py/generate.py wmt20_en_ru_eval/ --path ens_enru/model1.pt:ens_enru/model2.pt:ens_enru/model3.pt --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset test${j} --compute-uncertainty >& ensemble/results-test${j}.txt
+Run ensemble baseline:
+```
+mkdir ensemble
+for i in test test1; do 
+    python3 ~/fairseq-py/generate.py wmt20_en_ru/ --path baseline-models/model1.pt:baseline-models/model2.pt:baseline-models/model3.pt  --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset ${i} --compute-uncertainty >& ensemble/results-${i}.txt
 done
 ```
 
 This produces the raw output of the translations and associated uncertainty scores which then need to be processed further.
 
 
-### Processing the results locally
+### Processing the results locally and create a submission
 
-### Creating a submission
-й
+```
+chmod +x ./shifts/translation/assessment/eval_single.sh
+chmod +x ./shifts/translation/assessment/eval_ensemble.sh
+
+./shifts/translation/assessment/eval_single.sh
+./shifts/translation/assessment/eval_ensemble.sh
+```
