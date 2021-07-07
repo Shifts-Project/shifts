@@ -1,6 +1,6 @@
 # Machine Translation Track 
 
-Welcome to the Shifts Challenge Translation track!
+Welcome to the Shifts Challenge Translation track! In this readme we will provide an example of how to setup and run our baseline model, which is based on the paper [Uncertainty Estimation in Autoregressive Structured Prediction](https://openreview.net/pdf?id=jN5y-zb5Q7m) from ICLR2021. 
 
 ### Downloading and Processing the data
 To download the training and development data run the preprocess script:
