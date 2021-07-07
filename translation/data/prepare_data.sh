@@ -7,11 +7,15 @@ git clone https://github.com/moses-smt/mosesdecoder.git
 echo 'Cloning Subword NMT repository (for BPE pre-processing)...'
 git clone https://github.com/rsennrich/subword-nmt.git
 
+echo 'Cloning Shifts Challenge Repo '
+git clone https://github.com/yandex-research/shifts.git
+
 SCRIPTS=mosesdecoder/scripts
 TOKENIZER=$SCRIPTS/tokenizer/tokenizer.perl
 CLEAN=$SCRIPTS/training/clean-corpus-n.perl
 NORM_PUNC=$SCRIPTS/tokenizer/normalize-punctuation.perl
 DEDUP=remove_duplication.py
+CLEAN_DATA=shifts/translation/data/clean_nmt_data.py
 REM_NON_PRINT_CHAR=$SCRIPTS/tokenizer/remove-non-printing-char.perl
 BPEROOT=subword-nmt/subword_nmt
 BPE_TOKENS=40000
@@ -26,8 +30,8 @@ URLS=(
   "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.en.translatedto.ru.gz"
   "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.gz"
   "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.translatedto.en.gz"
-  "http://data.statmt.org/wmt20/translation-task/dev.tgz"
-  "http://data.statmt.org/wmt20/translation-task/test.tgz"
+  "http://data.statmt.org/wmt19/translation-task/dev.tgz"
+  "https://storage.yandexcloud.net/yandex-research/shifts/translation/canonical-dev-out-data.tar"
 )
 FILES=(
   "paracrawl-release1.en-ru.zipporah0-dedup-clean.tgz"
@@ -40,11 +44,10 @@ FILES=(
   "news.ru.gz"
   "news.ru.translatedto.en.gz"
   "dev.tgz"
-  "test.tgz"
+  "reddit-dev.tar"
 )
 
 CORPORA=(
-  #    "news"
   "paracrawl-release1.en-ru.zipporah0-dedup-clean"
   "commoncrawl.ru-en"
   "en-ru/UNv1.0.en-ru"
@@ -52,7 +55,6 @@ CORPORA=(
   "news-commentary-v15.en-ru"
   "WikiMatrix.v1.en-ru.langid"
   "wikititles-v2.ru-en"
-  "global_voices"
 )
 
 OUTDIR=wmt20_en_ru
@@ -69,135 +71,113 @@ lang=en-ru
 prep=$OUTDIR
 tmp=$prep/tmp
 orig=orig
-dev=dev/newstest2020
+dev=dev/newstest2019
 
 mkdir -p $orig $tmp $prep
 
 cd $orig
 
-for ((i=0;i<${#URLS[@]};++i)); do
-    file=${FILES[i]}
-    echo $file
+for ((i = 0; i < ${#URLS[@]}; ++i)); do
+  file=${FILES[i]}
+  echo $file
+  if [ -f $file ]; then
+    echo "$file already exists, skipping download"
+  else
+    url=${URLS[i]}
+    wget "$url"
     if [ -f $file ]; then
-        echo "$file already exists, skipping download"
+      echo "$url successfully downloaded."
     else
-        url=${URLS[i]}
-        wget "$url"
-        if [ -f $file ]; then
-            echo "$url successfully downloaded."
-        else
-            echo "$url not successfully downloaded."
-            exit -1
-        fi
-
-        if [ ${file: -4} == ".tgz" ]; then
-            tar zxvf $file
-        elif [ ${file: -4} == ".tar" ]; then
-            tar xvf $file
-        elif [ ${file: -4} == ".gz" ]; then
-            gunzip $file
-        fi
+      echo "$url not successfully downloaded."
+      exit -1
     fi
+
+    if [ ${file: -4} == ".tgz" ]; then
+      tar zxvf $file
+    elif [ ${file: -4} == ".tar" ]; then
+      tar xvf $file
+    elif [ ${file: -4} == ".gz" ]; then
+      gunzip $file
+    fi
+  fi
 done
 
-awk -F "\t" 'BEGIN {OFS=FS} {print $1}' news-commentary-v15.en-ru.tsv > news-commentary-v15.en-ru.en
-awk -F "\t" 'BEGIN {OFS=FS} {print $2}' news-commentary-v15.en-ru.tsv > news-commentary-v15.en-ru.ru
+awk -F "\t" 'BEGIN {OFS=FS} {print $1}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.en
+awk -F "\t" 'BEGIN {OFS=FS} {print $2}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.ru
 cd ..
 
 exit
 
 echo "pre-processing train data..."
 for l in $src $tgt; do
-    rm $tmp/train.tags.$lang.tok.$l
-    for f in "${CORPORA[@]}"; do
-        cat $orig/$f.$l | \
-            perl $NORM_PUNC $l | \
-            perl $REM_NON_PRINT_CHAR | \
-            perl $TOKENIZER -threads 24 -a -l $l >> $tmp/train.tags.$lang.tok.$l
-    done
+  rm $tmp/train.tags.$lang.tok.$l
+  for f in "${CORPORA[@]}"; do
+    cat $orig/$f.$l |
+      perl $NORM_PUNC $l |
+      perl $REM_NON_PRINT_CHAR |
+      perl $TOKENIZER -threads 24 -a -l $l >>$tmp/train.tags.$lang.tok.$l
+  done
 done
 
 echo "processing back-trans news dataset"
-cat $orig/news.ru.translatedto.en | \
-            perl $NORM_PUNC en | \
-            perl $REM_NON_PRINT_CHAR | \
-            perl $TOKENIZER -threads 24 -a -l en >> $tmp/train.tags.$lang.tok.en
+cat $orig/news.ru.translatedto.en |
+  perl $NORM_PUNC en |
+  perl $REM_NON_PRINT_CHAR |
+  perl $TOKENIZER -threads 24 -a -l en >>$tmp/train.tags.$lang.tok.en
 
-cat $orig/news.ru | \
-            perl $NORM_PUNC ru | \
-            perl $REM_NON_PRINT_CHAR | \
-            perl $TOKENIZER -threads 24 -a -l ru >> $tmp/train.tags.$lang.tok.ru
+cat $orig/news.ru |
+  perl $NORM_PUNC ru |
+  perl $REM_NON_PRINT_CHAR |
+  perl $TOKENIZER -threads 24 -a -l ru >>$tmp/train.tags.$lang.tok.ru
 
- Remove Deplications
-paste $tmp/train.tags.$lang.tok.en $tmp/train.tags.$lang.tok.ru | python clean_nmt_data.py --directions en-ru --no-zero-len --max-sent-len 1024 --no-bad-utf --max-jaccard-coef-exclusive 0.05 --filter-equality >> $tmp/tmp
-awk -F "\t" '{print $1}'  $tmp/tmp > $tmp/train.tags.$lang.clean.tok.en
-awk -F "\t" '{print $2}'  $tmp/tmp > $tmp/train.tags.$lang.clean.tok.ru
+echo "Remove Deplications, clean data"
+paste $tmp/train.tags.$lang.tok.en $tmp/train.tags.$lang.tok.ru | python $CLEAN_DATA --directions en-ru --no-zero-len --max-sent-len 1024 --no-bad-utf --max-jaccard-coef-exclusive 0.05 --filter-equality >>$tmp/tmp
+awk -F "\t" '{print $1}' $tmp/tmp >$tmp/train.tags.$lang.clean.tok.en
+awk -F "\t" '{print $2}' $tmp/tmp >$tmp/train.tags.$lang.clean.tok.ru
 rm $tmp/tmp
 
-echo "pre-processing test data..."
+echo "pre-processing test data news 19..."
 for l in $src $tgt; do
-    if [ "$l" == "$src" ]; then
-        t="src"
-    else
-        t="ref"
-    fi
-    grep '<seg id' $orig/test/newstest2020-enru-$t.$l.sgm | \
-        sed -e 's/<seg id="[0-9]*">\s*//g' | \
-        sed -e 's/\s*<\/seg>\s*//g' | \
-        sed -e "s/\’/\'/g" | \
-    perl $TOKENIZER -threads 24 -a -l $l > $tmp/test.$l
-    echo ""
-done
-
-echo "pre-processing test data 19..."
-for l in $src $tgt; do
-    if [ "$l" == "$src" ]; then
-        t="src"
-    else
-        t="ref"
-    fi
-    grep '<seg id' $orig/test/newstest2019-enru-$t.$l.sgm | \
-        sed -e 's/<seg id="[0-9]*">\s*//g' | \
-        sed -e 's/\s*<\/seg>\s*//g' | \
-        sed -e "s/\’/\'/g" | \
-    perl $TOKENIZER -threads 24 -a -l $l > $tmp/test19.$l
-    echo ""
+  if [ "$l" == "$src" ]; then
+    t="src"
+  else
+    t="ref"
+  fi
+  grep '<seg id' $orig/test/newstest2019-enru-$t.$l.sgm |
+    sed -e 's/<seg id="[0-9]*">\s*//g' |
+    sed -e 's/\s*<\/seg>\s*//g' |
+    sed -e "s/\’/\'/g" |
+    perl $TOKENIZER -threads 24 -a -l $l >$tmp/test19.$l
+  echo ""
 done
 
 for l in $src $tgt; do
-cat $orig/global_voices.${l} | \
-            perl $NORM_PUNC ${l} | \
-            perl $REM_NON_PRINT_CHAR | \
-            perl $TOKENIZER -threads 24 -a -l ${l} >> $tmp/global_voices.$l
-done
-
-for l in $src $tgt; do
-cat $orig/reddit_valid.${l} | \
-            perl $NORM_PUNC ${l} | \
-            perl $REM_NON_PRINT_CHAR | \
-            perl $TOKENIZER -threads 24 -a -l ${l} >> $tmp/reddit_valid.$l
+  cat $orig/reddit_dev.${l} |
+    perl $NORM_PUNC ${l} |
+    perl $REM_NON_PRINT_CHAR |
+    perl $TOKENIZER -threads 24 -a -l ${l} >>$tmp/reddit_valid.$l
 done
 
 exit
 
 echo "splitting train and valid..."
 for l in $src $tgt; do
-    awk '{if (NR%100 == 0)  print $0; }' $tmp/train.tags.$lang.clean.tok.$l > $tmp/valid.$l
-    awk '{if (NR%100 != 0)  print $0; }' $tmp/train.tags.$lang.clean.tok.$l > $tmp/train.$l
+  awk '{if (NR%100 == 0)  print $0; }' $tmp/train.tags.$lang.clean.tok.$l >$tmp/valid.$l
+  awk '{if (NR%100 != 0)  print $0; }' $tmp/train.tags.$lang.clean.tok.$l >$tmp/train.$l
 done
 
 TRAIN=$tmp/train.en-ru
 BPE_CODE=$prep/code
 rm -f $TRAIN
 for l in $src $tgt; do
-    cat $tmp/train.$l >> $TRAIN
+  cat $tmp/train.$l >>$TRAIN
 done
 
 echo "learn_bpe.py on ${TRAIN}..."
-python $BPEROOT/learn_bpe.py -s $BPE_TOKENS < $TRAIN > $BPE_CODE
+python $BPEROOT/learn_bpe.py -s $BPE_TOKENS <$TRAIN >$BPE_CODE
 
 for L in $src $tgt; do
-  for f in train.$L valid.$L test.$L test19.$L reddit_valid.$L global_voices.$L; do
+  for f in train.$L valid.$L test19.$L reddit_dev.$L; do
     echo "apply_bpe.py to ${f}..."
     python $BPEROOT/apply_bpe.py -c $BPE_CODE <$tmp/$f >$tmp/bpe.$f
   done
@@ -207,9 +187,7 @@ perl $CLEAN -ratio 1.5 $tmp/bpe.train $src $tgt $prep/train 1 250
 perl $CLEAN -ratio 1.5 $tmp/bpe.valid $src $tgt $prep/valid 1 250
 
 for L in $src $tgt; do
-  cp $tmp/bpe.test.$L $prep/test.$L
+  cp $tmp/bpe.valid.$L $prep/valid.$L
   cp $tmp/bpe.test19.$L $prep/test19.$L
-  cp $tmp/bpe.test19.$L $prep/test19.$L
-  cp $tmp/bpe.reddit_valid.$L $prep/reddit_valid.$L
-  cp $tmp/bpe.global_voices.$L $prep/global_voices.$L
+  cp $tmp/bpe.reddit_dev.$L $prep/reddit_dev.$L
 done
