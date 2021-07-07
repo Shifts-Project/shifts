@@ -22,8 +22,8 @@ For a more detailed example, take a look at the example [notebook](examples/exam
 
 To install the dataset API run:
 ```
-git clone git@github.com:yandex-research/uncertainty-challenge.git
-cd uncertainty-challenge/sdc_motion_prediction
+git clone git@github.com:yandex-research/shifts.git
+cd shifts/sdc
 pip install .
 ```
 
@@ -33,11 +33,11 @@ The data directory should have the following enclosed components:
 
 * Protobuf directories: `train_pb/`, `validation_pb/`
 * Tag files: `train_tags.txt`, `validation_tags.txt`
-* (If desired) rendered feature map directories: `train_rendered/`, 
+* (If desired) rendered feature map directories: `train_rendered/`,
     `validation_rendered/`
 
-We provide rendered feature maps at 128x128 resolution with zlib compression 
-level 1, which can be used to avoid rendering costs and significantly decrease 
+We provide rendered feature maps at 128x128 resolution with zlib compression
+level 1, which can be used to avoid rendering costs and significantly decrease
 decompression time (demonstrated in the example [notebook](examples/example.ipynb), in the `Prerendered Dataset` section).
 
 ### Scene Protobuf
@@ -72,7 +72,7 @@ Each `Scene` message includes the following fields:
 ## Submission Format
 
 Participants are expected to submit a serialized `Submission` proto file.
-The submission message includes a repeated field for predictions. An `ObjectPrediction` message should be created to correspond with each of the `prediction_requests` of a given `Scene`.  
+The submission message includes a repeated field for predictions. An `ObjectPrediction` message should be created to correspond with each of the `prediction_requests` of a given `Scene`.
 The `Object Prediction` includes the following fields:
 - `track_id`: id of vehicle, unique in scene
 - `scene_id`: id of scene, unique in full dataset
@@ -92,8 +92,8 @@ We highly recommend this, for ease of reading the LaTeX!
 
 ### Notation
 
-Competitors are provided with a training dataset 
-$\mathcal{D}_\textup{train}=\{(\bm{x}_i, \bm{y}_i)\}_{i = 1}^{N}$ 
+Competitors are provided with a training dataset
+$\mathcal{D}_\textup{train}=\{(\bm{x}_i, \bm{y}_i)\}_{i = 1}^{N}$
 of time-profiled ground truth trajectories (i.e., plans) $\bm{y}$ paired with high-dimensional observations $\bm{x}$ of the corresponding scenes.
 
 $\bm{y} = (s_1, \dots, s_T)$ correspond to the trajectory of a given vehicle observed through the SDG perception stack.
@@ -103,11 +103,11 @@ Each of the $T$ states $s_t$ correspond to the x- and y-displacement of the vehi
 ### Confidence Scores
 
 - Per-Plan Confidence Scores
-    
-   In our task, we expect a stochastic model to accompany its $D_i$ predicted plans on a given input $\bm{x}_i$ with scalar per-plan confidence scores $c_i^{(d)}, d \in \{1, \dots D_i\}$. 
+
+   In our task, we expect a stochastic model to accompany its $D_i$ predicted plans on a given input $\bm{x}_i$ with scalar per-plan confidence scores $c_i^{(d)}, d \in \{1, \dots D_i\}$.
    These provide an ordering of the plausibility of the various plans predicted for a given input.
-   They must be non-negative and sum to 1 (i.e., form a valid distribution). 
-   
+   They must be non-negative and sum to 1 (i.e., form a valid distribution).
+
 - Per--Prediction Request Confidence Scores
 
     We also expect models to produce a scalar confidence score corresponding to each prediction request input $\bm{x}_i$.
@@ -120,20 +120,20 @@ The average displacement error measures the quality of a predicted plan $\bm{y}$
 
     \text{ADE}(\bm{y}) \coloneqq \frac{1}{T} \sum_{t = 1}^T \left\lVert s_t - s^*_t \right\rVert_2,
 
-where $\bm{y} = (s_1, \dots, s_T)$. 
+where $\bm{y} = (s_1, \dots, s_T)$.
 
 - Aggregated ADE and Final Displacement Error (FDE)
 
 Stochastic models define a predictive distribution $q(\bf{y}|\bm{x}; \bm{\theta})$, and can therefore be evaluated over the $D$ trajectories sampled for a given input $\bm{x}$.
 
 For example, we can measure an aggregated ADE over $D$ samples with
-    
+
     \text{aggADE}_D(q) \coloneqq \underset{\{\bm{y}\}_{d = 1}^{D} \sim q(\bf{y} \mid \bf{x})}{\oplus} \text{ADE}(\mathbf{y}^{d}),
 
 where $\oplus$ is an aggregation operator, e.g., $\oplus = \min$ recovers the minimum ADE ($\text{minADE}_{D}$)
 
 We consider minimum and mean aggregation (minADE, avgADE), as well as the final displacement error (FDE)
-    
+
     \text{FDE}(\bf{y}) \coloneqq \left\lVert s_T - s^*_T \right\rVert,
 
 as well as its aggregated variants minFDE and avgFDE.
@@ -144,11 +144,11 @@ A stochastic model used in practice for motion prediction ultimately must **deci
 We may make this decision by selecting for evaluation the predicted plan with the **highest per-plan confidence score**.
 
 In other words, given per-plan confidence scores $c^{(d)}, d \in \{1, \dots D\}$ we select the top plan $y^{(d^{\*})}, d^* = \underset{d}{\arg \max}\ c^{(d)}$, and measure the decision quality using ``top1'' ADE and FDE metrics, e.g.,
-    
+
     \text{top1ADE}_D(q) \coloneqq \text{ADE}(\mathbf{y}^{(d^*)}).
 
 We may also wish to assess the quality of the relative weighting of the $D$ plans with their corresponding per-plan confidence scores $c^{(d)}$. This is accomplished with a weighted metric
-    
+
     \text{weightedADE}_D(q) \coloneqq \sum_{d \in D} c^{(d)} \cdot \text{ADE}(\mathbf{y}^{(d)}).
 
 top1FDE and weightedFDE follow analogously to the above.
@@ -160,7 +160,7 @@ We evaluate the quality of uncertainty quantification using retention-based metr
 
 Note that each retention curve is plotted with respect to a particular metric above (e.g., we consider AUC for retention on weightedADE).
 
-See the Performance Metrics section of the whitepaper and the [Retention Task](#retention-task) section below for more details. 
+See the Performance Metrics section of the whitepaper and the [Retention Task](#retention-task) section below for more details.
 
 ## Baselines
 
@@ -168,11 +168,11 @@ We provide ensemble-based baselines for the Motion Prediction Task using the Rob
 * Behavioral Cloning: MobileNetV2 encoder, GRU decoder
 * Deep Imitative Model: MobileNetV2 encoder, autoregressive flow decoder
 
-Model                                 | Paper                    | 
---------------------------------------| :----------------------: | 
-Robust Imitative Planning (RIP)       | [Filos et al., 2020]     | 
-Deep Imitative Model (DIM)            | [Rhinehart et al., 2018] | 
-Behavoral Cloning (BC)*               | [Codevilla et al., 2017] | 
+Model                                 | Paper                    |
+--------------------------------------| :----------------------: |
+Robust Imitative Planning (RIP)       | [Filos et al., 2020]     |
+Deep Imitative Model (DIM)            | [Rhinehart et al., 2018] |
+Behavoral Cloning (BC)*               | [Codevilla et al., 2017] |
 
 *A simple backbone, based on that used in Conditional Imitation Learning (CIL, Codevilla et al. 2017).
 
@@ -180,26 +180,26 @@ Behavoral Cloning (BC)*               | [Codevilla et al., 2017] |
 [Rhinehart et al., 2018]: https://arxiv.org/abs/1810.06544
 [Filos et al., 2020]: https://arxiv.org/abs/2006.14911
 
-See the `Method-Specific Hypers` section in [sdc/config.py](sdc/config.py) for more information on hyperparameters specific to RIP, BC, and DIM. 
+See the `Method-Specific Hypers` section in [sdc/config.py](sdc/config.py) for more information on hyperparameters specific to RIP, BC, and DIM.
 
 ### Robust Imitative Planning Overview
 
 The RIP ensemble method ([Filos et al., 2020]) stochastically generates multiple predictions for a given prediction request.
-Our adaptation of the method produces confidence scores at two levels of granularity: 
-1. Each prediction request. 
+Our adaptation of the method produces confidence scores at two levels of granularity:
+1. Each prediction request.
 2. Each of the predicted plans generated for each of those prediction requests.
 
 This same format is expected from competitors, as detailed in the `Submission Format` section above.
 
 In detail, we use the following approach for plan and confidence score generation:
 1. **Plan Generation.** Given a scene input in the format of a rendered image, K ensemble members generate G plans.<sup>1</sup>
-2. **Plan Scoring.** We score each of the G plans by computing a log probability under each of the K trained likelihood models. 
+2. **Plan Scoring.** We score each of the G plans by computing a log probability under each of the K trained likelihood models.
 3. **Per-Plan Confidence Scores.** We aggregate the G * K total scores to G scores, using the `--rip_per_plan_algorithm` aggregating over the log-likelihood estimates sampled from the model posterior (i.e., contributed by each ensemble member) to produce a robust score for each of the G plans.
 4. **Per--Prediction Request Confidence Score.** We aggregate the G remaining scores to a single score, representing ensemble confidence for the scene context overall, using the `--rip_per_scene_algorithm`.
-5. **Plan Selection.** Among the G plans, the RIP ensemble produces the D = `--rip_num_preds` top plans as determined by their corresponding G per-plan confidence scores. 
+5. **Plan Selection.** Among the G plans, the RIP ensemble produces the D = `--rip_num_preds` top plans as determined by their corresponding G per-plan confidence scores.
 6. **Confidence Reporting.** Competitors are expected to produce, for a given prediction request, per-plan confidence scores which are non-negative and sum to 1 (i.e., form a valid distribution). We obtain these scores $c^{(d)}$ by applying a softmax to the D top per-plan confidence scores. We report these c^{(d)} and C (computed in step 4) as our final per-plan confidence scores and per--prediction request confidence score, respectively.
 
-To summarize, our implementation of RIP for motion prediction produces D plans and corresponding normalized per-plan scores c^{(d)}, as well as an aggregated confidence C for the overall prediction request. 
+To summarize, our implementation of RIP for motion prediction produces D plans and corresponding normalized per-plan scores c^{(d)}, as well as an aggregated confidence C for the overall prediction request.
 
 ### Training RIP Ensemble Members
 
@@ -216,7 +216,7 @@ python run.py --model_name bc --data_use_prerendered True --bc_generation_mode s
 See [sdc/oatomobile/torch/baselines](sdc/oatomobile/torch/baselines) for the baseline implementations.
 
 We can train K different ensemble members by sweeping over the `--torch_seed` parameter.
- 
+
 By default we checkpoint every time the ADE on the Moscow validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
 
 ### Evaluating RIP with Trained Ensemble Members
@@ -229,7 +229,7 @@ For example, with the Lower Quartile aggregation strategy for per-plan and per--
 python run.py --model_name bc --data_use_prerendered True --bc_generation_mode sampling --torch_seed 1 --np_seed 1 --rip_per_plan_algorithm LQ --rip_per_scene_algorithm LQ --rip_k 5
 ```
 
-The Torch and NumPy seeds will affect the evaluation through sampling from the model, batching, etc. 
+The Torch and NumPy seeds will affect the evaluation through sampling from the model, batching, etc.
 
 The above command will create a directory in which the RIP ensemble member checkpoints are expected.
 Place them there, and re-run the command to evaluate the RIP ensemble.
@@ -242,7 +242,7 @@ We provide utilities for two types of downstream analysis on RIP predictions:
 1. Retention on per--prediction request confidence.
 2. Dataset metadata analysis.
 
-We use Weights & Biases ([wandb](https://wandb.ai/home)) for experiment tracking. 
+We use Weights & Biases ([wandb](https://wandb.ai/home)) for experiment tracking.
 wandb allows us to conveniently track run progress online, and can be disabled by executing `wandb offline`.
 
 #### Retention Task
@@ -278,7 +278,7 @@ The RIP evaluation script provided above will generate data for area under reten
 
 These are logged to wandb, and also stored as a pd.DataFrame in `{--dir_data}/metrics/{model_name}/results.tsv` (or stored under a separately specified directory `--dir_metrics`, at `{--dir_metrics}/{model_name}/results.tsv`).
 
-You can run the RIP evaluation script multiple times with varied `--np_seed` and `--torch_seed`, and our plotting utilities will generate aggregated plots with error bars. 
+You can run the RIP evaluation script multiple times with varied `--np_seed` and `--torch_seed`, and our plotting utilities will generate aggregated plots with error bars.
 
 The command to generate retention plots for a particular model is:
 
@@ -302,7 +302,7 @@ In addition to comparing performance on the retention task, you may wish to inve
 
 We provide utilities for this by setting the command `--debug_collect_dataset_stats=True` when running a RIP evaluation script. Metadata will be stored under the directory `--dir_metadata_cache` (or `{--dir_data}/metadata_cache` if unspecified).
 
-As a starting point for analysis of model predictions, we provide an example notebook located at [examples/analyze_dataset_metadata.ipynb](examples/analyze_dataset_metadata.ipynb). 
+As a starting point for analysis of model predictions, we provide an example notebook located at [examples/analyze_dataset_metadata.ipynb](examples/analyze_dataset_metadata.ipynb).
 
 ### Additional References
 

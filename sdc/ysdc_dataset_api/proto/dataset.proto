@@ -27,7 +27,6 @@ message VehicleTrack {
 }
 
 message VehicleTracks {
-    // represents one tracker message
     repeated VehicleTrack tracks = 1;
 }
 
@@ -42,10 +41,12 @@ message PredictionRequest {
 
 message Scene {
     string id = 1;
-    repeated VehicleTracks past_vehicle_tracks = 2;  // features zone vehicle messages
-    repeated PedestrianTracks past_pedestrian_tracks = 3;  // features zone pedestrian messages
+    repeated VehicleTracks past_vehicle_tracks = 2;
+    repeated PedestrianTracks past_pedestrian_tracks = 3;
     repeated VehicleTrack past_ego_track = 4;
-    repeated VehicleTracks future_vehicle_tracks = 5;  // gt zone vehicle messages
+    repeated VehicleTracks future_vehicle_tracks = 5;
+    repeated PedestrianTracks future_pedestrian_tracks = 10;
+    repeated VehicleTrack future_ego_track = 11;
     repeated PredictionRequest prediction_requests = 6;
     PathGraph path_graph = 7;
     repeated TrafficLightSections traffic_lights = 8;

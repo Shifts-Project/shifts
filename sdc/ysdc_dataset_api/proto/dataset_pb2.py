@@ -23,7 +23,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rdataset.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\x1a\tmap.proto\x1a\ntags.proto\"\xb0\x01\n\x0fPedestrianTrack\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12*\n\x08position\x18\x02 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12,\n\ndimensions\x18\x03 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x31\n\x0flinear_velocity\x18\x04 \x01(\x0b\x32\x18.neurips_dataset.Vector3\"\xf1\x01\n\x0cVehicleTrack\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12*\n\x08position\x18\x02 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12,\n\ndimensions\x18\x03 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x31\n\x0flinear_velocity\x18\x04 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x35\n\x13linear_acceleration\x18\x05 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x0b\n\x03yaw\x18\x06 \x01(\x01\">\n\rVehicleTracks\x12-\n\x06tracks\x18\x01 \x03(\x0b\x32\x1d.neurips_dataset.VehicleTrack\"D\n\x10PedestrianTracks\x12\x30\n\x06tracks\x18\x01 \x03(\x0b\x32 .neurips_dataset.PedestrianTrack\"^\n\x11PredictionRequest\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12\x37\n\x0ftrajectory_tags\x18\x02 \x03(\x0e\x32\x1e.neurips_dataset.TrajectoryTag\"\xe9\x03\n\x05Scene\x12\n\n\x02id\x18\x01 \x01(\t\x12;\n\x13past_vehicle_tracks\x18\x02 \x03(\x0b\x32\x1e.neurips_dataset.VehicleTracks\x12\x41\n\x16past_pedestrian_tracks\x18\x03 \x03(\x0b\x32!.neurips_dataset.PedestrianTracks\x12\x35\n\x0epast_ego_track\x18\x04 \x03(\x0b\x32\x1d.neurips_dataset.VehicleTrack\x12=\n\x15\x66uture_vehicle_tracks\x18\x05 \x03(\x0b\x32\x1e.neurips_dataset.VehicleTracks\x12?\n\x13prediction_requests\x18\x06 \x03(\x0b\x32\".neurips_dataset.PredictionRequest\x12.\n\npath_graph\x18\x07 \x01(\x0b\x32\x1a.neurips_dataset.PathGraph\x12=\n\x0etraffic_lights\x18\x08 \x03(\x0b\x32%.neurips_dataset.TrafficLightSections\x12.\n\nscene_tags\x18\t \x01(\x0b\x32\x1a.neurips_dataset.SceneTags**\n\tActorType\x12\x0c\n\x08kVehicle\x10\x00\x12\x0f\n\x0bkPedestrian\x10\x01\x62\x06proto3'
+  serialized_pb=b'\n\rdataset.proto\x12\x0fneurips_dataset\x1a\ngeom.proto\x1a\tmap.proto\x1a\ntags.proto\"\xb0\x01\n\x0fPedestrianTrack\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12*\n\x08position\x18\x02 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12,\n\ndimensions\x18\x03 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x31\n\x0flinear_velocity\x18\x04 \x01(\x0b\x32\x18.neurips_dataset.Vector3\"\xf1\x01\n\x0cVehicleTrack\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12*\n\x08position\x18\x02 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12,\n\ndimensions\x18\x03 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x31\n\x0flinear_velocity\x18\x04 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x35\n\x13linear_acceleration\x18\x05 \x01(\x0b\x32\x18.neurips_dataset.Vector3\x12\x0b\n\x03yaw\x18\x06 \x01(\x01\">\n\rVehicleTracks\x12-\n\x06tracks\x18\x01 \x03(\x0b\x32\x1d.neurips_dataset.VehicleTrack\"D\n\x10PedestrianTracks\x12\x30\n\x06tracks\x18\x01 \x03(\x0b\x32 .neurips_dataset.PedestrianTrack\"^\n\x11PredictionRequest\x12\x10\n\x08track_id\x18\x01 \x01(\x04\x12\x37\n\x0ftrajectory_tags\x18\x02 \x03(\x0e\x32\x1e.neurips_dataset.TrajectoryTag\"\xe7\x04\n\x05Scene\x12\n\n\x02id\x18\x01 \x01(\t\x12;\n\x13past_vehicle_tracks\x18\x02 \x03(\x0b\x32\x1e.neurips_dataset.VehicleTracks\x12\x41\n\x16past_pedestrian_tracks\x18\x03 \x03(\x0b\x32!.neurips_dataset.PedestrianTracks\x12\x35\n\x0epast_ego_track\x18\x04 \x03(\x0b\x32\x1d.neurips_dataset.VehicleTrack\x12=\n\x15\x66uture_vehicle_tracks\x18\x05 \x03(\x0b\x32\x1e.neurips_dataset.VehicleTracks\x12\x43\n\x18\x66uture_pedestrian_tracks\x18\n \x03(\x0b\x32!.neurips_dataset.PedestrianTracks\x12\x37\n\x10\x66uture_ego_track\x18\x0b \x03(\x0b\x32\x1d.neurips_dataset.VehicleTrack\x12?\n\x13prediction_requests\x18\x06 \x03(\x0b\x32\".neurips_dataset.PredictionRequest\x12.\n\npath_graph\x18\x07 \x01(\x0b\x32\x1a.neurips_dataset.PathGraph\x12=\n\x0etraffic_lights\x18\x08 \x03(\x0b\x32%.neurips_dataset.TrafficLightSections\x12.\n\nscene_tags\x18\t \x01(\x0b\x32\x1a.neurips_dataset.SceneTags**\n\tActorType\x12\x0c\n\x08kVehicle\x10\x00\x12\x0f\n\x0bkPedestrian\x10\x01\x62\x06proto3'
   ,
   dependencies=[geom__pb2.DESCRIPTOR,map__pb2.DESCRIPTOR,tags__pb2.DESCRIPTOR,])
 
@@ -47,8 +47,8 @@ _ACTORTYPE = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=1214,
-  serialized_end=1256,
+  serialized_start=1340,
+  serialized_end=1382,
 )
 _sym_db.RegisterEnumDescriptor(_ACTORTYPE)
 
@@ -325,28 +325,42 @@ _SCENE = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='prediction_requests', full_name='neurips_dataset.Scene.prediction_requests', index=5,
+      name='future_pedestrian_tracks', full_name='neurips_dataset.Scene.future_pedestrian_tracks', index=5,
+      number=10, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='future_ego_track', full_name='neurips_dataset.Scene.future_ego_track', index=6,
+      number=11, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='prediction_requests', full_name='neurips_dataset.Scene.prediction_requests', index=7,
       number=6, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='path_graph', full_name='neurips_dataset.Scene.path_graph', index=6,
+      name='path_graph', full_name='neurips_dataset.Scene.path_graph', index=8,
       number=7, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='traffic_lights', full_name='neurips_dataset.Scene.traffic_lights', index=7,
+      name='traffic_lights', full_name='neurips_dataset.Scene.traffic_lights', index=9,
       number=8, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
     _descriptor.FieldDescriptor(
-      name='scene_tags', full_name='neurips_dataset.Scene.scene_tags', index=8,
+      name='scene_tags', full_name='neurips_dataset.Scene.scene_tags', index=10,
       number=9, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -365,7 +379,7 @@ _SCENE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=723,
-  serialized_end=1212,
+  serialized_end=1338,
 )
 
 _PEDESTRIANTRACK.fields_by_name['position'].message_type = geom__pb2._VECTOR3
@@ -382,6 +396,8 @@ _SCENE.fields_by_name['past_vehicle_tracks'].message_type = _VEHICLETRACKS
 _SCENE.fields_by_name['past_pedestrian_tracks'].message_type = _PEDESTRIANTRACKS
 _SCENE.fields_by_name['past_ego_track'].message_type = _VEHICLETRACK
 _SCENE.fields_by_name['future_vehicle_tracks'].message_type = _VEHICLETRACKS
+_SCENE.fields_by_name['future_pedestrian_tracks'].message_type = _PEDESTRIANTRACKS
+_SCENE.fields_by_name['future_ego_track'].message_type = _VEHICLETRACK
 _SCENE.fields_by_name['prediction_requests'].message_type = _PREDICTIONREQUEST
 _SCENE.fields_by_name['path_graph'].message_type = map__pb2._PATHGRAPH
 _SCENE.fields_by_name['traffic_lights'].message_type = map__pb2._TRAFFICLIGHTSECTIONS
