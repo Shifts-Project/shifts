@@ -4,7 +4,7 @@
 
 This repository contains data readers and examples for the three tracks of the Shifts Dataset and the [Shifts Challenge](https://research.yandex.com/shifts). 
 
-The Shits Dataset contains curated and labelled examples of real, 'in-the-wild' distributional shift across three large-scale tasks. Specifically, it contains a tabular weather prediction task, machine translation, and Vehicle Motion Prediction. Dataset shift is ubiquitous in all of these tasks and modalities. The dataset and benchmark results on it are detailed in our associated paper: [Shifts: A Dataset of Real Distributional Shift Across Multiple Large-Scale Tasks](https://storage.yandexcloud.net/yandex-research/shifts/paper.pdf)
+The Shits Dataset contains curated and labelled examples of real, 'in-the-wild' distributional shift across three large-scale tasks. Specifically, it contains a tabular weather prediction task, machine translation, and Vehicle Motion Prediction. Dataset shift is ubiquitous in all of these tasks and modalities. The dataset,  assessment metrics and benchmark results are detailed in our associated paper: [Shifts: A Dataset of Real Distributional Shift Across Multiple Large-Scale Tasks](https://storage.yandexcloud.net/yandex-research/shifts/paper.pdf)
 
 If you use the Shifts Dataset in your work, please cite our paper using the following Bibtex:
 ```
