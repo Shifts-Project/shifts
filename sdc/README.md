@@ -80,7 +80,7 @@ The `Object Prediction` includes the following fields:
     - `trajectory`:
         - repeated `points`: trajectory points in vehicle-centered coordinate system. Note that only x and y coordinates are expected to be predicted.
     - `weight`: positive trajectory weight, e.g. confidence of the predicted trajectory in multi-modal prediction. Higher weight correspond to more likely trajectory. Used to aggregate displacement metrics across modes.
-- `uncertainty_measure`: predicted scene-level confidence
+- `uncertainty_measure`: predicted scene-level uncertainty. Note that for our baseline, the uncertainty_measure is the negation of the per--prediction request confidence score.
 - `is_ood`: boolean indicating if the prediction request corresponds to the OOD dataset (`is_ood`=True) or in-domain dataset (`is_ood`=False)
 
 All protobuf message definitions can be found at [ysdc_dataset_api/proto](ysdc_dataset_api/proto).
@@ -95,6 +95,7 @@ We highly recommend this, for ease of reading the LaTeX!
 Competitors are provided with a training dataset
 $\mathcal{D}_\textup{train}=\{(\bm{x}_i, \bm{y}_i)\}_{i = 1}^{N}$
 of time-profiled ground truth trajectories (i.e., plans) $\bm{y}$ paired with high-dimensional observations $\bm{x}$ of the corresponding scenes.
+Note that we will use plans and trajectories interchangeably in the following.
 
 $\bm{y} = (s_1, \dots, s_T)$ correspond to the trajectory of a given vehicle observed through the SDG perception stack.
 
@@ -102,15 +103,16 @@ Each of the $T$ states $s_t$ correspond to the x- and y-displacement of the vehi
 
 ### Confidence Scores
 
-- Per-Plan Confidence Scores
+- Per-Plan Confidence Scores (aka Per-Trajectory Confidence Scores)
 
    In our task, we expect a stochastic model to accompany its $D_i$ predicted plans on a given input $\bm{x}_i$ with scalar per-plan confidence scores $c_i^{(d)}, d \in \{1, \dots D_i\}$.
    These provide an ordering of the plausibility of the various plans predicted for a given input.
    They must be non-negative and sum to 1 (i.e., form a valid distribution).
 
-- Per--Prediction Request Confidence Scores
+- Per--Prediction Request Uncertainty Score
 
-    We also expect models to produce a scalar confidence score corresponding to each prediction request input $\bm{x}_i$.
+    We also expect models to produce a scalar uncertainty score U corresponding to each prediction request input $\bm{x}_i$ (this is an **uncertainty** rather than a confidence for consistency with other Shifts Challenge tasks).
+    Often in the codebase we refer to a per--prediction request confidence score which is simply a negation of U; C = -U.
 
 ### Standard Metrics
 
@@ -154,9 +156,9 @@ We may also wish to assess the quality of the relative weighting of the $D$ plan
 top1FDE and weightedFDE follow analogously to the above.
 
 
-### Per--Prediction Request Confidence-Aware Metrics
+### Per--Prediction Request Uncertainty-Aware Metrics
 
-We evaluate the quality of uncertainty quantification using retention-based metrics, in which the per--prediction request confidences determine retention order.
+We evaluate the quality of uncertainty quantification using retention-based metrics, in which the per--prediction request uncertainty scores determine retention order.
 
 Note that each retention curve is plotted with respect to a particular metric above (e.g., we consider AUC for retention on weightedADE).
 
@@ -185,9 +187,9 @@ See the `Method-Specific Hypers` section in [sdc/config.py](sdc/config.py) for m
 ### Robust Imitative Planning Overview
 
 The RIP ensemble method ([Filos et al., 2020]) stochastically generates multiple predictions for a given prediction request.
-Our adaptation of the method produces confidence scores at two levels of granularity:
-1. Each prediction request.
-2. Each of the predicted plans generated for each of those prediction requests.
+Our adaptation of the method produces uncertainty/confidence scores at two levels of granularity:
+1. Each prediction request (uncertainty score).
+2. Each of the predicted plans generated for each of those prediction requests (confidence scores).
 
 This same format is expected from competitors, as detailed in the `Submission Format` section above.
 
@@ -195,12 +197,12 @@ In detail, we use the following approach for plan and confidence score generatio
 1. **Plan Generation.** Given a scene input in the format of a rendered image, K ensemble members generate G plans.<sup>1</sup>
 2. **Plan Scoring.** We score each of the G plans by computing a log probability under each of the K trained likelihood models.
 3. **Per-Plan Confidence Scores.** We aggregate the G * K total scores to G scores, using the `--rip_per_plan_algorithm` aggregating over the log-likelihood estimates sampled from the model posterior (i.e., contributed by each ensemble member) to produce a robust score for each of the G plans.
-4. **Per--Prediction Request Confidence Score.** We aggregate the G remaining scores to a single score, representing ensemble confidence for the scene context overall, using the `--rip_per_scene_algorithm`.
-5. **Plan Selection.** Among the G plans, the RIP ensemble produces the D = `--rip_num_preds` top plans as determined by their corresponding G per-plan confidence scores.
-6. **Confidence Reporting.** Competitors are expected to produce, for a given prediction request, per-plan confidence scores which are non-negative and sum to 1 (i.e., form a valid distribution). We obtain these scores $c^{(d)}$ by applying a softmax to the D top per-plan confidence scores. We report these c^{(d)} and C (computed in step 4) as our final per-plan confidence scores and per--prediction request confidence score, respectively.
+4. **Plan Selection.** Among the G plans, the RIP ensemble produces the D = `--rip_num_preds` top plans as determined by their corresponding G per-plan confidence scores.
+5. **Per--Prediction Request Confidence Score.** We aggregate the D top per-trajectory confidence scores to a single score C, representing ensemble confidence for the scene context overall, using the `--rip_per_scene_algorithm`. To obtain our desired per--prediction request uncertainty score, we simply negate: U = -C.
+6. **Confidence Reporting.** Competitors are expected to produce, for a given prediction request, per-plan confidence scores which are non-negative and sum to 1 (i.e., form a valid distribution). We obtain these scores $c^{(d)}$ by applying a softmax to the D top per-plan confidence scores. We report these c^{(d)} and U (computed in step 5) as our final per-plan confidence scores and per--prediction request uncertainty score, respectively.
 
-To summarize, our implementation of RIP for motion prediction produces D plans and corresponding normalized per-plan scores c^{(d)}, as well as an aggregated confidence C for the overall prediction request.
-
+To summarize, our implementation of RIP for motion prediction produces D plans and corresponding normalized per-plan scores c^{(d)}, as well as an aggregated uncertainty score U for the overall prediction request.
+We often in the codebase refer to per--prediction request confidence scores, which correspond to the negation of U: C = -U.
 ### Training RIP Ensemble Members
 
 [Lakshminarayanan et al., 2017]: https://arxiv.org/abs/1612.01474v3
@@ -217,7 +219,7 @@ See [sdc/oatomobile/torch/baselines](sdc/oatomobile/torch/baselines) for the bas
 
 We can train K different ensemble members by sweeping over the `--torch_seed` parameter.
 
-By default we checkpoint every time the ADE on the Moscow validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
+By default we checkpoint every time the ADE on the OOD validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
 
 ### Evaluating RIP with Trained Ensemble Members
 
@@ -238,9 +240,12 @@ See [sdc/config.py](sdc/config.py) for descriptions of all parameters.
 
 ### Performance Analysis
 
-We provide utilities for two types of downstream analysis on RIP predictions:
-1. Retention on per--prediction request confidence.
-2. Dataset metadata analysis.
+We provide utilities for three types of downstream analysis on RIP predictions:
+1. Retention on per--prediction request uncertainty scores.
+2. Dataset metadata analysis for a particular RIP method.
+3. Caching all predictions and plan-level confidence scores for a complete downstream analysis of a RIP ensemble with a particular backbone (e.g., sweeping over aggregation strategies and number of ensemble members K).
+
+Below we walk through each type of analysis, and demonstrate extra flags for evaluating RIP models which might be helpful for evaluating your own architectures.
 
 We use Weights & Biases ([wandb](https://wandb.ai/home)) for experiment tracking.
 wandb allows us to conveniently track run progress online, and can be disabled by executing `wandb offline`.
@@ -286,7 +291,7 @@ The command to generate retention plots for a particular model is:
 python plot_retention_curves.py --results_dir {--dir_metrics}/{model_name} --plot_dir '.' --model_name {model_name}
 ```
 
-where the --results_dir should point to the subdirectory of a particular model name (e.g., 'rip-dim-k_3-plan_uq-scene_uq' corresponding to a RIP ensemble with Upper Quartile aggregation, DIM backbone density models, and 5 ensemble members).
+where the `--results_dir` should point to the subdirectory of a particular model name (e.g., 'rip-dim-k_5-plan_uq-scene_uq' corresponding to a RIP ensemble with Upper Quartile aggregation, DIM backbone density models, and 5 ensemble members).
 
 You can generate plots comparing several models with
 
@@ -294,7 +299,7 @@ You can generate plots comparing several models with
 python plot_retention_curves.py --results_dir {--dir_metrics} --plot_dir='.'
 ```
 
-where the --results_dir should point to the metrics directory containing all `model_name` subdirectories.
+where the `--results_dir` should point to the metrics directory containing all `model_name` subdirectories.
 
 #### Caching Dataset Metadata for Downstream Analysis
 
@@ -304,6 +309,29 @@ We provide utilities for this by setting the command `--debug_collect_dataset_st
 
 As a starting point for analysis of model predictions, we provide an example notebook located at [examples/analyze_dataset_metadata.ipynb](examples/analyze_dataset_metadata.ipynb).
 
+#### Caching All Predictions for Comparing RIP Configurations
+
+Finally, you may wish to cache all predictions and per-plan confidence scores of constituent models in a RIP ensemble, instead of performing the RIP aggregation steps and caching losses, in order to compare RIP performance for a particular backbone (BC or DIM) across many ensemble sizes and aggregation strategies.
+
+These utilities allow one to simply evaluate a RIP model at the largest K they wish to consider, and then compare performance with various ensemble sizes/aggregation strategies post-hoc.
+
+In particular, the predictions, ground truth values, per-plan confidence scores, and request IDs are stored for each prediction request. 
+For the confidence scores, this means we store all G * K log-likelihood scorings pairwise between plans and ensemble members.
+This is controlled by the `--rip_cache_all_preds=True` flag, and importantly, **should be used in conjunction with the above metadata caching** in order to retrieve the correct pairing of (request ID, scene ID) to uniquely identify every prediction request.
+
+For example,
+```
+python run.py --model_name bc  --data_use_prerendered True --rip_per_plan_algorithm MA --rip_per_scene_algorithm MA --rip_k 5 --debug_collect_dataset_stats True --rip_eval_subgroup eval --rip_cache_all_preds True
+```
+will evaluate a RIP ensemble with backbone model BC, aggregation strategy MA (for both per-plan and per--prediction request), ensemble size K = 5.
+
+This script will produce metadata as well as cache all of the fields mentioned above.
+
+Note also the additional flag:
+`--rip_eval_subgroup eval` restricts to evaluating the RIP ensemble only on validation data for convenience. You may also pass `train` to only evaluate on training data.
+
+We provide an example [notebook](examples/compare_rip_models.ipynb) walking through downstream comparative analysis of RIP variants.
+ 
 ### Additional References
 
 For additional reference papers on the Motion Prediction task, see the following:
