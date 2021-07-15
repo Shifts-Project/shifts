@@ -293,7 +293,8 @@ Used to compute aggregate metrics over predictions on a full eval dataset.
 def compute_all_aggregator_metrics(
     per_plan_confidences: np.ndarray,
     predictions: np.ndarray,
-    ground_truth: np.ndarray
+    ground_truth: np.ndarray,
+    metric_name: Optional[str] = None
 ):
     """Batch size B, we assume consistent number of predictions D per scene.
 
@@ -302,10 +303,31 @@ def compute_all_aggregator_metrics(
     predictions: np.ndarray, shape (B, D, T, 2)
     ground_truth: np.ndarray, shape (B, T, 2), there is only one
         ground_truth trajectory for each prediction request.
+    metric_name: Optional[str], if specified, compute a particular metric only.
     """
     metrics_dict = defaultdict(list)
 
-    for base_metric_name in VALID_BASE_METRICS:
+    if metric_name is None:
+        base_metrics = VALID_BASE_METRICS
+    else:
+        base_metrics = []
+        for metric in VALID_BASE_METRICS:
+            if metric.upper() in metric_name:
+                base_metrics.append(metric)
+        if not base_metrics:
+            raise ValueError(f'Invalid metric name {metric_name} specified.')
+
+    if metric_name is None:
+        aggregators = VALID_AGGREGATORS
+    else:
+        aggregators = []
+        for agg in VALID_AGGREGATORS:
+            if agg in metric_name:
+                aggregators.append(agg)
+        if not aggregators:
+            raise ValueError(f'Invalid metric name {metric_name} specified.')
+
+    for base_metric_name in base_metrics:
         if base_metric_name == 'ade':
             base_metric = average_displacement_error
         elif base_metric_name == 'fde':
@@ -319,7 +341,7 @@ def compute_all_aggregator_metrics(
             req_plan_losses = base_metric(
                 predicted=req_preds, ground_truth=req_gt)
 
-            for aggregator in VALID_AGGREGATORS:
+            for aggregator in aggregators:
                 metric_key = f'{aggregator}{base_metric_name.upper()}'
                 metrics_dict[metric_key].append(
                     aggregate_prediction_request_losses(

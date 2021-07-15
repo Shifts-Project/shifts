@@ -15,13 +15,13 @@
 
 from pprint import pprint
 
-from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
-    evaluate_step_rip, RIPAgent)
 from sdc.oatomobile.torch.baselines.batch_preprocessing import batch_transform
 from sdc.oatomobile.torch.baselines.behavioral_cloning import (
     BehaviouralModel, train_step_bc, evaluate_step_bc)
 from sdc.oatomobile.torch.baselines.deep_imitative_model import (
     ImitativeModel, train_step_dim, evaluate_step_dim)
+from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
+    evaluate_step_rip, RIPAgent)
 
 
 def init_behavioral_model(c):
@@ -55,7 +55,6 @@ def get_dim_kwargs(c):
         'dim_hidden': c.model_dim_hidden,
         'output_shape': c.model_output_shape,
         'scale_eps': c.dim_scale_eps,
-        'grad_ascent': c.dim_grad_ascent,
         'device': c.exp_device
     }
 
@@ -107,7 +106,8 @@ def get_rip_kwargs(c):
         'model_name': c.model_name,
         'device': c.exp_device,
         'samples_per_model': c.rip_samples_per_model,
-        'num_preds': c.rip_num_preds
+        'num_preds': c.rip_num_preds,
+        'cache_all_preds': c.rip_cache_all_preds
     }
 
 
@@ -119,8 +119,7 @@ BACKBONE_NAME_TO_KWARGS_FN = {
 BACKBONE_NAME_TO_CLASS_FNS = {
     'bc': (init_behavioral_model, train_step_bc, evaluate_step_bc),
     'dim': (init_imitative_model, train_step_dim, evaluate_step_dim),
-    # TODO: RIP wrapper on BC (rnn decoder)
-    # TODO: RIP with MC Dropout?
+    # TODO: RIP with MC Dropout (Ensembles)
 }
 
 BACKBONE_NAME_TO_FULL_NAME = {

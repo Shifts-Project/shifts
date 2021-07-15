@@ -21,18 +21,17 @@ See a description of the retention task in the README.
 import datetime
 import os
 from collections import defaultdict
-from functools import partial
-from typing import Sequence, Union, Dict, Tuple
+from typing import Sequence, Union, Dict, Tuple, Optional
 
 import numpy as np
 import pandas as pd
+
+from sdc.assessment import f_beta_metrics, calc_uncertainty_regection_curve
+from sdc.constants import (
+    VALID_AGGREGATORS, VALID_BASE_METRICS)
 from ysdc_dataset_api.evaluation.metrics import (
     average_displacement_error, final_displacement_error,
     aggregate_prediction_request_losses, _softmax_normalize)
-
-from sdc.constants import (
-    VALID_AGGREGATORS, VALID_BASE_METRICS)
-from sdc.assessment import f_beta_metrics
 
 
 class SDCLoss:
@@ -50,12 +49,7 @@ class SDCLoss:
         self.plan_confidence_scores = []
         self.pred_request_confidence_scores = []  # Shape (M,)
 
-        # We sweep over these retention thresholds, at each threshold retaining
-        # the specified proportion of prediction requests with the highest
-        # confidence scores.
-        self.retention_thresholds = c.metrics_retention_thresholds
-
-        # Path where area under retention curve results should be stored
+        # Path where retention (both standard and fbeta) results are stored
         metrics_dir = (
             f'{c.dir_data}/metrics' if not c.dir_metrics else c.dir_metrics)
         os.makedirs(metrics_dir, exist_ok=True)
@@ -76,12 +70,6 @@ class SDCLoss:
         # Seeds used in evaluating the current model.
         self.np_seed = c.np_seed
         self.torch_seed = c.torch_seed
-
-        # If self.use_oracle == True, we assume that all datapoints not
-        # retained have 0 loss (i.e., perfect accuracy)
-        # Otherwise we disclude them, and report performance of predictions
-        # made on retained points only.
-        self.use_oracle = c.metrics_retention_use_oracle
 
         # Model prefix -- used for convenience to differentiate runs, e.g.,
         # those trained on a subset or all of the training data
@@ -116,6 +104,7 @@ class SDCLoss:
                     f'Unexpected number of dims in `plan_confidence_scores`: '
                     f'{plan_array_dims}.')
         except RuntimeError:
+            # Don't need to do a concatenation
             print('Detected differing number of predicted '
                   'plans for each scene.')
             pass
@@ -139,59 +128,58 @@ class SDCLoss:
         assert len(self.base_metric_to_losses['ade']) == len(
             self.base_metric_to_losses['fde'])
 
+        result_dicts = []
+
         # ** RIP evaluation **
 
-        # Sort prediction request confidences by decreasing confidence
-        sorted_pred_req_confs = np.argsort(
-            self.pred_request_confidence_scores)[::-1]
+        # * Default Method *
+        # Evaluate retention (standard and fbeta) using
+        # uncertainty estimates of model
+        uncertainty_scores = (-self.pred_request_confidence_scores)
+        default_fbeta_aucs, default_r_aucs, default_retention_arrs = (
+            self.collect_retention_and_fbeta_metrics(
+                uncertainty_scores=uncertainty_scores,
+                model_name='Default'))
+        result_dicts += [default_fbeta_aucs, default_r_aucs]
 
-        # Evaluate metrics for each prediction request retention proportion
-        pred_req_retention_metrics = (
-            self.evaluate_pred_request_retention_thresholds(
-                sorted_pred_req_confs))
-
-        # Store metrics that were computed with RIP
+        # Store retention curve
         self.store_retention_metrics(
             model_name=self.model_name,
-            metrics_dict=pred_req_retention_metrics, dataset_key=dataset_key,
-            return_parsed_dict=False)
+            retention_arrs=default_retention_arrs,
+            dataset_key=dataset_key)
 
-        # ** Random Retention evaluation **
-        # Randomly sorting prediction request confidences provides a baseline
-        # for the model with the same predictions but poor uncertainty
-        random_pred_req_confs = np.random.permutation(
+        # * Random Method *
+        # Randomly sorting prediction request uncertainty scores provides a
+        # baseline for the model with the same predictions
+        # but uninformative uncertainty
+        random_uncertainties = np.random.permutation(
             self.pred_request_confidence_scores.shape[0])
-        random_retention_metrics = (
-            self.evaluate_pred_request_retention_thresholds(
-                random_pred_req_confs))
+        random_fbeta_aucs, random_r_aucs, random_retention_arrs = (
+            self.collect_retention_and_fbeta_metrics(
+                uncertainty_scores=random_uncertainties,
+                model_name='Random'))
+        result_dicts += [random_fbeta_aucs, random_r_aucs]
         self.store_retention_metrics(
             model_name=f'{self.model_name}-Random',
-            metrics_dict=random_retention_metrics, dataset_key=dataset_key,
-            return_parsed_dict=False)
+            retention_arrs=random_retention_arrs,
+            dataset_key=dataset_key)
 
-        # ** Optimal Retention evaluation **
-        # Sort prediction requests by the loss, giving us the performance
+        # * Optimal Method *
+        # Use the loss as the uncertainty, giving us the performance
         # of the model if it had perfectly calibrated uncertainty
-        optimal_retention_metrics = (
-            self.get_pred_request_retention_thresholds_optimal_perf())
+        optimal_fbeta_aucs, optimal_r_aucs, optimal_retention_arrs = (
+            self.collect_retention_and_fbeta_metrics(
+                uncertainty_scores=None,  # triggers using losses as uncert
+                model_name='Optimal'))
+        result_dicts += [optimal_fbeta_aucs, optimal_r_aucs]
         self.store_retention_metrics(
             model_name=f'{self.model_name}-Optimal',
-            metrics_dict=optimal_retention_metrics, dataset_key=dataset_key,
-            return_parsed_dict=False)
-
-        pred_req_retention_metrics = {
-            f'{metric_key}_{retention_threshold}': loss
-            for (retention_threshold, metric_key), loss in
-            pred_req_retention_metrics.items()
-        }
-
-        # Additional evaluation metrics:
-        fbeta_metrics = self.collect_fbeta_metrics()
+            retention_arrs=optimal_retention_arrs,
+            dataset_key=dataset_key)
 
         final_metrics = {}
-
-        for res_dict in [pred_req_retention_metrics, fbeta_metrics]:
-            for key, value in res_dict.items():
+        for result_dict in result_dicts:
+            for key, value in result_dict.items():
                 final_metrics[key] = value
 
         self.clear_per_dataset_attributes()
@@ -263,18 +251,57 @@ class SDCLoss:
             self.pred_request_confidence_scores.append(
                 pred_request_confidence_scores)
 
-    def collect_fbeta_metrics(self):
-        """Use general Shifts Challenge assessment API to compute fbeta_auc,
-        fbeta_95, and fbeta rejection curve.
+    def collect_retention_and_fbeta_metrics(
+        self,
+        uncertainty_scores: Optional[np.ndarray],
+        model_name: str,
+    ) -> Tuple[Dict, Dict, Dict]:
+        """Computes:
+                - retention curve
+                - fbeta rejection curve (along with auc and fbeta at 95%)
+            using general Shifts Challenge assessment API.
 
+        Uses per--prediction request uncertainty scores and all
+            pairwise combinations of aggregation (min, avg, weighted, top1)
+            and ADE/FDE.
+
+        NOTE: we expect per--prediction request `uncertainty_scores`, i.e.,
+            the score should be higher for a point on which the model is more
+            uncertain.
+            These can be obtained by, for example, taking the mean of per-plan
+            confidence scores and negating.
+
+        Args:
+            uncertainty_scores: np.ndarray, accompanying uncertainty scores.
+                See note above. At each possible retention threshold, we
+                retain the proportion of the dataset with lowest uncertainty
+                and compute metrics as normal.
+                If this is not provided, we assume that we are using the losses
+                as the uncertainties, i.e., computing an optimal baseline.
+            model_name: str, used for storing fbeta retention curves.
+                e.g., we store for Random/Optimal/Default methods.
         Returns:
-            Dict, with
+            Tuple[Dict, Dict, Dict]
+            First Dict (fbeta auc, f95 values)
                 key: str, e.g., minADE_fbeta_auc
-                val: np.array, error metric
+                val: float, fbeta AUC or F95 for given metric
+            Second Dict (retention auc values):
+                key: str, e.g., minADE_r_auc
+                val: float, retention AUC for given metric
+            Third Dict (full retention curves)
+                key: str, e.g., minADE
+                val: np.ndarray, retention curve
         """
-        uncertainties = -np.array(self.pred_request_confidence_scores)
-        M = uncertainties.shape[0]
-        fbeta_metrics_results = {}
+        if uncertainty_scores is None:
+            compute_optimal_baseline = True
+            print('Computing Optimal retention baseline.')
+        else:
+            compute_optimal_baseline = False
+
+        M = uncertainty_scores.shape[0]
+        fbeta_aucs = {}
+        r_aucs = {}
+        retention_arrs = {}
 
         # Create directory to store retention arrays
         retention_dir = 'fbeta_retention'
@@ -286,9 +313,7 @@ class SDCLoss:
 
             for aggregator in VALID_AGGREGATORS:
                 metric_key_prefix = f'{aggregator}{base_metric.upper()}'
-
                 per_plan_losses = self.base_metric_to_losses[base_metric]
-
                 per_pred_req_losses = []
 
                 # Do this instead of enumerate to handle np.ndarray
@@ -304,275 +329,88 @@ class SDCLoss:
                     per_pred_req_losses.append(agg_prediction_loss)
 
                 per_pred_req_losses = np.array(per_pred_req_losses)
+
+                if compute_optimal_baseline:
+                    # Use the loss as uncertainty, i.e., perfectly calibrated
+                    # uncertainty estimates
+                    uncertainty_scores = per_pred_req_losses
+
+                # Compute fbeta results and store the arrays.
                 f_auc, f95, retention = f_beta_metrics(
                     errors=per_pred_req_losses,
-                    uncertainty=uncertainties,
+                    uncertainty=uncertainty_scores,
                     threshold=self.fbeta_threshold,
                     beta=self.fbeta_beta)
-                fbeta_metrics_results[
-                    f'{metric_key_prefix}__f_auc'] = f_auc
-                fbeta_metrics_results[
-                    f'{metric_key_prefix}__f95'] = f95
-                fbeta_retention_path = f'{retention_dir}/{metric_key_prefix}'
+                fbeta_aucs[f'{model_name}__{metric_key_prefix}__f_auc'] = f_auc
+                fbeta_aucs[f'{model_name}__{metric_key_prefix}__f95'] = f95
+                fbeta_retention_path = (
+                    f'{retention_dir}/{model_name}__{metric_key_prefix}')
                 print(f'Stored fbeta retention results to '
                       f'{fbeta_retention_path}.')
-                np.save(f'{retention_dir}/{metric_key_prefix}', arr=retention)
+                np.save(fbeta_retention_path, arr=retention)
 
-        return fbeta_metrics_results
+                # Compute retention/rejection arrays.
+                rejection_curve = calc_uncertainty_regection_curve(
+                    errors=per_pred_req_losses,
+                    uncertainty=uncertainty_scores)
+                r_auc = rejection_curve.mean()
+                r_aucs[f'{model_name}__{metric_key_prefix}__r_auc'] = r_auc
+                retention_arrs[metric_key_prefix] = rejection_curve
 
-    def evaluate_pred_request_retention_thresholds(
-        self,
-        sorted_pred_request_confidences: np.ndarray,
-    ) -> Dict[Tuple[float, str], np.ndarray]:
-        """For various retention thresholds, evaluate all pairwise
-            combinations of aggregation (e.g., min, avg, ...) and ADE/FDE.
-
-            Code based on Deferred Prediction utilities due to
-                Neil Band and Angelos Filos
-                https://github.com/google/uncertainty-baselines
-
-        Args:
-            sorted_pred_request_confidences: np.ndarray, per--prediction
-                request confidence scores, sorted by decreasing confidence.
-                At each retention threshold, we retain the top (X * 100)%
-                of the dataset and compute metrics as normal.
-        Returns:
-          Dict with format key: str = f'metric_retain_scene_{fraction}',
-          and value: metric value at given data retained fraction.
-        """
-        M = len(self.base_metric_to_losses['ade'])
-        metrics_dict = {}
-        retention_threshold_to_n_points = {}
-
-        # Compute metrics for range of retention thresholds
-        for retention_threshold in self.retention_thresholds:
-            retain_bool_mask = np.zeros_like(
-                sorted_pred_request_confidences)
-            n_retained_points = int(M * retention_threshold)
-            indices_to_retain = sorted_pred_request_confidences[
-                :n_retained_points]
-
-            # These are used for normalization
-            # We can reflect our use of the oracle on all non-retained points
-            # (importantly, assuming we are using ADE/FDE) by just normalizing
-            # over all datapoints (since the losses at non-retained points
-            # would be 0).
-            if self.use_oracle:
-                n_retained_points = M
-            retention_threshold_to_n_points[
-                retention_threshold] = n_retained_points
-            retain_bool_mask[indices_to_retain] = 1
-            retain_bool_mask = retain_bool_mask.astype(np.bool_)
-
-            counter = 0
-
-            # Do this instead of enumerate to handle np.ndarray
-            for datapoint_index in range(M):
-                if not retain_bool_mask[datapoint_index]:
-                    continue
-                else:
-                    counter += 1
-
-                for base_metric in VALID_BASE_METRICS:
-                    assert base_metric in {'ade', 'fde'}, (
-                        'This method must be updated to handle oracle use + '
-                        'any metric for which perfect performance is not 0 '
-                        '(e.g., an accuracy).')
-
-                    per_plan_losses = self.base_metric_to_losses[
-                        base_metric][datapoint_index]
-                    per_plan_confidences = self.plan_confidence_scores[
-                        datapoint_index]
-
-                    # Normalize the per-plan confidence scores for a
-                    # particular prediction request (i.e., within this scene).
-                    per_plan_weights = self.softmax(per_plan_confidences)
-
-                    for aggregator in VALID_AGGREGATORS:
-                        metric_key = (f'{aggregator}{base_metric.upper()}_'
-                                      f'retain_scene')
-                        agg_prediction_loss = (
-                            aggregate_prediction_request_losses(
-                                aggregator=aggregator,
-                                per_plan_losses=per_plan_losses,
-                                per_plan_weights=per_plan_weights))
-                        if (retention_threshold, metric_key) not in (
-                                metrics_dict.keys()):
-                            metrics_dict[
-                                (retention_threshold, metric_key)] = (
-                                agg_prediction_loss)
-                        else:
-                            metrics_dict[
-                                (retention_threshold, metric_key)] += (
-                                agg_prediction_loss)
-
-        normed_metrics_dict = {}
-        for (retention_threshold, metric_key), loss in metrics_dict.items():
-            normed_metrics_dict[(retention_threshold, metric_key)] = (
-                loss / retention_threshold_to_n_points[retention_threshold])
-
-        return normed_metrics_dict
-
-    def get_pred_request_retention_thresholds_optimal_perf(
-            self) -> Dict[Tuple[float, str], np.ndarray]:
-        """Determine the optimal performance on the retention task if we
-            used a model with perfectly calibrated confidence (i.e., its
-            confidence ordering has perfect Spearman correlation with the
-            true ordering of losses for each pairwise combination of
-            aggregation (e.g., min, top1, ...) and ADE/FDE.
-
-            Code based on Deferred Prediction utilities due to
-                Neil Band and Angelos Filos
-                https://github.com/google/uncertainty-baselines
-
-        Returns:
-          Dict with format key: str = f'metric_retain_scene_{fraction}',
-          and value: metric value at given data retained fraction.
-        """
-        M = len(self.base_metric_to_losses['ade'])
-        metrics_dict = {}
-        retention_threshold_to_n_points = {}
-
-        # Here we need to put the metrics and aggregators
-        # (i.e., minADE, maxFDE, and other ways to aggregate losses within
-        # a scene across proposed plans) in the outer loop.
-        # This allows us to sort "perfectly" based on loss -- i.e., what a
-        # model with optimally calibrated uncertainty would do, to obtain
-        # an upper bound on retention performance with our given
-        # model's plan predictions.
-        for base_metric in VALID_BASE_METRICS:
-            assert base_metric in {'ade', 'fde'}, (
-                'This method must be updated to handle oracle use + '
-                'any metric for which perfect performance is not 0 '
-                '(e.g., an accuracy).')
-            per_plan_losses = self.base_metric_to_losses[base_metric]
-            for aggregator in VALID_AGGREGATORS:
-                metric_key = (f'{aggregator}{base_metric.upper()}_'
-                              f'retain_scene')
-                metric_agg_losses = np.zeros(M)
-                for datapoint_index in range(M):
-                    datapoint_losses = per_plan_losses[datapoint_index]
-                    datapoint_weights = self.softmax(
-                        self.plan_confidence_scores[datapoint_index])
-                    metric_agg_losses[datapoint_index] = (
-                        aggregate_prediction_request_losses(
-                            aggregator=aggregator,
-                            per_plan_losses=datapoint_losses,
-                            per_plan_weights=datapoint_weights))
-
-                # Now we argsort the losses to get the ideal order
-                # i.e., order losses in ascending order (breaks for accuracy)
-                # TODO: update for any miss rate - like metric
-                sorted_metric_agg_losses = np.argsort(metric_agg_losses)
-
-                # Compute metrics for range of retention thresholds
-                for retention_threshold in self.retention_thresholds:
-                    retain_bool_mask = np.zeros_like(
-                        sorted_metric_agg_losses)
-                    n_retained_points = int(M * retention_threshold)
-                    indices_to_retain = sorted_metric_agg_losses[
-                        :n_retained_points]
-
-                    # These are used for normalization
-                    # We can reflect our use of the oracle on all
-                    # non-retained points (importantly, assuming we are
-                    # using ADE/FDE) by just normalizing over all datapoints
-                    # (since the losses at non-retained points would be 0).
-                    if self.use_oracle:
-                        n_retained_points = M
-                    retention_threshold_to_n_points[
-                        retention_threshold] = n_retained_points
-                    retain_bool_mask[indices_to_retain] = 1
-                    retain_bool_mask = retain_bool_mask.astype(np.bool_)
-                    counter = 0
-
-                    # Do this instead of enumerate to handle np.ndarray
-                    for datapoint_index in range(M):
-                        if not retain_bool_mask[datapoint_index]:
-                            continue
-                        else:
-                            counter += 1
-
-                        datapoint_losses = per_plan_losses[datapoint_index]
-                        datapoint_weights = self.softmax(
-                            self.plan_confidence_scores[datapoint_index])
-                        agg_prediction_loss = (
-                            aggregate_prediction_request_losses(
-                                aggregator=aggregator,
-                                per_plan_losses=datapoint_losses,
-                                per_plan_weights=datapoint_weights))
-
-                        if (retention_threshold, metric_key) not in (
-                                metrics_dict.keys()):
-                            metrics_dict[
-                                (retention_threshold, metric_key)] = (
-                                agg_prediction_loss)
-                        else:
-                            metrics_dict[
-                                (retention_threshold, metric_key)] += (
-                                agg_prediction_loss)
-
-        normed_metrics_dict = {}
-        for (retention_threshold, metric_key), loss in metrics_dict.items():
-            normed_metrics_dict[(retention_threshold, metric_key)] = (
-                loss / retention_threshold_to_n_points[retention_threshold])
-
-        return normed_metrics_dict
+        return fbeta_aucs, r_aucs, retention_arrs
 
     def store_retention_metrics(
         self,
         model_name: str,
-        metrics_dict: Dict[Tuple[float, str], np.ndarray],
-        dataset_key: str,
-        return_parsed_dict: bool = True
+        retention_arrs: Dict[str, np.ndarray],
+        dataset_key: str
     ):
         """
         Code based on Deferred Prediction utilities due to
             Neil Band and Angelos Filos
             https://github.com/google/uncertainty-baselines
 
-        Parses a dict of metrics for values obtained at various
-            retain proportions.
-
+        Parses a dict of retention arrays.
         Stores results to a DataFrame at the specified path
             (or updates a DataFrame that already exists at the path).
-
-        Optionally, returns a dict with retain proportions separated,
-        which allows for more natural logging of tf.Summary values and downstream
-        TensorBoard visualization.
 
         Args:
             model_name: `str`, name of the model for which we are storing
                 metrics.
-            metrics_dict: `Dict`, metrics computed at various retention
+            retention_arrs: `Dict`, metrics computed at all possible retention
                 thresholds.
             dataset_key: `str`, key denoting the name of the evaluation dataset
-            return_parsed_dict: `bool`, will return a dict with retain
-                proportions separated, which is easier to use for logging
-                downstream.
 
         Returns:
           `Optional[Dict]`
         """
-        results = []
-        parsed_dict = defaultdict(list) if return_parsed_dict else None
+        # Get the length of a retention array, confirm all are same length
+        first_key = next(iter(retention_arrs))
+        ret_arr_len = len(retention_arrs[first_key])
+        for _, arr in retention_arrs.items():
+            assert len(arr) == ret_arr_len
 
-        for (retention_threshold, metric_key), metric_value in (
-                metrics_dict.items()):
-            results.append((metric_key, retention_threshold, metric_value))
+        # Tile for the number of retention metrics
+        retention_thresholds = np.arange(ret_arr_len) / float(ret_arr_len)
+        retention_thresholds_expanded = (
+            retention_thresholds.tolist() * len(retention_arrs))
 
-            if parsed_dict is not None:
-                parsed_dict[metric_key].append(
-                    (retention_threshold, metric_value))
+        retention_values = []
+        metric_names = []
+        for metric_key, arr in retention_arrs.items():
+            metric_names += [metric_key] * len(arr)
+            retention_values.append(arr)
 
-        new_results_df = pd.DataFrame(
-            results, columns=['metric', 'retention_threshold', 'value'])
+        data = {
+            'metric': metric_names,
+            'retention_threshold': retention_thresholds_expanded,
+            'value': np.concatenate(retention_values, axis=0)}
+        new_results_df = pd.DataFrame(data)
 
         # Add metadata
         new_results_df['dataset_key'] = dataset_key
         new_results_df['model_prefix'] = self.model_prefix
         new_results_df['model_name'] = model_name
-        new_results_df['use_oracle'] = self.use_oracle
         new_results_df['eval_seed'] = (
             f'np_{self.np_seed}__torch_{self.torch_seed}')
         new_results_df['run_datetime'] = datetime.datetime.now()
@@ -600,9 +438,3 @@ class SDCLoss:
         print(
             f'Successfully {action_str} results dataframe '
             f'at {model_results_path}.')
-
-        if parsed_dict is not None:
-            for metric_name in parsed_dict.keys():
-                # Sort by ascending retain proportion
-                parsed_dict[metric_name] = sorted(parsed_dict[metric_name])
-            return parsed_dict

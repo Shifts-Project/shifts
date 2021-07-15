@@ -7,14 +7,18 @@ Script adapted from Uncertainty Baselines project,
 
 import os
 from itertools import product
-from typing import Optional
+from typing import Optional, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from absl import app
 from absl import flags
 from absl import logging
+
+from sdc.assessment import calc_uncertainty_regection_curve
+from sdc.constants import BASELINE_TO_COLOR_HEX
 
 # Data load / output flags.
 flags.DEFINE_string(
@@ -35,10 +39,21 @@ FLAGS = flags.FLAGS
 
 
 def get_plotting_style_metric_name(metric_name):
-    # if 'confidence-weight' in metric_name:
-    #     return f'Confidence Weighted ' \
-    #            f'{metric_name.split("confidence-weight")[-1]}'
     return metric_name.split('_')[0]
+
+
+def get_sparsification_factor(arr_len):
+    """Determine with which multiple we
+    subsample the array (for easier plotting)."""
+    sparsification_factor = None
+    if arr_len > 100000:
+        sparsification_factor = 1000
+    elif arr_len > 10000:
+        sparsification_factor = 100
+    elif arr_len > 1000:
+        sparsification_factor = 10
+
+    return sparsification_factor
 
 
 def construct_model_name_helper(model_prefix, full_name, auc_mean, auc_std):
@@ -72,17 +87,13 @@ def get_plotting_style_model_name(model_prefix, model_name, auc_mean, auc_std):
     scene_algo = scene_algo.split('_')[-1]
 
     if rand_or_opt is not None:
-        # model_name = (
-        #     f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
-        #     f'Scene {scene_algo.upper()}) {rand_or_opt}')
         model_name = (
-            f'RIP ({backbone_name.upper()}) {rand_or_opt}')
+            f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
+            f'Scene {scene_algo.upper()}) {rand_or_opt}')
     else:
-        # model_name = (
-        #     f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
-        #     f'Scene {scene_algo.upper()})')
         model_name = (
-            f'RIP ({backbone_name.upper()})')
+            f'RIP ({backbone_name}, K={k}, Plan {plan_algo.upper()}, '
+            f'Scene {scene_algo.upper()})')
 
     return construct_model_name_helper(
         model_prefix, model_name, auc_mean, auc_std)
@@ -229,6 +240,14 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
             auc_mean = np.mean(mean)
             auc_std = np.mean(std)
 
+            # Sparsify the arrays for easier display if they are large
+            sparsification_factor = get_sparsification_factor(
+                len(retained_data))
+            if sparsification_factor is not None:
+                retained_data = retained_data[::sparsification_factor]
+                mean = mean[::sparsification_factor]
+                std = std[::sparsification_factor]
+
             # Visualize mean with standard error
             ax.plot(
                 retained_data,
@@ -262,6 +281,167 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
             print(f'{dataset_key} - Use Oracle {use_oracle} - '
                   f'{plotting_metric_name}')
             plt.show()
+
+
+def plot_retention_curve_with_baselines(
+    uncertainty_scores: np.ndarray,
+    losses: np.ndarray,
+    model_key: str,
+    metric_name: str = 'weightedADE'
+):
+    """
+    Plot a retention curve with Random and Optimal baselines.
+
+    Assumes that `uncertainty_scores` convey uncertainty (not confidence)
+    for a particular point.
+
+    Args:
+        uncertainty_scores: np.ndarray, per--prediction request uncertainty
+            scores (e.g., obtained by averaging per-plan confidence scores
+            and negating).
+        losses: np.ndarray, array of loss values, e.g., weightedADE.
+        model_key: str, used for displaying the model configurations in the
+            plot legend.
+        metric_name: str, retention metric, displayed on y-axis.
+    """
+    M = len(losses)
+
+    methods = ['Random', 'Baseline', 'Optimal']
+    aucs_retention_curves = []
+
+    # Random results
+    random_indices = np.arange(M)
+    np.random.shuffle(random_indices)
+    retention_curve = calc_uncertainty_regection_curve(
+        errors=losses, uncertainty=random_indices)
+    aucs_retention_curves.append((retention_curve.mean(), retention_curve))
+    print('Computed Random curve.')
+
+    # Get baseline results
+    retention_curve = calc_uncertainty_regection_curve(
+        errors=losses, uncertainty=uncertainty_scores)
+    aucs_retention_curves.append((retention_curve.mean(), retention_curve))
+    print('Computed Model curve.')
+
+    # Optimal results
+    retention_curve = calc_uncertainty_regection_curve(
+        errors=losses, uncertainty=losses)
+    aucs_retention_curves.append((retention_curve.mean(), retention_curve))
+    print('Computed Optimal curve.')
+
+    plt.rcParams.update({'font.size': 12})
+
+    fig, ax = plt.subplots()
+    for b, (baseline, (auc, retention_values)) in enumerate(
+            zip(methods, aucs_retention_curves)):
+        color = BASELINE_TO_COLOR_HEX[baseline]
+        if baseline == 'Baseline':
+            baseline = ''
+
+        # Subsample the retention value,
+        # as there are likely many of them
+        # (on any of the dataset splits)
+        sparsification_factor = get_sparsification_factor(
+            retention_values.shape[0])
+        retention_values = retention_values[::sparsification_factor][::-1]
+        retention_thresholds = np.arange(
+            len(retention_values)) / len(retention_values)
+
+        ax.plot(
+            retention_thresholds,
+            retention_values,
+            label=f'RIP ({model_key}) {baseline} [AUC: {auc:.3f}]',
+            color=color)
+
+    ax.set(xlabel='Retention Fraction', ylabel=metric_name)
+    ax.legend()
+    fig.tight_layout()
+    sns.set_style('darkgrid')
+    plt.show()
+    return fig
+
+
+def plot_retention_curves_from_dict(
+    model_key_to_auc_and_curve: Dict[str, Tuple[float, np.ndarray]],
+    metric_name: str = 'weightedADE'
+):
+    """
+    Plot a set of retention curves.
+
+    Args:
+        model_key_to_auc_and_curve: Dict[str, Tuple[float, np.ndarray]],
+            mapping from a model key to retention results.
+        metric_name: str, retention metric, displayed on y-axis.
+    """
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    plt.rcParams.update({'font.size': 12})
+    fig, ax = plt.subplots()
+
+    for b, (model_key, (auc, retention_values)) in enumerate(
+            model_key_to_auc_and_curve.items()):
+        # Subsample the retention value,
+        # as there are likely many of them
+        # (on any of the dataset splits)
+        sparsification_factor = get_sparsification_factor(
+            retention_values.shape[0])
+        retention_values = retention_values[::sparsification_factor][::-1]
+        retention_thresholds = np.arange(
+            len(retention_values)) / len(retention_values)
+
+        ax.plot(
+            retention_thresholds,
+            retention_values,
+            label=f'RIP ({model_key}) [AUC: {auc:.3f}]',
+            color=colors[b])
+
+    ax.set(xlabel='Retention Fraction', ylabel=metric_name)
+    ax.legend()
+    fig.tight_layout()
+    sns.set_style('darkgrid')
+    plt.show()
+    return fig
+
+
+def plot_fbeta_retention_curve_with_baselines(
+    results_dict: Dict[str, Tuple[float, float, np.array]],
+    model_key: str,
+    metric_name: str
+):
+    """Plot fbeta retention curve with Random and Optimal baselines.
+
+    Args:
+        results_dict: Dict[str, Tuple[float, float, np.array]],
+            fbeta retention results as produced by
+                `sdc.analyze_metadata.f1_retention_baseline_results`.
+        model_key: str, used for displaying the model configurations in the
+            plot legend.
+        metric_name: str, retention metric, displayed on y-axis.
+    """
+    fig, ax = plt.subplots()
+    plt.rcParams.update({'font.size': 12})
+
+    for b, (baseline, retention_results) in enumerate(results_dict.items()):
+        f_auc, f95, retention_arr = retention_results
+        color = BASELINE_TO_COLOR_HEX[baseline]
+        if baseline == 'Baseline':
+            baseline = ''
+
+        x = np.arange(len(retention_arr))
+        x = x / len(retention_arr)
+        ax.plot(
+            x,
+            retention_arr,
+            label=f'RIP ({model_key}) {baseline} [AUC: {f_auc:.3f}]',
+            color=color)
+
+        ax.set(xlabel='Retention Fraction',
+               ylabel=f'F1-{metric_name}')
+        ax.legend()
+        fig.tight_layout()
+
+    sns.set_style('darkgrid')
+    plt.show()
+    return fig
 
 
 def main(argv):

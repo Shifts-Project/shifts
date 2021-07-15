@@ -28,6 +28,14 @@ SPLIT_TO_SCENE_TAGS_PATH = {
     'test': '/test_tags.txt'
 }
 
+# Matplotlib colors for retention plots with baselines.
+# Matches paper color scheme.
+BASELINE_TO_COLOR_HEX = {
+    'Optimal': '#2CA02C',  # Green
+    'Baseline': '#FF7F0E',  # Orange
+    'Random': '#1F77B4'  # Blue
+}
+
 RENDERER_CONFIG = {
     # parameters of feature maps to render
     'feature_map_params': {

@@ -112,7 +112,7 @@ def build_parser():
              'validation loss improves.')
     parser.add_argument(
         '--exp_checkpoint_validation_loss', type=str,
-        default='moscow__validation__ade',
+        default='ood__validation__ade',
         help='Loss to use for model checkpointing (i.e., checkpoint if model '
              'improves this validation loss. Note that by default, this uses '
              'the in-distribution (Moscow, no precipitation) validation set.')
@@ -157,10 +157,6 @@ def build_parser():
     # #### Method-Specific Hypers #############################################
     ###########################################################################
 
-    # parser.add_argument(
-    #     '--dim_noise_level', type=float, default=1e-2,
-    #     help="Noise with which ground truth trajectories are perturbed in "
-    #          "training DIM.")
     parser.add_argument(
         '--bc_deterministic', type='bool', default=False,
         help='Train BC on the ADE objective, instead of using a valid '
@@ -175,10 +171,6 @@ def build_parser():
     parser.add_argument(
         '--dim_scale_eps', type=float, default=1e-7,
         help="Additive epsilon constant to avoid a 0 or negative scale.")
-    parser.add_argument(
-        '--dim_grad_ascent', type='bool', default=False,
-        help='Perform gradient ascent on the base distribution sample `x` '
-             'when generating the plan conditioned on scene context.')
     parser.add_argument(
         '--rip_per_plan_algorithm', type=str, default=None,
         help="Use Robust Imitative Planning wrapper to select a robust "
@@ -211,23 +203,18 @@ def build_parser():
         '--rip_eval_subgroup', type=str, default=None,
         help="If specified, RIP will only evaluate on either train/eval "
              "datasets. Helpful to parallelize evaluation load across jobs.")
+    parser.add_argument(
+        '--rip_cache_all_preds', type='bool', default=False,
+        help='Cache every predicted plan and their scores under each of the '
+             'models. No aggregation is applied. '
+             'Used for post-hoc analysis with whatever RIP algorithm '
+             'is desired, or a different (a smaller) number of ensemble '
+             'members.')
 
     ###########################################################################
     # #### Metrics ############################################################
     ###########################################################################
 
-    parser.add_argument(
-        '--metrics_retention_thresholds', type=str,
-        default=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
-        help="Based on confidence scores for scenes (or plans, of which there "
-             "may be many per scene), compute other metrics when retaining "
-             "this proportion of all scenes (plans).")
-    parser.add_argument(
-        '--metrics_retention_use_oracle', type='bool',
-        default=True,
-        help='If enabled, will compute retention scores with 0 loss on all '
-             'non-retained points. This is analogous to the AV agent working '
-             'with a human that can perform optimally when given control.')
     parser.add_argument(
         '--fbeta_threshold', type=float,
         default=1.0,

@@ -17,10 +17,11 @@
 import os
 from typing import Mapping, Union, Sequence, Tuple, Optional, Dict
 
+import numpy as np
 import torch
 
-from sdc.metrics import SDCLoss
 from sdc.cache_metadata import MetadataCache
+from sdc.metrics import SDCLoss
 from sdc.oatomobile.torch.baselines.behavioral_cloning import (
     BehaviouralModel)
 from sdc.oatomobile.torch.baselines.deep_imitative_model import (
@@ -38,6 +39,7 @@ class RIPAgent:
                  device: str,
                  samples_per_model: int,
                  num_preds: int,
+                 cache_all_preds: bool,
                  **kwargs) -> None:
         """Constructs a robust imitative planning agent.
 
@@ -66,6 +68,10 @@ class RIPAgent:
         assert model_name in ("bc", "dim")
         self._model_name = model_name
 
+        # If enabled, don't use aggregation -- just cache all
+        # predictions and scores
+        self.cache_all_preds = cache_all_preds
+
     @staticmethod
     def run_rip_aggregation(algorithm, scores_to_aggregate):
         if algorithm == 'WCM':
@@ -86,7 +92,7 @@ class RIPAgent:
     def call_ensemble_members(
         self,
         **observation: Mapping[str, torch.Tensor]
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         Q = self._samples_per_model
         K = len(self._models)  # Number of ensemble members
 
@@ -103,7 +109,7 @@ class RIPAgent:
         predictions = torch.stack(predictions, dim=0)
         G, B, T, _ = predictions.size()
 
-        # For each element in the batch, we have K models and Q predictions.
+        # For each element in the batch, we have K models and G predictions.
         # Score each plan under each model.
         # (MC sampling over the model posterior)
         scores = []
@@ -119,16 +125,19 @@ class RIPAgent:
         # of plan j under the likelihood of model i.
         scores = torch.stack(scores, dim=0)
 
+        if self.cache_all_preds:
+            # permute axes to (B, G, T, 2)
+            # predictions = np.transpose(predictions, axes=(1, 0, 2, 3))
+            predictions = predictions.permute((1, 0, 2, 3))
+
+            # permute axes to (B, G, K)
+            # scores = scores.reshape(B, G, K)
+            scores = scores.permute((2, 1, 0))
+            return predictions, scores, None
+
         # Aggregate scores from the `K` models.
         scores = self.run_rip_aggregation(
             algorithm=self._per_plan_algorithm,
-            scores_to_aggregate=scores)
-
-        # Get per--prediction request (per-scene) confidence scores by
-        # aggregating per-plan
-        # TODO: We could choose to aggregate over the topk plans instead
-        pred_request_confidence_scores = self.run_rip_aggregation(
-            algorithm=self._per_scene_algorithm,
             scores_to_aggregate=scores)
 
         # Get indices of the plans with highest RIP-aggregated scores
@@ -147,6 +156,13 @@ class RIPAgent:
 
         # Shape (B, num_preds)
         plan_confidence_scores = torch.stack(plan_confidence_scores, dim=0)
+
+        # Get per--prediction request (per-scene) confidence scores by
+        # aggregating over topk plans
+        pred_request_confidence_scores = self.run_rip_aggregation(
+            algorithm=self._per_scene_algorithm,
+            scores_to_aggregate=plan_confidence_scores.permute((1, 0)))
+
         plan_confidence_scores = plan_confidence_scores.detach()
         return (best_plans, plan_confidence_scores,
                 pred_request_confidence_scores)
@@ -187,22 +203,26 @@ def evaluate_step_rip(
     ground_truth = batch['ground_truth_trajectory']
     predictions = predictions.detach().cpu().numpy()
     plan_confidence_scores = plan_confidence_scores.detach().cpu().numpy()
-    pred_request_confidence_scores = (
-        pred_request_confidence_scores.detach().cpu().numpy())
+
+    # If we are caching all predictions, this is not computed yet
+    if model.cache_all_preds:
+        pred_request_confidence_scores = np.zeros(0)
+    else:
+        pred_request_confidence_scores = (
+            pred_request_confidence_scores.detach().cpu().numpy())
 
     if metadata_cache is not None:
-        # Just store predictions and ground truths, we will later load these
-        # and evaluate loss manually
         metadata_cache.collect_batch_stats(
             predictions=predictions, batch=batch,
             plan_confidence_scores=plan_confidence_scores,
             pred_request_confidence_scores=pred_request_confidence_scores)
 
-    sdc_loss.cache_batch_losses(
-        predictions_list=predictions,
-        ground_truth_batch=ground_truth,
-        plan_confidence_scores_list=plan_confidence_scores,
-        pred_request_confidence_scores=pred_request_confidence_scores)
+    if not model.cache_all_preds:
+        sdc_loss.cache_batch_losses(
+            predictions_list=predictions,
+            ground_truth_batch=ground_truth,
+            plan_confidence_scores_list=plan_confidence_scores,
+            pred_request_confidence_scores=pred_request_confidence_scores)
 
 
 def load_rip_checkpoints(

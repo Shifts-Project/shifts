@@ -8,18 +8,18 @@ import torch.optim as optim
 import tqdm as tq
 from transformers import get_cosine_schedule_with_warmup
 
+from sdc.cache_metadata import MetadataCache
 from sdc.dataset import load_datasets, load_dataloaders
 from sdc.metrics import SDCLoss
-from sdc.cache_metadata import MetadataCache
 from sdc.oatomobile.tf.loggers import TensorBoardLogger
 from sdc.oatomobile.torch.baselines import (
     ImitativeModel, BehaviouralModel, batch_transform, init_model)
 from sdc.oatomobile.torch.baselines.robust_imitative_planning import (
     load_rip_checkpoints)
 from sdc.oatomobile.torch.savers import Checkpointer
-from sdc.oatomobile.utils.loggers.wandb import WandbLogger
 from sdc.oatomobile.torch.utils import (
     safe_torch_to_float, safe_torch_to_numpy)
+from sdc.oatomobile.utils.loggers.wandb import WandbLogger
 
 
 def count_parameters(model):
@@ -37,7 +37,7 @@ def train(c):
     clip_gradients = c.model_clip_gradients
     num_epochs = c.exp_num_epochs
     num_warmup_epochs = c.exp_num_lr_warmup_epochs
-    # checkpoint_frequency = c.exp_checkpoint_frequency
+    checkpoint_frequency = c.exp_checkpoint_frequency
     output_shape = c.model_output_shape
     num_timesteps_to_keep, _ = output_shape
     data_dtype = c.data_dtype
@@ -46,8 +46,10 @@ def train(c):
               c.rip_per_scene_algorithm is not None)
     eval_mode = (c.debug_eval_mode or is_rip)
     collect_dataset_stats = c.debug_collect_dataset_stats
-    consider_train = c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'train'
-    consider_eval = c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'eval'
+    consider_train = (
+        c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'train')
+    consider_eval = (
+        c.rip_eval_subgroup is None or c.rip_eval_subgroup == 'eval')
 
     if c.exp_image_downsize_hw is None:
         downsample_hw = None
@@ -91,7 +93,7 @@ def train(c):
         os.makedirs(checkpoint_dir, exist_ok=True)
         checkpointer = Checkpointer(
             model=model, ckpt_dir=checkpoint_dir, torch_seed=c.torch_seed,
-            checkpoint_frequency=c.exp_checkpoint_frequency)
+            checkpoint_frequency=checkpoint_frequency)
 
     # Init dataloaders.
     # Split = None loads train, validation, and test.
@@ -131,19 +133,6 @@ def train(c):
         train_args['metadata_cache'] = metadata_cache
         evaluate_args['metadata_cache'] = metadata_cache
         evaluate_args['sdc_loss'] = sdc_loss
-
-    # if model_name == 'dim':
-        # noise_level = c.dim_noise_level
-        # train_args['noise_level'] = noise_level
-
-    # # Theoretical limit of NLL, given the noise level.
-    # nll_limit = -torch.sum(  # pylint: disable=no-member
-    #     D.MultivariateNormal(
-    #         loc=torch.zeros(output_shape[-2] * output_shape[-1]),
-    #         scale_tril=torch.eye(
-    #             # output_shape[-2] * output_shape[-1]) * noise_level,
-    #     ).log_prob(
-    #         torch.zeros(output_shape[-2] * output_shape[-1])))
 
     def train_epoch(
             dataloader: torch.utils.data.DataLoader) -> torch.Tensor:
@@ -203,7 +192,7 @@ def train(c):
         if eval_loss_dict is not None:
             for key in eval_loss_dict:
                 eval_loss_dict[key] /= steps
-        if is_rip:
+        if is_rip and not c.rip_cache_all_preds:
             eval_loss_dict = sdc_loss.evaluate_dataset_losses(dataset_key)
         if collect_dataset_stats:
             metadata_cache.cache_dataset_stats(dataset_key)
@@ -244,6 +233,7 @@ def train(c):
     logger = WandbLogger(optimizer)
     logger.start_counting()
     steps = 0
+    # TODO: remove test data stuff
     if c.debug_overfit_test_data_only:
         validation_dataloaders = {}
     else:
@@ -254,6 +244,7 @@ def train(c):
             validation_dataloaders = eval_dataloaders['test']
             print(validation_dataloaders.keys())
 
+    # TODO: remove test data stuff
     if eval_mode or collect_dataset_stats:
         print('Running evaluation. Setting num_epochs to 1.')
         num_epochs = 1
