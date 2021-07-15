@@ -2,7 +2,7 @@
 
 ## Task
 
-Predict the output temperature given a set of weather features. Refer to (cite paper) for more detail about the task.
+Predict the output temperature given a set of weather features.
 
 ## Getting Started
 
