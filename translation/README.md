@@ -13,16 +13,18 @@ chmod +x ./shifts/translation/data/prepare_data.sh
 
 ### Setting up the baselines
 
-First clone a Fairseq fork which contains...
+First clone a Fairseq fork which contains an implementation of [Uncertainty Estimation in Autoregressive Structured Prediction](https://openreview.net/pdf?id=jN5y-zb5Q7m). Note that code is a little outdated and uses Fairseq 0.7. We plan to create a cleaner up-to-date implementation soon. 
 
 ```
-clone MY COOL Set
+git clone https://github.com/KaosEngineer/structured-uncertainty.git
+cd structured-uncertainty 
+python3 -m pip install --user --no-deps --editable .
 ```
 
 Next process the data into Fairseq format
 
 ```
-python3 ~/fairseq-py/fairseq-preprocess.py  --source-lang en --target-lang ru \\
+python3 structured-uncertainty/fairseq-preprocess.py  --source-lang en --target-lang ru \\
 --trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
 --destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
 ```
@@ -40,7 +42,7 @@ Run single model baseline:
 ```
 mkdir single 
 for i in test test1; do 
-    python3 ~/fairseq-py/generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results_${i}.txt
+    python3 structured-uncertainty//generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results_${i}.txt
 done
 ```
 
@@ -48,7 +50,7 @@ Run ensemble baseline:
 ```
 mkdir ensemble
 for i in test test1; do 
-    python3 ~/fairseq-py/generate.py wmt20_en_ru/ --path baseline-models/model1.pt:baseline-models/model2.pt:baseline-models/model3.pt  --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset ${i} --compute-uncertainty >& ensemble/results-${i}.txt
+    python3 structured-uncertainty/generate.py wmt20_en_ru/ --path baseline-models/model1.pt:baseline-models/model2.pt:baseline-models/model3.pt  --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset ${i} --compute-uncertainty >& ensemble/results-${i}.txt
 done
 ```
 
