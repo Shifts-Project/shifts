@@ -219,7 +219,7 @@ See [sdc/oatomobile/torch/baselines](sdc/oatomobile/torch/baselines) for the bas
 
 We can train K different ensemble members by sweeping over the `--torch_seed` parameter.
 
-By default we checkpoint every time the ADE on the OOD validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
+By default we checkpoint every time the ADE on the Moscow validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
 
 ### Evaluating RIP with Trained Ensemble Members
 

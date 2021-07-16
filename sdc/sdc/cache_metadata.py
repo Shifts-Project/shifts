@@ -89,7 +89,7 @@ class MetadataCache:
         pred_request_confidence_scores: np.ndarray,
         plan_confidence_scores: np.ndarray,
     ):
-        # TODO: support for varying # plans per prediction request
+        # TODO: Extend to variant D_i
         for obj in [predictions, plan_confidence_scores,
                     pred_request_confidence_scores]:
             if not isinstance(obj, np.ndarray):
@@ -256,9 +256,8 @@ ground-truth values, and per-plan confidence scores from storage.
 def load_dataset_key_to_arrs(
     metadata_cache_dir: str,
     chosen_dataset_keys: Sequence[str] = (
-        'moscow__validation', 'ood__validation', 'moscow__test', 'ood__test')
+        'moscow__validation', 'ood__validation')
 ) -> Dict[str, Dict]:
-    # TODO: remove test from these keys
     dataset_key_to_arrs = defaultdict(dict)
 
     for file_name in os.listdir(metadata_cache_dir):
@@ -275,19 +274,17 @@ def load_dataset_key_to_arrs(
     return dataset_key_to_arrs
 
 
-def construct_full_dev_eval_sets(
+def construct_full_dev_sets(
     dataset_key_to_arrs: Dict[str, Dict]
 ) -> Dict[str, Dict]:
     """Given a dataset_key_to_arrs object as loaded from
-    `load_dataset_key_to_arrs` above, add full__validation and
-    full__test datasets, composed of the corresponding moscow and ood sets.
-    # TODO: remove test dataset stuff
+        `load_dataset_key_to_arrs` above, add full__validation dataset,
+        composed of the corresponding moscow and ood sets.
     """
     field_keys = [
         'predictions', 'plan_conf_scores', 'gt_trajectories', 'request_ids']
     full_dataset_to_subdataset_names = {
-        'full__validation': ['moscow__validation', 'ood__validation'],
-        'full__test': ['moscow__test', 'ood__test'],
+        'full__validation': ['moscow__validation', 'ood__validation']
     }
     for full_dataset_key, subdataset_keys in (
             full_dataset_to_subdataset_names.items()):

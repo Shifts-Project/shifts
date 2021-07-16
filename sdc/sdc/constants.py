@@ -15,17 +15,14 @@ VALID_BASE_METRICS = {'ade', 'fde'}
 SPLIT_TO_PB_DATASET_PATH = {  # Protobufs (unrendered)
     'train': '/train_pb/',
     'validation': '/validation_pb/',
-    'test': '/test_pb/'
 }
 SPLIT_TO_RENDERED_DATASET_PATH = {  # np.ndarrays (rendered)
     'train': '/train_rendered/',
     'validation': '/validation_rendered/',
-    'test': '/test_rendered/'
 }
 SPLIT_TO_SCENE_TAGS_PATH = {
     'train': '/train_tags.txt',
     'validation': '/validation_tags.txt',
-    'test': '/test_tags.txt'
 }
 
 # Matplotlib colors for retention plots with baselines.

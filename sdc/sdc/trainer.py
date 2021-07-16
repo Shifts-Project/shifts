@@ -96,7 +96,7 @@ def train(c):
             checkpoint_frequency=checkpoint_frequency)
 
     # Init dataloaders.
-    # Split = None loads train, validation, and test.
+    # Split = None loads train, validation.
     datasets = load_datasets(c, splits=None)
     train_dataloader, eval_dataloaders = load_dataloaders(datasets, c)
 
@@ -122,9 +122,6 @@ def train(c):
     if c.tb_logging:
         dataset_names = ['moscow__train'] + list(
             set(eval_dataloaders['validation'].keys()))
-        # TODO: remove eval on test set
-        if eval_mode:
-            dataset_names += list(set(eval_dataloaders['test'].keys()))
         print(f'TensorBoard logging for datasets {dataset_names}.')
         writer = TensorBoardLogger(
             log_dir=c.dir_tensorboard, dataset_names=dataset_names)
@@ -233,32 +230,25 @@ def train(c):
     logger = WandbLogger(optimizer)
     logger.start_counting()
     steps = 0
-    # TODO: remove test data stuff
-    if c.debug_overfit_test_data_only:
+    if c.debug_overfit_dev_data_only:
+        train_dataset_key = 'moscow__validation'
         validation_dataloaders = {}
     else:
-        try:
-            validation_dataloaders = eval_dataloaders['validation']
-        except KeyError:
-            print('No validation sets found. Computing per-epoch test loss:')
-            validation_dataloaders = eval_dataloaders['test']
-            print(validation_dataloaders.keys())
+        train_dataset_key = 'moscow__train'
+        validation_dataloaders = eval_dataloaders['validation']
 
-    # TODO: remove test data stuff
     if eval_mode or collect_dataset_stats:
         print('Running evaluation. Setting num_epochs to 1.')
         num_epochs = 1
-        test_dataloaders = eval_dataloaders['test']
 
     with tq.tqdm(range(num_epochs)) as pbar_epoch:
         for epoch in pbar_epoch:
             epoch_loss_dict = defaultdict(dict)
 
             if (not eval_mode or collect_dataset_stats) and consider_train:
-                dataset_key = 'moscow__train'
                 if is_rip:
                     loss_train_dict = evaluate_epoch(
-                        train_dataloader, dataset_key=dataset_key)
+                        train_dataloader, dataset_key=train_dataset_key)
                 else:
                     loss_train_dict, epoch_steps = train_epoch(
                         train_dataloader)
@@ -266,45 +256,35 @@ def train(c):
 
                 for loss_key, loss_value in loss_train_dict.items():
                     epoch_loss_dict['train'][
-                        f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
-                        loss_value)
+                        f'{train_dataset_key}__{loss_key}'] = (
+                        safe_torch_to_float(loss_value))
                 if c.tb_logging:
-                    write(model, train_dataloader, writer, dataset_key,
+                    write(model, train_dataloader, writer, train_dataset_key,
                           loss_train_dict, epoch)
 
             # Evaluates model on validation datasets
             if consider_eval:
-                for dataset_key, dataloader_val in validation_dataloaders.items():
+                for dataset_key, dataloader_val in (
+                        validation_dataloaders.items()):
                     loss_val_dict = evaluate_epoch(dataloader_val, dataset_key)
                     for loss_key, loss_value in loss_val_dict.items():
                         epoch_loss_dict[
                             'validation'][
-                            f'{dataset_key}__{loss_key}'] = safe_torch_to_float(
-                            loss_value)
+                            f'{dataset_key}__{loss_key}'] = (
+                                safe_torch_to_float(loss_value))
 
                     if c.tb_logging:
                         write(model, dataloader_val, writer, dataset_key,
-                            loss_val_dict, epoch)
+                              loss_val_dict, epoch)
 
-            if eval_mode and consider_eval:
-                # TODO: remove in final code
-                # Evaluate on the test sets.
-                for dataset_key, dataloader_test in test_dataloaders.items():
-                    loss_test_dict = evaluate_epoch(
-                        dataloader_test, dataset_key)
-                    for loss_key, loss_value in loss_test_dict.items():
-                        epoch_loss_dict[
-                            'test'][f'{dataset_key}__{loss_key}'] = (
-                            safe_torch_to_float(loss_value))
-                    if c.tb_logging:
-                        write(model, dataloader_test, writer, dataset_key,
-                              loss_test_dict, epoch)
-            elif consider_eval:
+            if not eval_mode and consider_eval:
                 # Checkpoints model weights if c.exp_checkpoint_validation_loss
                 # has improved since last checkpoint.
+                dataset_key = (
+                    'train' if c.debug_overfit_dev_data_only else 'validation')
                 checkpointer.save(
                     epoch, epoch_loss_dict[
-                        'validation'][c.exp_checkpoint_validation_loss])
+                        dataset_key][c.exp_checkpoint_validation_loss])
 
             # Updates progress bar description.
             pbar_string = ''
@@ -315,19 +295,11 @@ def train(c):
                     pbar_string += '{} {:.2f} | '.format(
                         dataset_key, loss_train)
 
-            # if c.model_name == 'dim':
-            #     pbar_string += 'THEORYMIN: {:.2f} | '.format(nll_limit)
-
             if consider_eval:
                 pbar_string += 'Val Losses: '
-                for dataset_key, loss_val in epoch_loss_dict['validation'].items():
+                for dataset_key, loss_val in epoch_loss_dict[
+                        'validation'].items():
                     pbar_string += '{} {:.2f} | '.format(dataset_key, loss_val)
-
-                if eval_mode:
-                    pbar_string += 'Test Losses: '
-                    for dataset_key, loss_test in epoch_loss_dict['test'].items():
-                        pbar_string += '{} {:.2f} | '.format(
-                            dataset_key, loss_test)
 
             pbar_string += '\n'
             pbar_epoch.set_description(pbar_string)

@@ -38,8 +38,8 @@ def load_overfit_set_file_paths(
 
 
 def load_datasets(c, splits: Optional[List[str]] = None):
-    if c.debug_overfit_test_data_only:
-        splits = ['test']
+    if c.debug_overfit_dev_data_only:
+        splits = ['validation']
     if splits is not None:
         print(f'Loading datasets for splits {splits}.')
 
@@ -102,10 +102,10 @@ def load_dataloaders(datasets, c):
     print(f'Building dataloaders with num_workers={num_workers}, '
           f'prefetch_factor={prefetch_factor}.')
 
-    if c.debug_overfit_test_data_only:
+    if c.debug_overfit_dev_data_only:
         train_dataloader = torch.utils.data.DataLoader(
-            datasets['test']['moscow__test'], batch_size=batch_size,
-            num_workers=num_workers, pin_memory=True,
+            datasets['validation']['moscow__validation'],
+            batch_size=batch_size, num_workers=num_workers, pin_memory=True,
             prefetch_factor=prefetch_factor)
         eval_dataloaders = {}
     else:
@@ -114,10 +114,9 @@ def load_dataloaders(datasets, c):
             num_workers=num_workers, pin_memory=True,
             prefetch_factor=prefetch_factor)
 
-        # Load dataloaders for in- and out-of-domain
-        # validation and test datasets.
+        # Load dataloaders for in- and out-of-domain validation datasets.
         eval_dataloaders = defaultdict(dict)
-        for eval_mode in ['validation', 'test']:
+        for eval_mode in ['validation']:
             if eval_mode not in datasets.keys():
                 continue
 

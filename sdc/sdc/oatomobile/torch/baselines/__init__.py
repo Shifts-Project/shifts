@@ -119,7 +119,6 @@ BACKBONE_NAME_TO_KWARGS_FN = {
 BACKBONE_NAME_TO_CLASS_FNS = {
     'bc': (init_behavioral_model, train_step_bc, evaluate_step_bc),
     'dim': (init_imitative_model, train_step_dim, evaluate_step_dim),
-    # TODO: RIP with MC Dropout (Ensembles)
 }
 
 BACKBONE_NAME_TO_FULL_NAME = {

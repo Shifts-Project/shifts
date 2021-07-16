@@ -112,7 +112,7 @@ def build_parser():
              'validation loss improves.')
     parser.add_argument(
         '--exp_checkpoint_validation_loss', type=str,
-        default='ood__validation__ade',
+        default='moscow__validation__ade',
         help='Loss to use for model checkpointing (i.e., checkpoint if model '
              'improves this validation loss. Note that by default, this uses '
              'the in-distribution (Moscow, no precipitation) validation set.')
@@ -232,8 +232,8 @@ def build_parser():
         '--debug_overfit_eval', type='bool', default=False,
         help='Train on a very small subset, try to overfit.')
     parser.add_argument(
-        '--debug_overfit_test_data_only', type='bool', default=False,
-        help='If True, only use the test data.')
+        '--debug_overfit_dev_data_only', type='bool', default=False,
+        help='If True, only use the dev data.')
     parser.add_argument(
         '--debug_overfit_n_examples', type=int, default=10,
         help='Size of the subset of train on which we try to overfit.')
