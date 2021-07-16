@@ -337,7 +337,7 @@ def plot_retention_curve_with_baselines(
         # (on any of the dataset splits)
         sparsification_factor = get_sparsification_factor(
             retention_values.shape[0])
-        retention_values = retention_values[::sparsification_factor]
+        retention_values = retention_values[::sparsification_factor][::-1]
         retention_thresholds = np.arange(
             len(retention_values)) / len(retention_values)
 
@@ -378,7 +378,7 @@ def plot_retention_curves_from_dict(
         # (on any of the dataset splits)
         sparsification_factor = get_sparsification_factor(
             retention_values.shape[0])
-        retention_values = retention_values[::sparsification_factor]
+        retention_values = retention_values[::sparsification_factor][::-1]
         retention_thresholds = np.arange(
             len(retention_values)) / len(retention_values)
 
