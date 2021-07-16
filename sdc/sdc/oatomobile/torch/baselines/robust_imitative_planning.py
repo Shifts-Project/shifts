@@ -131,7 +131,6 @@ class RIPAgent:
             predictions = predictions.permute((1, 0, 2, 3))
 
             # permute axes to (B, G, K)
-            # scores = scores.reshape(B, G, K)
             scores = scores.permute((2, 1, 0))
             return predictions, scores, None
 

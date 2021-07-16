@@ -298,7 +298,7 @@ class SDCLoss:
         else:
             compute_optimal_baseline = False
 
-        M = uncertainty_scores.shape[0]
+        M = self.pred_request_confidence_scores.shape[0]
         fbeta_aucs = {}
         r_aucs = {}
         retention_arrs = {}
@@ -352,7 +352,7 @@ class SDCLoss:
                 # Compute retention/rejection arrays.
                 rejection_curve = calc_uncertainty_regection_curve(
                     errors=per_pred_req_losses,
-                    uncertainty=uncertainty_scores)
+                    uncertainty=uncertainty_scores)[::-1]
                 r_auc = rejection_curve.mean()
                 r_aucs[f'{model_name}__{metric_key_prefix}__r_auc'] = r_auc
                 retention_arrs[metric_key_prefix] = rejection_curve

@@ -17,7 +17,7 @@ from absl import app
 from absl import flags
 from absl import logging
 
-from sdc.assessment import calc_uncertainty_regection_curve
+from sdc.assessment import calc_uncertainty_regection_curve, f_beta_metrics
 from sdc.constants import BASELINE_TO_COLOR_HEX
 
 # Data load / output flags.
@@ -190,18 +190,15 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
      plot_dir: `str`, directory to which plots will be written
     """
     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    markers = ['o', 'D', 's', '8', '^', '*']
     dataset_keys = list(sorted(set(results_df['dataset_key'])))
     metrics = set(results_df['metric'])
-    use_oracles = set(results_df['use_oracle'])
 
-    outside_loop = product(dataset_keys, use_oracles, metrics)
+    outside_loop = product(dataset_keys, metrics)
 
     # We do a plot for each of these.
-    for dataset_key, use_oracle, metric in outside_loop:
+    for dataset_key, metric in outside_loop:
         metric_df = results_df[
             (results_df['dataset_key'] == dataset_key) &
-            (results_df['use_oracle'] == use_oracle) &
             (results_df['metric'] == metric)].copy()
 
         fig, ax = plt.subplots()
@@ -254,8 +251,7 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
                 mean,
                 label=get_plotting_style_model_name(
                     model_prefix, baseline, auc_mean, auc_std),
-                color=colors[b % len(colors)],
-                marker=markers[b % len(markers)])
+                color=colors[b % len(colors)])
             ax.fill_between(
                 retained_data,
                 mean - std,
@@ -271,15 +267,13 @@ def plot_results_df(results_df: pd.DataFrame, plot_dir: str):
             os.makedirs(plot_dir, exist_ok=True)
             metric_plot_path = os.path.join(
                 plot_dir,
-                f'{dataset_key} - Use Oracle {use_oracle} - '
-                f'{plotting_metric_name}.pdf')
+                f'{dataset_key} - {plotting_metric_name}.pdf')
             fig.savefig(metric_plot_path, transparent=True, dpi=300,
                         format='pdf')
             logging.info('Saved plot for metric %s, baselines %s '
                          'to %s.', metric, baselines, metric_plot_path)
         else:
-            print(f'{dataset_key} - Use Oracle {use_oracle} - '
-                  f'{plotting_metric_name}')
+            print(f'{dataset_key} - {plotting_metric_name}')
             plt.show()
 
 
@@ -343,7 +337,7 @@ def plot_retention_curve_with_baselines(
         # (on any of the dataset splits)
         sparsification_factor = get_sparsification_factor(
             retention_values.shape[0])
-        retention_values = retention_values[::sparsification_factor][::-1]
+        retention_values = retention_values[::sparsification_factor]
         retention_thresholds = np.arange(
             len(retention_values)) / len(retention_values)
 
@@ -384,7 +378,7 @@ def plot_retention_curves_from_dict(
         # (on any of the dataset splits)
         sparsification_factor = get_sparsification_factor(
             retention_values.shape[0])
-        retention_values = retention_values[::sparsification_factor][::-1]
+        retention_values = retention_values[::sparsification_factor]
         retention_thresholds = np.arange(
             len(retention_values)) / len(retention_values)
 
@@ -440,6 +434,52 @@ def plot_fbeta_retention_curve_with_baselines(
         fig.tight_layout()
 
     sns.set_style('darkgrid')
+    plt.show()
+    return fig
+
+
+def get_comparative_f1_retention_results(
+    baseline_name_to_df,
+    metric_name,
+):
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    fig, ax = plt.subplots()
+    methods = []
+    aucs_retention_curves = []
+
+    for baseline_name, dataset_df in baseline_name_to_df.items():
+        errors = dataset_df[metric_name].to_numpy()
+        uncertainty = -(
+            dataset_df['pred_request_confidence_scores'].to_numpy())
+        threshold = 1
+        beta = 1
+
+        # Using our model's uncertainty values
+        retention_results = f_beta_metrics(
+            errors=errors, uncertainty=uncertainty, threshold=threshold,
+            beta=beta)
+
+        f_auc, f95, retention_arr = retention_results
+        aucs_retention_curves.append((f_auc, retention_arr))
+        methods.append(baseline_name)
+
+    x = np.arange(len(retention_arr))
+    x = x / len(retention_arr)
+
+    for b, (baseline, (f_auc, retention_arr)) in enumerate(
+            zip(methods, aucs_retention_curves)):
+        ax.plot(
+            x,
+            retention_arr,
+            label=f'{baseline} [AUC: {f_auc:.3f}]',
+            color=colors[b % len(colors)]
+        )
+
+        ax.set(xlabel='Retention Fraction',
+               ylabel=f'F1-{metric_name}')
+        ax.legend()
+        fig.tight_layout()
+
     plt.show()
     return fig
 
