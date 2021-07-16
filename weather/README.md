@@ -6,7 +6,7 @@ Predict the output temperature given a set of weather features.
 
 ## Getting Started
 
-`tutorial.ipynb` walks through the steps for:
+`tutorial.ipynb` provides an example of how to impelement a baseline using the method from [Uncertainty Estimation in Gradient Boosting via Ensembles](https://arxiv.org/pdf/2006.10562.pdf). It walks through the following steps:
 1. Repository download
 2. Data download
 3. Data loading
