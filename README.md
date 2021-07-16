@@ -1,4 +1,4 @@
-![img](https://github.com/yandex-research/uncertainty-challenge/blob/main/2.png)
+![img](https://github.com/yandex-research/uncertainty-challenge/blob/main/shifts_logo.png)
 
 # Shifts Challege
 
