@@ -46,7 +46,7 @@ Shifts SDC Motion Prediction Dataset is released under [CC BY NC SA 4.0](https:/
 
 As the [Shifts Challenge](https://research.yandex.com/shifts) is currently underway, we are only releasing the full training and development sets of the **canonical partition** for all tasks of the Shift Dataset, as detailed in our [paper](https://arxiv.org/pdf/2107.07455.pdf). Evaluation data without ground-truth labels or metadata will be released on **October 17th 2021**. The evaluation data labels and ground-truth predictions, as well as the full Shifts Dataset, will become availabe on **November 1st 2021**, after the Shifts Challenge concludes.
 
-**By downloading the Shifts Dataset, you automatically agree to the linceses described above.**
+**By downloading the Shifts Dataset, you automatically agree to the licenses described above.**
 
 ### Weather Prediction
 
