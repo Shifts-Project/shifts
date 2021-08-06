@@ -24,8 +24,8 @@ python3 -m pip install --user --no-deps --editable .
 Next process the data into Fairseq format
 
 ```
-python3 structured-uncertainty/fairseq-preprocess.py  --source-lang en --target-lang ru \\
---trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
+python3 structured-uncertainty/preprocess.py  --source-lang en --target-lang ru \\
+--trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/reddit_dev  \\
 --destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
 ```
 
