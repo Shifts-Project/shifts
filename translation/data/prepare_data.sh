@@ -159,7 +159,6 @@ for l in $src $tgt; do
     perl $TOKENIZER -threads 24 -a -l ${l} >>$tmp/reddit_dev.$l
 done
 
-exit
 
 echo "splitting train and valid..."
 for l in $src $tgt; do
