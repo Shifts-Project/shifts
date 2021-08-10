@@ -40,16 +40,18 @@ level 1, which can optionally be used to avoid rendering costs and significantly
 decompression time (demonstrated in the example [notebook](examples/example.ipynb), in the `Prerendered Dataset` section).
 
 The expected directory structure is:
+```
 shifts/
- |--> sdc/
-       |--> data/
-              |--> train_pb/
-              |--> validation_pb/
-              |--> train_tags.txt
-              |--> validation_tags.txt              
-              |--> train_rendered/
-              |--> validation_rendered/
-              
+   |--> sdc/
+         |--> data/    
+               |--> train_pb/
+               |--> validation_pb/
+               |--> train_tags.txt
+               |--> validation_tags.txt              
+               |--> train_rendered/
+               |--> validation_rendered/
+```
+
 ### Scene Protobuf
 
 Each file in a protobuf directory contains a serialized protobuf message `Scene`.
