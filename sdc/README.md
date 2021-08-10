@@ -35,11 +35,21 @@ The data directory should have the following enclosed components:
 * Tag files: `train_tags.txt`, `validation_tags.txt`
 * (If desired) rendered feature map directories: `train_rendered/`,
     `validation_rendered/`
-
 We provide rendered feature maps at 128x128 resolution with zlib compression
-level 1, which can be used to avoid rendering costs and significantly decrease
+level 1, which can optionally be used to avoid rendering costs and significantly decrease
 decompression time (demonstrated in the example [notebook](examples/example.ipynb), in the `Prerendered Dataset` section).
 
+The expected directory structure is:
+shifts/
+ |--> sdc/
+       |--> data/
+              |--> train_pb/
+              |--> validation_pb/
+              |--> train_tags.txt
+              |--> validation_tags.txt              
+              |--> train_rendered/
+              |--> validation_rendered/
+              
 ### Scene Protobuf
 
 Each file in a protobuf directory contains a serialized protobuf message `Scene`.
