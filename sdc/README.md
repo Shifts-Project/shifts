@@ -31,10 +31,10 @@ pip install .
 
 The data directory should have the following enclosed components:
 
-* Protobuf directories: `train_pb/`, `validation_pb/`
-* Tag files: `train_tags.txt`, `validation_tags.txt`
+* Protobuf directories: `train_pb/`, `development_pb/`
+* Tag files: `train_tags.txt`, `development_tags.txt`
 * (If desired) rendered feature map directories: `train_rendered/`,
-    `validation_rendered/`
+    `development_rendered/`
 We provide rendered feature maps at 128x128 resolution with zlib compression
 level 1, which can optionally be used to avoid rendering costs and significantly decrease
 decompression time (demonstrated in the example [notebook](examples/example.ipynb), in the `Prerendered Dataset` section).
@@ -45,11 +45,11 @@ shifts/
    |--> sdc/
          |--> data/    
                |--> train_pb/
-               |--> validation_pb/
+               |--> development_pb/
                |--> train_tags.txt
-               |--> validation_tags.txt              
+               |--> development_tags.txt              
                |--> train_rendered/
-               |--> validation_rendered/
+               |--> development_rendered/
 ```
 
 ### Scene Protobuf
