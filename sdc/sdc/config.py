@@ -112,10 +112,10 @@ def build_parser():
              'validation loss improves.')
     parser.add_argument(
         '--exp_checkpoint_validation_loss', type=str,
-        default='moscow__validation__ade',
+        default='moscow__development__ade',
         help='Loss to use for model checkpointing (i.e., checkpoint if model '
              'improves this validation loss. Note that by default, this uses '
-             'the in-distribution (Moscow, no precipitation) validation set.')
+             'the in-distribution (Moscow, no precipitation) development set.')
 
     ###########################################################################
     # #### Model ##############################################################
@@ -201,7 +201,7 @@ def build_parser():
              "generations from the ensemble members.")
     parser.add_argument(
         '--rip_eval_subgroup', type=str, default=None,
-        help="If specified, RIP will only evaluate on either train/eval "
+        help="If specified, RIP will only evaluate on either train/development "
              "datasets. Helpful to parallelize evaluation load across jobs.")
     parser.add_argument(
         '--rip_cache_all_preds', type='bool', default=False,

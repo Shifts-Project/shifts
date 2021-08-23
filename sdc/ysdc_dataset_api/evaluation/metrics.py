@@ -286,7 +286,7 @@ def batch_mean_metric_torch(
 
 """
 Dataset analysis utilities.
-Used to compute aggregate metrics over predictions on a full eval dataset.
+Used to compute aggregate metrics over predictions on a full development dataset.
 """
 
 
