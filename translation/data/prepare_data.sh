@@ -21,40 +21,22 @@ BPEROOT=subword-nmt/subword_nmt
 BPE_TOKENS=40000
 
 URLS=(
-  "https://s3.amazonaws.com/web-language-models/paracrawl/release1/paracrawl-release1.en-ru.zipporah0-dedup-clean.tgz"
-  "http://statmt.org/wmt13/training-parallel-commoncrawl.tgz"
-  "http://data.statmt.org/news-commentary/v15/training/news-commentary-v15.en-ru.tsv.gz"
-  "http://data.statmt.org/wikititles/v2/wikititles-v2.ru-en.tsv.gz"
-  "http://data.statmt.org/wmt20/translation-task/WikiMatrix/WikiMatrix.v1.en-ru.langid.tsv.gz"
-  "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.en.gz"
-  "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.en.translatedto.ru.gz"
-  "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.gz"
-  "http://data.statmt.org/wmt20/translation-task/back-translation/ru-en/news.ru.translatedto.en.gz"
-  "http://data.statmt.org/wmt19/translation-task/dev.tgz"
+  "https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar"
   "https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar"
 )
 FILES=(
-  "paracrawl-release1.en-ru.zipporah0-dedup-clean.tgz"
-  "training-parallel-commoncrawl.tgz"
-  "news-commentary-v15.en-ru.tsv.gz"
-  "wikititles-v2.ru-en.tsv.gz"
-  "WikiMatrix.v1.en-ru.langid.tsv.gz"
-  "news.en.gz"
-  "news.en.translatedto.ru.gz"
-  "news.ru.gz"
-  "news.ru.translatedto.en.gz"
-  "dev.tgz"
+  "train-data.tar"
   "dev-data.tar"
 )
 
 CORPORA=(
-  "paracrawl-release1.en-ru.zipporah0-dedup-clean"
-  "commoncrawl.ru-en"
-  "en-ru/UNv1.0.en-ru"
-  "1mcorpus/corpus.en_ru.1m"
-  "news-commentary-v15.en-ru"
-  "WikiMatrix.v1.en-ru.langid"
-  "wikititles-v2.ru-en"
+  "train-data/paracrawl-release1.en-ru.zipporah0-dedup-clean"
+  "train-data/commoncrawl.ru-en"
+  "train-data/en-ru/UNv1.0.en-ru"
+  "train-data/1mcorpus/corpus.en_ru.1m"
+  "train-data/news-commentary-v15.en-ru"
+  "train-data/WikiMatrix.v1.en-ru.langid"
+  "train-data/wikititles-v2.ru-en"
 )
 
 OUTDIR=wmt20_en_ru
@@ -71,7 +53,6 @@ lang=en-ru
 prep=$OUTDIR
 tmp=$prep/tmp
 orig=orig
-dev=dev/newstest2019
 
 mkdir -p $orig $tmp $prep
 
@@ -96,54 +77,62 @@ for ((i = 0; i < ${#URLS[@]}; ++i)); do
       tar zxvf $file
     elif [ ${file: -4} == ".tar" ]; then
       tar xvf $file
-    elif [ ${file: -4} == ".gz" ]; then
+    elif [ ${file: -3} == ".gz" ]; then
       gunzip $file
     fi
   fi
 done
 
-awk -F "\t" 'BEGIN {OFS=FS} {print $1}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.en
-awk -F "\t" 'BEGIN {OFS=FS} {print $2}' news-commentary-v15.en-ru.tsv >news-commentary-v15.en-ru.ru
+awk -F "\t" 'BEGIN {OFS=FS} {print $1}' train-data/news-commentary-v15.en-ru.tsv > train-data/news-commentary-v15.en-ru.en
+awk -F "\t" 'BEGIN {OFS=FS} {print $2}' train-data/news-commentary-v15.en-ru.tsv > train-data/news-commentary-v15.en-ru.ru
+
+awk -F "\t" 'BEGIN {OFS=FS} {print $2}' train-data/wikititles-v2.ru-en.tsv > train-data/wikititles-v2.ru-en.en
+awk -F "\t" 'BEGIN {OFS=FS} {print $1}' train-data/wikititles-v2.ru-en.tsv > train-data/wikititles-v2.ru-en.ru
+
+awk -F "\t" 'BEGIN {OFS=FS} {print $2}' train-data/WikiMatrix.v1.en-ru.langid.tsv > train-data/WikiMatrix.v1.en-ru.langid.en
+awk -F "\t" 'BEGIN {OFS=FS} {print $3}' train-data/WikiMatrix.v1.en-ru.langid.tsv > train-data/WikiMatrix.v1.en-ru.langid.ru
 
 cd ..
-
 
 echo "pre-processing train data..."
 for l in $src $tgt; do
   rm $tmp/train.tags.$lang.tok.$l
   for f in "${CORPORA[@]}"; do
+    echo ${f}
     cat $orig/$f.$l |
       perl $NORM_PUNC $l |
       perl $REM_NON_PRINT_CHAR |
-      perl $TOKENIZER -threads 24 -a -l $l >>$tmp/train.tags.$lang.tok.$l
+      perl $TOKENIZER -threads 24 -a -l $l >> $tmp/train.tags.$lang.tok.$l
   done
 done
 
 echo "processing back-trans news dataset"
-cat $orig/news.ru.translatedto.en |
+cat $orig/train-data/news.ru.translatedto.en |
   perl $NORM_PUNC en |
   perl $REM_NON_PRINT_CHAR |
-  perl $TOKENIZER -threads 24 -a -l en >>$tmp/train.tags.$lang.tok.en
+  perl $TOKENIZER -threads 24 -a -l en >> $tmp/train.tags.$lang.tok.en
 
-cat $orig/news.ru |
+cat $orig/train-data/news.ru |
   perl $NORM_PUNC ru |
   perl $REM_NON_PRINT_CHAR |
-  perl $TOKENIZER -threads 24 -a -l ru >>$tmp/train.tags.$lang.tok.ru
+  perl $TOKENIZER -threads 24 -a -l ru >> $tmp/train.tags.$lang.tok.ru
+
+
 
 echo "Remove Deplications, clean data"
 paste $tmp/train.tags.$lang.tok.en $tmp/train.tags.$lang.tok.ru | python $CLEAN_DATA --directions en-ru --no-zero-len --max-sent-len 1024 --no-bad-utf --max-jaccard-coef-exclusive 0.05 --filter-equality >>$tmp/tmp
-awk -F "\t" '{print $1}' $tmp/tmp >$tmp/train.tags.$lang.clean.tok.en
-awk -F "\t" '{print $2}' $tmp/tmp >$tmp/train.tags.$lang.clean.tok.ru
+awk -F "\t" '{print $1}' $tmp/tmp > $tmp/train.tags.$lang.clean.tok.en
+awk -F "\t" '{print $2}' $tmp/tmp > $tmp/train.tags.$lang.clean.tok.ru
 rm $tmp/tmp
 
-echo "pre-processing test data news 19..."
+echo "pre-processing dev data newstest19..."
 for l in $src $tgt; do
   if [ "$l" == "$src" ]; then
     t="src"
   else
     t="ref"
   fi
-  grep '<seg id' $orig/test/newstest2019-enru-$t.$l.sgm |
+  grep '<seg id' $orig/dev-data/newstest2019-enru-$t.$l.sgm |
     sed -e 's/<seg id="[0-9]*">\s*//g' |
     sed -e 's/\s*<\/seg>\s*//g' |
     sed -e "s/\’/\'/g" |
@@ -151,14 +140,13 @@ for l in $src $tgt; do
   echo ""
 done
 
-
+echo "pre-processing dev data reddit..."
 for l in $src $tgt; do
   cat $orig/dev-data/reddit_dev.${l} |
     perl $NORM_PUNC ${l} |
     perl $REM_NON_PRINT_CHAR |
     perl $TOKENIZER -threads 24 -a -l ${l} >>$tmp/reddit_dev.$l
 done
-
 
 echo "splitting train and valid..."
 for l in $src $tgt; do
