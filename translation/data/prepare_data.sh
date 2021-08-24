@@ -43,7 +43,6 @@ OUTDIR=wmt20_en_ru
 
 if [ ! -d "$SCRIPTS" ]; then
   echo "Please set SCRIPTS variable correctly to point to Moses scripts."
-  "http://data.statmt.org/wmt17/translation-task/training-parallel-nc-v12.tgz"
   exit
 fi
 
