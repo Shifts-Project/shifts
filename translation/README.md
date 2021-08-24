@@ -36,6 +36,16 @@ wget https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline
 tar -xf baseline-models.tar
 ```
 
+### Training a model
+
+If you don't want to use the downloaded baseline and instead want to train your model, you can run the following command:
+
+```
+python3 structured-uncertainty/train.py data-bin/wmt20_en_ru --arch transformer_wmt_en_de_big --share-decoder-input-output-embed --fp16 --memory-efficient-fp16 --num-workers 16 --optimizer adam --adam-betas '(0.9, 0.98)' --clip-norm 0.0 --lr 5e-4 --lr-scheduler inverse_sqrt --warmup-updates 4000 --dropout 0.1 --weight-decay 0.0001 --criterion label_smoothed_cross_entropy --label-smoothing 0.1 --max-tokens 5120 --save-dir MODEL_DIR --max-update 50000 --update-freq 16 --keep-last-epochs 10 --seed 0
+```
+
+This was used to produce the baselines, with only the seed varying.
+
 ### Running the baselines
 
 Run single model baseline:

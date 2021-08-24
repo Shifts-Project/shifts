@@ -121,7 +121,7 @@ def train(c):
 
     if c.tb_logging:
         dataset_names = ['moscow__train'] + list(
-            set(eval_dataloaders['validation'].keys()))
+            set(eval_dataloaders['development'].keys()))
         print(f'TensorBoard logging for datasets {dataset_names}.')
         writer = TensorBoardLogger(
             log_dir=c.dir_tensorboard, dataset_names=dataset_names)
@@ -231,11 +231,11 @@ def train(c):
     logger.start_counting()
     steps = 0
     if c.debug_overfit_dev_data_only:
-        train_dataset_key = 'moscow__validation'
+        train_dataset_key = 'moscow__development'
         validation_dataloaders = {}
     else:
         train_dataset_key = 'moscow__train'
-        validation_dataloaders = eval_dataloaders['validation']
+        validation_dataloaders = eval_dataloaders['development']
 
     if eval_mode or collect_dataset_stats:
         print('Running evaluation. Setting num_epochs to 1.')
@@ -262,14 +262,14 @@ def train(c):
                     write(model, train_dataloader, writer, train_dataset_key,
                           loss_train_dict, epoch)
 
-            # Evaluates model on validation datasets
+            # Evaluates model on development datasets
             if consider_eval:
                 for dataset_key, dataloader_val in (
                         validation_dataloaders.items()):
                     loss_val_dict = evaluate_epoch(dataloader_val, dataset_key)
                     for loss_key, loss_value in loss_val_dict.items():
                         epoch_loss_dict[
-                            'validation'][
+                            'development'][
                             f'{dataset_key}__{loss_key}'] = (
                                 safe_torch_to_float(loss_value))
 
@@ -281,7 +281,7 @@ def train(c):
                 # Checkpoints model weights if c.exp_checkpoint_validation_loss
                 # has improved since last checkpoint.
                 dataset_key = (
-                    'train' if c.debug_overfit_dev_data_only else 'validation')
+                    'train' if c.debug_overfit_dev_data_only else 'development')
                 checkpointer.save(
                     epoch, epoch_loss_dict[
                         dataset_key][c.exp_checkpoint_validation_loss])
@@ -298,7 +298,7 @@ def train(c):
             if consider_eval:
                 pbar_string += 'Val Losses: '
                 for dataset_key, loss_val in epoch_loss_dict[
-                        'validation'].items():
+                        'development'].items():
                     pbar_string += '{} {:.2f} | '.format(dataset_key, loss_val)
 
             pbar_string += '\n'

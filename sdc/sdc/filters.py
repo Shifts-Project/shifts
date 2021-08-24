@@ -19,9 +19,9 @@ tags.proto file in sources
 Training Data ('train')
 'moscow__train': Moscow intersected with NO precipitation
 
-Validation Data ('validation')
-'moscow__validation': Moscow intersected with NO precipitation
-'ood__validation': Skolkovo, Modiin, and Innopolis intersected with
+Development Data ('development')
+'moscow__development': Moscow intersected with NO precipitation
+'ood__development': Skolkovo, Modiin, and Innopolis intersected with
     (No precipitation, Rain and Snow)
 
 Test Data ('test')
@@ -42,7 +42,7 @@ def filter_moscow_no_precipitation_data(scene_tags_dict):
         return False
 
 
-def filter_ood_validation_data(scene_tags_dict):
+def filter_ood_development_data(scene_tags_dict):
     if (scene_tags_dict['track'] in ['Skolkovo', 'Modiin', 'Innopolis'] and
         scene_tags_dict[
             'precipitation'] in ['kNoPrecipitation', 'kRain', 'kSnow']):
@@ -55,8 +55,8 @@ DATASETS_TO_FILTERS = {
     'train': {
         'moscow__train': filter_moscow_no_precipitation_data
     },
-    'validation': {
-        'moscow__validation': filter_moscow_no_precipitation_data,
-        'ood__validation': filter_ood_validation_data
+    'development': {
+        'moscow__development': filter_moscow_no_precipitation_data,
+        'ood__development': filter_ood_development_data
     }
 }

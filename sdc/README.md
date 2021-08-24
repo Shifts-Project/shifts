@@ -31,14 +31,26 @@ pip install .
 
 The data directory should have the following enclosed components:
 
-* Protobuf directories: `train_pb/`, `validation_pb/`
-* Tag files: `train_tags.txt`, `validation_tags.txt`
+* Protobuf directories: `train_pb/`, `development_pb/`
+* Tag files: `train_tags.txt`, `development_tags.txt`
 * (If desired) rendered feature map directories: `train_rendered/`,
-    `validation_rendered/`
-
+    `development_rendered/`
 We provide rendered feature maps at 128x128 resolution with zlib compression
-level 1, which can be used to avoid rendering costs and significantly decrease
+level 1, which can optionally be used to avoid rendering costs and significantly decrease
 decompression time (demonstrated in the example [notebook](examples/example.ipynb), in the `Prerendered Dataset` section).
+
+The expected directory structure is:
+```
+shifts/
+   |--> sdc/
+         |--> data/
+               |--> train_pb/
+               |--> development_pb/
+               |--> train_tags.txt
+               |--> development_tags.txt
+               |--> train_rendered/
+               |--> development_rendered/
+```
 
 ### Scene Protobuf
 
@@ -219,7 +231,7 @@ See [sdc/oatomobile/torch/baselines](sdc/oatomobile/torch/baselines) for the bas
 
 We can train K different ensemble members by sweeping over the `--torch_seed` parameter.
 
-By default we checkpoint every time the ADE on the Moscow validation dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
+By default we checkpoint every time the ADE on the Moscow development dataset decreases. The number of improvements before a checkpoint can be specified with `--exp_checkpoint_frequency` and the loss metric/dataset can be set with `--exp_checkpoint_validation_loss`.
 
 ### Evaluating RIP with Trained Ensemble Members
 
@@ -263,7 +275,7 @@ to a human passenger if its uncertainty for a scene is particularly high.
 
 We can quantify the quality of a motion prediction model's uncertainty
 estimates through a `retention` task, in which the model is asked to make
-predictions on a range of proportions of the evaluation dataset.
+predictions on a range of proportions of the development dataset.
 We can assume that for the proportion of scenes that are not retained,
 a human passenger is able to successfully navigate the setting (i.e.,
 achieve near-perfect accuracy with respect to an expert trajectory).
@@ -315,7 +327,7 @@ Finally, you may wish to cache all predictions and per-plan confidence scores of
 
 These utilities allow one to simply evaluate a RIP model at the largest K they wish to consider, and then compare performance with various ensemble sizes/aggregation strategies post-hoc.
 
-In particular, the predictions, ground truth values, per-plan confidence scores, and request IDs are stored for each prediction request. 
+In particular, the predictions, ground truth values, per-plan confidence scores, and request IDs are stored for each prediction request.
 For the confidence scores, this means we store all G * K log-likelihood scorings pairwise between plans and ensemble members.
 This is controlled by the `--rip_cache_all_preds=True` flag, and importantly, **should be used in conjunction with the above metadata caching** in order to retrieve the correct pairing of (request ID, scene ID) to uniquely identify every prediction request.
 
@@ -328,10 +340,10 @@ will evaluate a RIP ensemble with backbone model BC, aggregation strategy MA (fo
 This script will produce metadata as well as cache all of the fields mentioned above.
 
 Note also the additional flag:
-`--rip_eval_subgroup eval` restricts to evaluating the RIP ensemble only on validation data for convenience. You may also pass `train` to only evaluate on training data.
+`--rip_eval_subgroup eval` restricts to evaluating the RIP ensemble only on development data for convenience. You may also pass `train` to only evaluate on training data.
 
 We provide an example [notebook](examples/compare_rip_models.ipynb) walking through downstream comparative analysis of RIP variants.
- 
+
 ### Additional References
 
 For additional reference papers on the Motion Prediction task, see the following:
