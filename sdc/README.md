@@ -52,6 +52,8 @@ shifts/
                |--> development_rendered/
 ```
 
+For more information on where paths for various objects (such as model checkpoints, or where intermediate metrics, TensorBoard, or wandb logs will be written out), see [sdc/config.py](sdc/config.py).
+
 ### Scene Protobuf
 
 Each file in a protobuf directory contains a serialized protobuf message `Scene`.
