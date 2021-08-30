@@ -171,6 +171,20 @@ def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
 
 
 def log_likelihood(ground_truth, predicted, weights, sigma=1.0):
+    """Calculates log-likelihood of the ground_truth trajectory
+    under the gaussian mixture parametrized by predicted trajectories, weights and sigma.
+    Please follow the link below for the metric formulation:
+    https://github.com/yandex-research/shifts/blob/5763aa865654a570c2951936372ea14cac0d59ef/sdc/ysdc_dataset_api/evaluation/log_likelihood.pdf
+
+    Args:
+        ground_truth (np.ndarray): ground truth trajectory, (n_timestamps, 2)
+        predicted (np.ndarray): predicted trajectories, (n_modes, n_timestamps, 2)
+        weights (np.ndarray): confidence weights associated with trajectories, (n_modes,)
+        sigma (float, optional): distribution standart deviation. Defaults to 1.0.
+
+    Returns:
+        float: calculated log-likelihood
+    """
     assert_weights_near_one(weights)
     assert_weights_non_negative(weights)
 
