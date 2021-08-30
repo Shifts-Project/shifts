@@ -77,6 +77,7 @@ def evaluate_submission_with_proto(
         pred_trajectories = pred_trajectories[np.argsort(weights)][-MAX_NUM_MODES:]
         weights = weights[np.argsort(weights)][-MAX_NUM_MODES:]
         gt_trajectory, _ = get_trajectories_weights_arrays(gt.weighted_trajectories)
+        gt_trajectory = gt_trajectory[0]  # Reduce modes dim
         metrics['avg_ade'].append(avg_ade(gt_trajectory, pred_trajectories))
         metrics['avg_fde'].append(avg_fde(gt_trajectory, pred_trajectories))
         metrics['min_ade'].append(min_ade(gt_trajectory, pred_trajectories))

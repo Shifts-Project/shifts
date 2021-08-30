@@ -170,13 +170,14 @@ def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
         per_plan_weights=weights)
 
 
-def log_likelihood(ground_truth, predicted, weights):
+def log_likelihood(ground_truth, predicted, weights, sigma=1.0):
     assert_weights_near_one(weights)
     assert_weights_non_negative(weights)
 
-    displacement_norms = np.sum((ground_truth - predicted) ** 2, axis=-1)
-    normalizing_const = np.log(2 * np.pi)
-    lse_args = np.log(weights) - np.sum(normalizing_const + 0.5 * displacement_norms, axis=-1)
+    displacement_norms_squared = np.sum((ground_truth - predicted) ** 2, axis=-1)
+    normalizing_const = np.log(2 * np.pi * sigma ** 2)
+    lse_args = np.log(weights) - np.sum(
+        normalizing_const + 0.5 * displacement_norms_squared / sigma ** 2, axis=-1)
     max_arg = lse_args.max()
     ll = np.log(np.sum(np.exp(lse_args - max_arg))) + max_arg
     return ll

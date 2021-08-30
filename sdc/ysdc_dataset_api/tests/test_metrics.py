@@ -60,16 +60,26 @@ def test_log_likelihood():
     pred = np.zeros((n_modes, n_timestamps, coord_dim))
     pred[1] = np.array([[1], [1], [1]])
     weights = np.array([1, 0])
+    sigma = 1.0
 
     assert log_likelihood(gt, pred, weights).shape == ()
     assert log_likelihood(gt, pred, weights) == pytest.approx(
-        -np.sum(np.log([2 * np.pi] * n_timestamps)))
+        -np.sum(np.log([2 * np.pi * sigma] * n_timestamps)))
 
     weights = np.array([0.5, 0.5])
-    assert log_likelihood(gt, pred, weights) == pytest.approx(
+    assert log_likelihood(gt, pred, weights, sigma) == pytest.approx(
         np.log(
-            0.5 * np.power(2 * np.pi, -n_timestamps)
-            + 0.5 * np.exp(np.sum([-np.log(2 * np.pi) - 0.5] * n_timestamps))
+            0.5 * np.power(2 * np.pi * sigma ** 2, -n_timestamps)
+            + 0.5 * np.exp(
+                np.sum([-np.log(2 * np.pi * sigma ** 2) - 0.5 / sigma ** 2] * n_timestamps))
+        ))
+
+    sigma = 2.0
+    assert log_likelihood(gt, pred, weights, sigma) == pytest.approx(
+        np.log(
+            0.5 * np.power(2 * np.pi * sigma ** 2, -n_timestamps)
+            + 0.5 * np.exp(
+                np.sum([-np.log(2 * np.pi * sigma ** 2) - 0.5 / sigma ** 2] * n_timestamps))
         ))
 
     pred = np.ones((n_modes, n_timestamps, coord_dim)) * 1e6
