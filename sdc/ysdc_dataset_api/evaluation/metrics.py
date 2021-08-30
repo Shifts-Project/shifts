@@ -171,6 +171,9 @@ def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
 
 
 def log_likelihood(ground_truth, predicted, weights):
+    assert_weights_near_one(weights)
+    assert_weights_non_negative(weights)
+
     displacement_norms = np.sum((ground_truth - predicted) ** 2, axis=-1)
     normalizing_const = np.log(2 * np.pi)
     lse_args = np.log(weights) - np.sum(normalizing_const + 0.5 * displacement_norms, axis=-1)
