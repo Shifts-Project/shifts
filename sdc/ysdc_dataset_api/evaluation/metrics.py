@@ -151,9 +151,6 @@ def top1_fde(ground_truth, predicted, weights):
 def weighted_ade(ground_truth, predicted, weights, normalize_weights=False):
     if normalize_weights:
         weights = _softmax_normalize(weights)
-    else:
-        _check_weights_are_non_negative(weights)
-        _check_weight_sum(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=average_displacement_error(
@@ -165,9 +162,6 @@ def weighted_ade(ground_truth, predicted, weights, normalize_weights=False):
 def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
     if normalize_weights:
         weights = _softmax_normalize(weights)
-    else:
-        _check_weights_are_non_negative(weights)
-        _check_weight_sum(weights)
     return aggregate_prediction_request_losses(
         aggregator='weighted',
         per_plan_losses=final_displacement_error(
@@ -176,14 +170,31 @@ def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
         per_plan_weights=weights)
 
 
-def _check_weights_are_non_negative(weights: np.ndarray):
-    if (weights < 0).sum() > 0:
-        raise ValueError('Weights are expected to be non-negative.')
+def log_likelihood(ground_truth, predicted, weights, sigma=1.0):
+    """Calculates log-likelihood of the ground_truth trajectory
+    under the gaussian mixture parametrized by predicted trajectories, weights and sigma.
+    Please follow the link below for the metric formulation:
+    https://github.com/yandex-research/shifts/blob/5763aa865654a570c2951936372ea14cac0d59ef/sdc/ysdc_dataset_api/evaluation/log_likelihood.pdf
 
+    Args:
+        ground_truth (np.ndarray): ground truth trajectory, (n_timestamps, 2)
+        predicted (np.ndarray): predicted trajectories, (n_modes, n_timestamps, 2)
+        weights (np.ndarray): confidence weights associated with trajectories, (n_modes,)
+        sigma (float, optional): distribution standart deviation. Defaults to 1.0.
 
-def _check_weight_sum(weights: np.ndarray):
-    if abs(weights.sum() - 1) > 1e-6:
-        raise ValueError('Weights are expected to sum to 1.')
+    Returns:
+        float: calculated log-likelihood
+    """
+    assert_weights_near_one(weights)
+    assert_weights_non_negative(weights)
+
+    displacement_norms_squared = np.sum((ground_truth - predicted) ** 2, axis=-1)
+    normalizing_const = np.log(2 * np.pi * sigma ** 2)
+    lse_args = np.log(weights) - np.sum(
+        normalizing_const + 0.5 * displacement_norms_squared / sigma ** 2, axis=-1)
+    max_arg = lse_args.max()
+    ll = np.log(np.sum(np.exp(lse_args - max_arg))) + max_arg
+    return ll
 
 
 def _softmax_normalize(weights: np.ndarray) -> np.ndarray:

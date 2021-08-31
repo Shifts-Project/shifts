@@ -4,9 +4,10 @@ import pytest
 from ..evaluation import (average_displacement_error, avg_ade, avg_fde,
                           evaluate_submission_with_proto,
                           final_displacement_error, get_prediction_horizon,
-                          get_trajectories_weights_arrays, min_ade, min_fde,
-                          top1_ade, top1_fde, trajectory_array_to_proto,
-                          weighted_ade, weighted_fde)
+                          get_trajectories_weights_arrays, log_likelihood,
+                          min_ade, min_fde, top1_ade, top1_fde,
+                          trajectory_array_to_proto, weighted_ade,
+                          weighted_fde)
 from ..proto import ObjectPrediction, Submission, WeightedTrajectory
 
 
@@ -48,6 +49,41 @@ def test_metrics():
     assert np.allclose(top1_fde(gt, pred, weights), 2.)
     assert np.allclose(weighted_ade(gt, pred, weights), 0.6)
     assert np.allclose(weighted_fde(gt, pred, weights), 1.2)
+
+
+def test_log_likelihood():
+    n_timestamps = 3
+    n_modes = 2
+    coord_dim = 1
+
+    gt = np.zeros((n_timestamps, coord_dim))
+    pred = np.zeros((n_modes, n_timestamps, coord_dim))
+    pred[1] = np.array([[1], [1], [1]])
+    weights = np.array([1, 0])
+    sigma = 1.0
+
+    assert log_likelihood(gt, pred, weights).shape == ()
+    assert log_likelihood(gt, pred, weights) == pytest.approx(
+        -np.sum(np.log([2 * np.pi * sigma] * n_timestamps)))
+
+    weights = np.array([0.5, 0.5])
+    assert log_likelihood(gt, pred, weights, sigma) == pytest.approx(
+        np.log(
+            0.5 * np.power(2 * np.pi * sigma ** 2, -n_timestamps)
+            + 0.5 * np.exp(
+                np.sum([-np.log(2 * np.pi * sigma ** 2) - 0.5 / sigma ** 2] * n_timestamps))
+        ))
+
+    sigma = 2.0
+    assert log_likelihood(gt, pred, weights, sigma) == pytest.approx(
+        np.log(
+            0.5 * np.power(2 * np.pi * sigma ** 2, -n_timestamps)
+            + 0.5 * np.exp(
+                np.sum([-np.log(2 * np.pi * sigma ** 2) - 0.5 / sigma ** 2] * n_timestamps))
+        ))
+
+    pred = np.ones((n_modes, n_timestamps, coord_dim)) * 1e6
+    assert np.isfinite(log_likelihood(gt, pred, weights))
 
 
 def test_evaluate_submission():
