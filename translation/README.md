@@ -60,7 +60,7 @@ Run single model baseline:
 ```
 mkdir single 
 for i in test test1; do 
-    python3 structured-uncertainty//generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results_${i}.txt
+    python3 structured-uncertainty//generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results-${i}.txt
 done
 ```
 
