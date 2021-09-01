@@ -7,7 +7,7 @@ output_dir=single
 (
   cd ${output_dir}
   #Obtain all measures of uncertainty
-  for i in test1 test2 test3 test4; do
+  for i in test test1 do
     rm -rf ${i}
     mkdir ${i}
 
