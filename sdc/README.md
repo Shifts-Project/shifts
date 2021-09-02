@@ -198,6 +198,12 @@ Behavoral Cloning (BC)*               | [Codevilla et al., 2017] |
 
 See the `Method-Specific Hypers` section in [sdc/config.py](sdc/config.py) for more information on hyperparameters specific to RIP, BC, and DIM.
 
+You can download trained baseline models as follows:
+```
+wget https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar
+tar -xf baseline-models.tar
+```
+
 ### Robust Imitative Planning Overview
 
 The RIP ensemble method ([Filos et al., 2020]) stochastically generates multiple predictions for a given prediction request.
