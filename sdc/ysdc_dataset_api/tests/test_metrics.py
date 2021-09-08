@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from ..evaluation import (average_displacement_error, avg_ade, avg_fde,
+                          corrected_negative_log_likelihood,
                           evaluate_submission_with_proto,
                           final_displacement_error, get_prediction_horizon,
                           get_trajectories_weights_arrays, log_likelihood,
@@ -86,6 +87,17 @@ def test_log_likelihood():
     assert np.isfinite(log_likelihood(gt, pred, weights))
 
 
+def test_corrected_nll():
+    n_timestamps = 3
+    coord_dim = 1
+
+    gt = np.zeros((n_timestamps, coord_dim))
+    pred = np.zeros((n_timestamps, coord_dim))
+    weights = np.array([1.])
+
+    assert corrected_negative_log_likelihood(gt, pred, weights) == pytest.approx(0)
+
+
 def test_evaluate_submission():
     gt_array = np.array([
         [0, 0],
@@ -139,6 +151,15 @@ def test_evaluate_submission():
 
     assert metrics['weighted_ade'][0] == pytest.approx(2 ** 0.5 / 2 * mode1_weight)
     assert metrics['weighted_fde'][0] == pytest.approx(2 ** 0.5 * mode1_weight)
+
+    T = gt_array.shape[0]
+    ll = np.log(
+        mode1_weight * np.power(2 * np.pi, -T) * np.exp(-np.sum((gt_array - mode1_array) ** 2) / 2)
+        + mode2_weight * np.power(2 * np.pi, -T) * np.exp(-np.sum((gt_array - mode2_array) ** 2) / 2)
+    )
+    kl = -ll - T * np.log(2 * np.pi)
+    assert metrics['log_likelihood'][0] == pytest.approx(ll)
+    assert metrics['corrected_nll'][0] == pytest.approx(kl)
 
 
 def test_trajectory_array_to_proto():

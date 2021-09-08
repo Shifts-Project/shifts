@@ -7,8 +7,9 @@ from ..dataset import MotionPredictionDataset
 from ..proto import (ObjectPrediction, Submission, Trajectory, Vector3,
                      WeightedTrajectory)
 from ..utils.map import repeated_points_to_array
-from .metrics import (avg_ade, avg_fde, log_likelihood, min_ade, min_fde,
-                      top1_ade, top1_fde, weighted_ade, weighted_fde)
+from .metrics import (avg_ade, avg_fde, corrected_negative_log_likelihood,
+                      log_likelihood, min_ade, min_fde, top1_ade, top1_fde,
+                      weighted_ade, weighted_fde)
 
 MAX_NUM_MODES = 25
 
@@ -87,6 +88,8 @@ def evaluate_submission_with_proto(
         metrics['weighted_ade'].append(weighted_ade(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_fde'].append(weighted_fde(gt_trajectory, pred_trajectories, weights))
         metrics['log_likelihood'].append(log_likelihood(gt_trajectory, pred_trajectories, weights))
+        metrics['corrected_nll'].append(
+            corrected_negative_log_likelihood(gt_trajectory, pred_trajectories, weights))
         metrics['is_ood'].append(gt.is_ood)
     return metrics
 
