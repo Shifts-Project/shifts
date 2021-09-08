@@ -157,9 +157,9 @@ def test_evaluate_submission():
         mode1_weight * np.power(2 * np.pi, -T) * np.exp(-np.sum((gt_array - mode1_array) ** 2) / 2)
         + mode2_weight * np.power(2 * np.pi, -T) * np.exp(-np.sum((gt_array - mode2_array) ** 2) / 2)
     )
-    kl = -ll - T * np.log(2 * np.pi)
+    corrected_nll = -ll - T * np.log(2 * np.pi)
     assert metrics['log_likelihood'][0] == pytest.approx(ll)
-    assert metrics['corrected_nll'][0] == pytest.approx(kl)
+    assert metrics['corrected_nll'][0] == pytest.approx(corrected_nll)
 
 
 def test_trajectory_array_to_proto():
