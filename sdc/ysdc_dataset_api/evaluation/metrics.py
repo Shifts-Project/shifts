@@ -172,9 +172,9 @@ def weighted_fde(ground_truth, predicted, weights, normalize_weights=False):
 
 def log_likelihood(ground_truth, predicted, weights, sigma=1.0):
     """Calculates log-likelihood of the ground_truth trajectory
-    under the gaussian mixture parametrized by predicted trajectories, weights and sigma.
+    under the factorized gaussian mixture parametrized by predicted trajectories, weights and sigma.
     Please follow the link below for the metric formulation:
-    https://github.com/yandex-research/shifts/blob/5763aa865654a570c2951936372ea14cac0d59ef/sdc/ysdc_dataset_api/evaluation/log_likelihood.pdf
+    https://github.com/yandex-research/shifts/blob/195b3214ff41e5b6c197ea7ef3e38552361f29fb/sdc/ysdc_dataset_api/evaluation/log_likelihood_based_metrics.pdf
 
     Args:
         ground_truth (np.ndarray): ground truth trajectory, (n_timestamps, 2)
@@ -195,6 +195,27 @@ def log_likelihood(ground_truth, predicted, weights, sigma=1.0):
     max_arg = lse_args.max()
     ll = np.log(np.sum(np.exp(lse_args - max_arg))) + max_arg
     return ll
+
+
+def corrected_negative_log_likelihood(ground_truth, predicted, weights, sigma=1.0):
+    """Calculates corrected negative log-likelihood of the ground_truth trajectory
+    under the factorized gaussian mixture parametrized by predicted trajectories, weights and sigma.
+    Please follow the link below for the metric formulation:
+    https://github.com/yandex-research/shifts/blob/195b3214ff41e5b6c197ea7ef3e38552361f29fb/sdc/ysdc_dataset_api/evaluation/log_likelihood_based_metrics.pdf
+
+    Args:
+        ground_truth (np.ndarray): ground truth trajectory, (n_timestamps, 2)
+        predicted (np.ndarray): predicted trajectories, (n_modes, n_timestamps, 2)
+        weights (np.ndarray): confidence weights associated with trajectories, (n_modes,)
+
+    Returns:
+        float: calculated corrected negative log-likelihood
+    """
+    n_timestamps = ground_truth.shape[0]
+    return (
+        -log_likelihood(ground_truth, predicted, weights, sigma)
+        - n_timestamps * np.log(2 * np.pi * sigma ** 2)
+    )
 
 
 def _softmax_normalize(weights: np.ndarray) -> np.ndarray:
