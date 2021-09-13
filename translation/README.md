@@ -32,14 +32,14 @@ tar -xf baseline-models.tar
 
 If you are pre-processing your own data, use the following command:
 ```
-python3 structured-uncertainty/fairseq-preprocess.py  --source-lang en --target-lang ru \\
+python3 structured-uncertainty/preprocess.py  --source-lang en --target-lang ru \\
 --trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
 --destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
 ```
 
 If you are using the provided baseline models, please pre-process using the following command:
 ```
-python3 structured-uncertainty/fairseq-preprocess.py  --srcdict baseline-models/dict.en.txt --tgtdict baseline-models/dict.ru.txt --source-lang en --target-lang ru \\
+python3 structured-uncertainty/preprocess.py  --srcdict baseline-models/dict.en.txt --tgtdict baseline-models/dict.ru.txt --source-lang en --target-lang ru \\
 --trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
 --destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
 ```
