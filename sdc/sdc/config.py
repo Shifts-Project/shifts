@@ -94,11 +94,11 @@ def build_parser():
         default=False, type=int,
         help='Print during mini-batch as well for large epochs.')
     parser.add_argument(
-        '--exp_lr', type=float, default=1e-3)
+        '--exp_lr', type=float, default=1e-4)
     parser.add_argument(
         '--exp_num_lr_warmup_epochs', type=int, default=1)
     parser.add_argument(
-        '--exp_batch_size', type=int, default=512)
+        '--exp_batch_size', type=int, default=650)
     parser.add_argument(
         '--exp_num_epochs', type=int, default=100)
     parser.add_argument(
@@ -149,7 +149,7 @@ def build_parser():
     parser.add_argument('--model_weight_decay', type=float, default=0.0,
                         help="The L2 penalty (regularization) coefficient.")
     parser.add_argument(
-        '--model_clip_gradients', type='bool', default=False,
+        '--model_clip_gradients', type='bool', default=True,
         help='Clips gradients to 1.0.')
 
 
