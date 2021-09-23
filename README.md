@@ -1,17 +1,17 @@
-![img](https://github.com/yandex-research/uncertainty-challenge/blob/main/2.png)
+![img](https://github.com/yandex-research/uncertainty-challenge/blob/main/shifts_logo.png)
 
 # Shifts Challege
 
 This repository contains data readers and examples for the three tracks of the Shifts Dataset and the [Shifts Challenge](https://research.yandex.com/shifts). 
 
-The Shits Dataset contains curated and labelled examples of real, 'in-the-wild' distributional shift across three large-scale tasks. Specifically, it contains a tabular weather prediction task, machine translation, and Vehicle Motion Prediction. Dataset shift is ubiquitous in all of these tasks and modalities. The dataset,  assessment metrics and benchmark results are detailed in our associated paper: [Shifts: A Dataset of Real Distributional Shift Across Multiple Large-Scale Tasks](https://storage.yandexcloud.net/yandex-research/shifts/paper.pdf)
+The Shifts Dataset contains curated and labelled examples of real, 'in-the-wild' distributional shift across three large-scale tasks. Specifically, it contains a tabular weather prediction task, machine translation, and Vehicle Motion Prediction. Dataset shift is ubiquitous in all of these tasks and modalities. The dataset,  assessment metrics and benchmark results are detailed in our associated paper: [Shifts: A Dataset of Real Distributional Shift Across Multiple Large-Scale Tasks](https://arxiv.org/pdf/2107.07455.pdf)
 
 If you use the Shifts Dataset in your work, please cite our paper using the following Bibtex:
 ```
-@InProceedings{shifts2021,
-  author    = {Malinin, Andrey and Band, Neil and Chesnokov, German and Gal, Yarin, and Gales, Mark J. F. and Noskov, Alexey and Ploskonosov, Andrey and Prokhorenkova, Liudmila and Provilkov, Ivan and Raina, Vatsal and Raina, Vyas and Shmatova, Mariya and Tigar, Panos and Yangel, Boris},
+@article{shifts2021,
+  author    = {Malinin, Andrey and Band, Neil and Ganshin, Alexander, and Chesnokov, German and Gal, Yarin, and Gales, Mark J. F. and Noskov, Alexey and Ploskonosov, Andrey and Prokhorenkova, Liudmila and Provilkov, Ivan and Raina, Vatsal and Raina, Vyas and Roginskiy, Denis and Shmatova, Mariya and Tigar, Panos and Yangel, Boris},
   title     = {Shifts: A Dataset of Real Distributional Shift Across Multiple Large-Scale Tasks},
-  booktitle = {ArXiv},
+  journal   =  {arXiv preprint arXiv:2107.07455},
   year      = {2021},
 }
 ```
@@ -44,9 +44,9 @@ Shifts SDC Motion Prediction Dataset is released under [CC BY NC SA 4.0](https:/
 
 ## Download links
 
-As the [Shifts Challenge](https://research.yandex.com/shifts) is currently underway, we are only releasing the full training and development sets of the **canonical partition** for all tasks of the Shift Dataset, as detailed in our [paper](https://storage.yandexcloud.net/yandex-research/shifts/paper.pdf). Evaluation data without ground-truth labels or metadata will be released on **October 17th 2021**. The evaluation data labels and ground-truth predictions, as well as the full Shifts Dataset, will become availabe on **November 1st 2021**, after the Shifts Challenge concludes.
+As the [Shifts Challenge](https://research.yandex.com/shifts) is currently underway, we are only releasing the full training and development sets of the **canonical partition** for all tasks of the Shift Dataset, as detailed in our [paper](https://arxiv.org/pdf/2107.07455.pdf). Evaluation data without ground-truth labels or metadata will be released on **October 17th 2021**. The evaluation data labels and ground-truth predictions, as well as the full Shifts Dataset, will become availabe on **November 1st 2021**, after the Shifts Challenge concludes.
 
-**By downloading the Shifts Dataset, you automatically agree to the linceses described above.**
+**By downloading the Shifts Dataset, you automatically agree to the licenses described above.**
 
 ### Weather Prediction
 
@@ -54,7 +54,7 @@ Canonical parition of the training and development data can be downloaded [here]
 
 ### Machine Translation
 
-The  development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar). The training data for this task if the WMT'20 En-Ru dataset. It can be downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
+The training data for this task is the [WMT'20 En-Ru](http://www.statmt.org/wmt20/translation-task.html) dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar) and the development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar). All data is automatically downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
 
 ### Motion Prediction
 

@@ -7,9 +7,9 @@ from ..dataset import MotionPredictionDataset
 from ..proto import (ObjectPrediction, Submission, Trajectory, Vector3,
                      WeightedTrajectory)
 from ..utils.map import repeated_points_to_array
-from .metrics import (avg_ade, avg_fde, min_ade, min_fde, top1_ade, top1_fde,
+from .metrics import (avg_ade, avg_fde, corrected_negative_log_likelihood,
+                      log_likelihood, min_ade, min_fde, top1_ade, top1_fde,
                       weighted_ade, weighted_fde)
-
 
 MAX_NUM_MODES = 25
 
@@ -78,6 +78,7 @@ def evaluate_submission_with_proto(
         pred_trajectories = pred_trajectories[np.argsort(weights)][-MAX_NUM_MODES:]
         weights = weights[np.argsort(weights)][-MAX_NUM_MODES:]
         gt_trajectory, _ = get_trajectories_weights_arrays(gt.weighted_trajectories)
+        gt_trajectory = gt_trajectory[0]  # Reduce modes dim
         metrics['avg_ade'].append(avg_ade(gt_trajectory, pred_trajectories))
         metrics['avg_fde'].append(avg_fde(gt_trajectory, pred_trajectories))
         metrics['min_ade'].append(min_ade(gt_trajectory, pred_trajectories))
@@ -86,6 +87,9 @@ def evaluate_submission_with_proto(
         metrics['top1_fde'].append(top1_fde(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_ade'].append(weighted_ade(gt_trajectory, pred_trajectories, weights))
         metrics['weighted_fde'].append(weighted_fde(gt_trajectory, pred_trajectories, weights))
+        metrics['log_likelihood'].append(log_likelihood(gt_trajectory, pred_trajectories, weights))
+        metrics['corrected_nll'].append(
+            corrected_negative_log_likelihood(gt_trajectory, pred_trajectories, weights))
         metrics['is_ood'].append(gt.is_ood)
     return metrics
 

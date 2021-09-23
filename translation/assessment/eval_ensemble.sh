@@ -6,7 +6,7 @@ output_dir=ensemble
 (
   cd ${output_dir}
   # Get hypotheses and eval
-  for i in test1 test2 test3 test4; do
+  for i in test test1; do
     rm -rf ${i}
     mkdir ${i}
 

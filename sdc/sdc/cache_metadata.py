@@ -256,7 +256,7 @@ ground-truth values, and per-plan confidence scores from storage.
 def load_dataset_key_to_arrs(
     metadata_cache_dir: str,
     chosen_dataset_keys: Sequence[str] = (
-        'moscow__validation', 'ood__validation')
+        'moscow__development', 'ood__development')
 ) -> Dict[str, Dict]:
     dataset_key_to_arrs = defaultdict(dict)
 
@@ -278,13 +278,13 @@ def construct_full_dev_sets(
     dataset_key_to_arrs: Dict[str, Dict]
 ) -> Dict[str, Dict]:
     """Given a dataset_key_to_arrs object as loaded from
-        `load_dataset_key_to_arrs` above, add full__validation dataset,
+        `load_dataset_key_to_arrs` above, add full__development dataset,
         composed of the corresponding moscow and ood sets.
     """
     field_keys = [
         'predictions', 'plan_conf_scores', 'gt_trajectories', 'request_ids']
     full_dataset_to_subdataset_names = {
-        'full__validation': ['moscow__validation', 'ood__validation']
+        'full__development': ['moscow__development', 'ood__development']
     }
     for full_dataset_key, subdataset_keys in (
             full_dataset_to_subdataset_names.items()):
