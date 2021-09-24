@@ -50,13 +50,13 @@ As the [Shifts Challenge](https://research.yandex.com/shifts) is currently under
 
 ### Weather Prediction
 
-Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-trn-dev-data.tar).
+Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-trn-dev-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/baseline-models.tar).
 
 ### Machine Translation
 
-The training data for this task is the [WMT'20 En-Ru](http://www.statmt.org/wmt20/translation-task.html) dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar) and the development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar). All data is automatically downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
+The training data for this task is the [WMT'20 En-Ru](http://www.statmt.org/wmt20/translation-task.html) dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar) and the development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar). All data is automatically downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline-models.tar).
 
 ### Motion Prediction
 
-Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar).
+Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar).
 
