@@ -209,7 +209,7 @@ def object_prediction_from_model_output(
             weight=model_output['plan_confidence_scores_list'][i],
         )
         object_prediction.weighted_trajectories.append(weighted_trajectory)
-    object_prediction.uncertainty_measure = model_output['pred_request_confidence_score']
+    object_prediction.uncertainty_measure = model_output['pred_request_uncertainty_measure']
     return object_prediction
 
 
