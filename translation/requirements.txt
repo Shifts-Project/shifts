@@ -1,4 +1,5 @@
 matplotlib
 numpy
 torch==1.6.0
-savrebleu==1.4.3
+sacrebleu==1.4.3
+nltk=3.4.5
