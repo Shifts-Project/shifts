@@ -2,4 +2,4 @@ matplotlib
 numpy
 torch==1.6.0
 sacrebleu==1.4.3
-nltk=3.4.5
+nltk==3.4.5
