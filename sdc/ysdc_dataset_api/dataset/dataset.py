@@ -24,7 +24,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
     def __init__(
             self,
             dataset_path: str,
-            scene_tags_fpath: str,
+            scene_tags_fpath: str = None,
             feature_producer: FeatureProducerBase = None,
             prerendered_dataset_path: str = None,
             transform_ground_truth_to_agent_frame: bool = True,
@@ -86,8 +86,10 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                   'scene file paths.')
             self._scene_file_paths = pre_filtered_scene_file_paths
         else:
-            self._scene_file_paths = self._filter_paths(
-                get_file_paths(dataset_path), scene_tags_fpath)
+            self._scene_file_paths = get_file_paths(dataset_path)
+            if scene_tags_fpath is not None:
+                self._scene_file_paths = self._filter_paths(
+                    self._scene_file_paths, scene_tags_fpath)
 
     @property
     def num_scenes(self) -> int:
