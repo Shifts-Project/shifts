@@ -26,7 +26,7 @@ parser.add_argument('path_in', type=str,
                     help='Path of directory containing in-domain data.')
 parser.add_argument('path_out', type=str,
                     help='Path of directory containing shifted data.')
-parser.add_argument('--save_path', type=str, default='./results.txt',
+parser.add_argument('--save_path', type=str, default='./results_dev.txt',
                     help='Path to where to save output.')
 parser.add_argument('--beam_width', type=int, default=5,
                     help='Path of directory where to save results.')

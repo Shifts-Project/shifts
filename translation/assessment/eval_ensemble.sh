@@ -51,7 +51,7 @@ output_dir=ensemble
 )
 
 #Evaluate submission
-python shifts/translation/assessment/evaluate.py ensemble/test ensemble/test1 --save_path ./results-ensemble.txt --beam_width 5 --nbest 5 --ensemble
+python shifts/translation/assessment/evaluate_dev.py ensemble/test ensemble/test1 --save_path ./results-ensemble.txt --beam_width 5 --nbest 5 --ensemble
 
 # Prepare submission
 python shifts/translation/assessment/create_submission.py ensemble/test ensemble/test1 --save_path ./submission-ensemble.json --beam_width 5 --nbest 5 --ensemble --uncertainty_metric SCR-PE
