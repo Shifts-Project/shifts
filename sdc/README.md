@@ -52,6 +52,8 @@ shifts/
                |--> development_rendered/
 ```
 
+For more information on where paths for various objects (such as model checkpoints, or where intermediate metrics, TensorBoard, or wandb logs will be written out), see [sdc/config.py](sdc/config.py).
+
 ### Scene Protobuf
 
 Each file in a protobuf directory contains a serialized protobuf message `Scene`.
@@ -195,6 +197,12 @@ Behavoral Cloning (BC)*               | [Codevilla et al., 2017] |
 [Filos et al., 2020]: https://arxiv.org/abs/2006.14911
 
 See the `Method-Specific Hypers` section in [sdc/config.py](sdc/config.py) for more information on hyperparameters specific to RIP, BC, and DIM.
+
+You can download trained baseline models as follows:
+```
+wget https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar
+tar -xf baseline-models.tar
+```
 
 ### Robust Imitative Planning Overview
 

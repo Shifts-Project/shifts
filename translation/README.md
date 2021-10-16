@@ -21,19 +21,27 @@ cd structured-uncertainty
 python3 -m pip install --user --no-deps --editable .
 ```
 
-Next process the data into Fairseq format
-
-```
-python3 structured-uncertainty/fairseq-preprocess.py  --source-lang en --target-lang ru \\
---trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
---destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
-```
-
 Download the baselines models
 
 ```
 wget https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline-models.tar
 tar -xf baseline-models.tar
+```
+
+### Pre-process the data into Fairseq format
+
+If you are pre-processing your own data, use the following command:
+```
+python3 structured-uncertainty/preprocess.py  --source-lang en --target-lang ru \\
+--trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
+--destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
+```
+
+If you are using the provided baseline models, please pre-process using the following command:
+```
+python3 structured-uncertainty/preprocess.py  --srcdict baseline-models/dict.en.txt --tgtdict baseline-models/dict.ru.txt --source-lang en --target-lang ru \\
+--trainpref wmt20_en_ru/train --validpref wmt20_en_ru/valid --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev  \\
+--destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
 ```
 
 ### Training a model
@@ -52,7 +60,7 @@ Run single model baseline:
 ```
 mkdir single 
 for i in test test1; do 
-    python3 structured-uncertainty//generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results_${i}.txt
+    python3 structured-uncertainty//generate.py wmt20_en_ru/ --path baseline-models/model1.pt --max-tokens 4096 --remove-bpe --nbest 5 --gen-subset ${i} >& single/results-${i}.txt
 done
 ```
 
