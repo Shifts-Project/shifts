@@ -6,7 +6,7 @@ output_dir=ensemble
 (
   cd ${output_dir}
   # Get hypotheses and eval
-  for i in test test1; do
+  for i in test test1 test2; do
     rm -rf ${i}
     mkdir ${i}
 
@@ -53,5 +53,8 @@ output_dir=ensemble
 #Evaluate submission
 python shifts/translation/assessment/evaluate_dev.py ensemble/test ensemble/test1 --save_path ./results-ensemble.txt --beam_width 5 --nbest 5 --ensemble
 
-# Prepare submission
+# Prepare dev submission
 python shifts/translation/assessment/create_submission.py ensemble/test ensemble/test1 --save_path ./submission-ensemble.json --beam_width 5 --nbest 5 --ensemble --uncertainty_metric SCR-PE
+
+# Prepare eval submission
+python shifts/translation/assessment/create_submission_eval.py ensemble/test2/ --save_path ./submission_eval.json --ensemble

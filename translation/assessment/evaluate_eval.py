@@ -336,16 +336,22 @@ def main():
     # Load refs and hypos
     refs, hypos, ids, nlls = load_text(args.path, beam_width=args.beam_width)
     bleu = corpus_bleu(sys_stream=[h[0] for h in hypos], ref_streams=[refs]).score
-    domain_labels = np.loadtxt(args.domain_path)
+    domain_labels_orig = np.loadtxt(args.domain_path, dtype=np.int32)
+    domain_labels = np.asarray([domain_labels_orig[i] for i in ids])
 
-    nlls_in = nlls[np.where(domain_labels == 0)]
-    nlls_out = nlls[np.where(domain_labels == 1)]
+
+    #print(len(np.where(domain_labels == 1)[0]))
+    #sys.exit()
+    nlls_in = nlls[np.where(domain_labels == 0)[0]]
+    nlls_out = nlls[np.where(domain_labels == 1)[0]]
 
     refs_in = [refs[i] for i in np.where(domain_labels == 0)[0]]
     refs_out = [refs[i] for i in np.where(domain_labels == 1)[0]]
 
     hypos_in = [hypos[i] for i in np.where(domain_labels == 0)[0]]
     hypos_out = [hypos[i] for i in np.where(domain_labels == 1)[0]]
+
+    #print(np.where(domain_labels == 0)[0][:4],np.where(domain_labels == 1)[0][:4])
 
     bleu_in, gleus_in, weights_in = eval_predictions(refs_in, hypos_in, nlls_in)
     bleu_out, gleus_out, weights_out = eval_predictions(refs_out, hypos_out, nlls_out)
@@ -374,8 +380,10 @@ def main():
 
         uncertainties_in, uncertainties_out = {}, {}
         for key in uncertainties.keys():
-            uncertainties_in[key] = uncertainties[key][np.where(domain_labels == 0)]
-            uncertainties_out[key] = uncertainties[key][np.where(domain_labels == 1)]
+            tmp = uncertainties[key][np.where(domain_labels == 0)[0]]
+            print(tmp.shape)
+            uncertainties_in[key] = tmp
+            uncertainties_out[key] = uncertainties[key][np.where(domain_labels == 1)[0]]
 
     else:
         uncertainties_in = {'NLL': np.mean(nlls_in, axis=1)}
