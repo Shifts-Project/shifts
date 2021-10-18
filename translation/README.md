@@ -84,3 +84,39 @@ chmod +x ./shifts/translation/assessment/eval_ensemble.sh
 ./shifts/translation/assessment/eval_single.sh
 ./shifts/translation/assessment/eval_ensemble.sh
 ```
+
+# Processing the Evaluation Data
+
+These steps assume that you have succesfully completed the steps above. First you have to download and preprocess the evaluation data.
+
+```
+chmod +x ./shifts/translation/data/prepare_eval_data.sh 
+./shifts/translation/data/prepare_eval_data.sh 
+```
+
+Next, you hae to tokenize it into fairseq format. If you are pre-processing your own data, use the following command:
+```
+python3 structured-uncertainty/preprocess.py  --source-lang en --target-lang ru \\
+--trainpref --testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev,wmt20_en_ru/eval   \\
+--destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
+```
+
+If you are using the provided baseline models, please pre-process using the following command:
+```
+python3 structured-uncertainty/preprocess.py  --srcdict baseline-models/dict.en.txt --tgtdict baseline-models/dict.ru.txt --source-lang en --target-lang ru \\
+--testpref wmt20_en_ru/test19,wmt20_en_ru/reddit_dev,wmt20_en_ru/eval  \\
+--destdir data-bin/wmt20_en_ru --thresholdtgt 0 --thresholdsrc 0  --workers 24
+```
+
+Run ensemble baseline:
+```
+for i in test2; do 
+    python3 structured-uncertainty/generate.py wmt20_en_ru/ --path baseline-models/model1.pt:baseline-models/model2.pt:baseline-models/model3.pt  --max-tokens 1024 --remove-bpe --nbest 5 --gen-subset ${i} --compute-uncertainty >& ensemble/results-${i}.txt
+done
+```
+
+Process and create submission:
+```
+chmod +x ./shifts/translation/assessment/eval_ensemble.sh
+./shifts/translation/assessment/eval_ensemble.sh
+```
