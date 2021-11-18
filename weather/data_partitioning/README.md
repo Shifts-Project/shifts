@@ -24,6 +24,8 @@ With the configuration parameters specified in the example command above, expect
  - `dev_out.csv` : 50,000 (after subsampling from 524,896)
  - `eval_out.csv` : 576,626
 
+To obtain the canonical splits used in the Shifts Challenge, directly download the split data.
+
 ### Splits
 
 ![alt text](https://github.com/yandex-research/uncertainty-challenge/blob/0ee9faa49d25a484c15adc893e174f90c4728d38/tabular_weather_prediction/data_partitioning/splits.PNG)
