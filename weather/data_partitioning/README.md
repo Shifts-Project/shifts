@@ -12,7 +12,7 @@ pip install scikit-learn <br />
 ### Example command
 
 ```
-python run_partition.py /path/to/weather/data/df_multiclass_temperature_latlons.csv /path/to/climate/info/koppen_interannual_1901-2010.tsv /path/to/save/generated/files --time_splits 0.6 0.1 0.15 0.15 --climate_splits 3 1 1 --in_domain_splits 0.8364199464 0.01358 0.15 --no_meta 'yes' --eval_dev_overlap 'yes'
+python run_partition.py /path/to/weather/data/df_multiclass_temperature_latlons.csv /path/to/climate/info/koppen_interannual_1901-2010.tsv /path/to/save/generated/files --time_splits 0.6 0.1 0.15 0.15 --climate_splits 3 1 1 --in_domain_splits 0.83642 0.01358 0.15 --no_meta 'yes' --eval_dev_overlap 'yes'
 ```
 Generate files:
 `train.csv` `dev_in.csv` `eval_in.csv` `dev_out.csv` `eval_out.csv` `dev_in_no_meta.csv` `eval_in_no_meta.csv` `dev_out_no_meta.csv` `eval_out_no_meta.csv`
