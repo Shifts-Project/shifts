@@ -47,7 +47,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         }.
         'scene_id' unique scene identifier.
         'track_id' vehicle id of the current prediction request.
-        'ground_truth_trajectory' field is always included, it contains ground truth trajectory for
+        'ground_truth_trajectory' the field contains ground truth trajectory for
         the current prediction request.
         'prerendered_feature_map' field would be present if prerendered_dataset_path was specified,
         contains pre-rendered feature maps.
@@ -114,16 +114,19 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         continue
                     track = get_latest_track_state_by_id(scene, request.track_id)
                     to_track_frame_tf = get_to_track_frame_transform(track)
-                    ground_truth_trajectory = get_gt_trajectory(scene, request.track_id)
-                    if self._transform_ground_truth_to_agent_frame:
-                        ground_truth_trajectory = transform_2d_points(
-                            ground_truth_trajectory, to_track_frame_tf)
+
                     result = {
-                        'ground_truth_trajectory': ground_truth_trajectory,
                         'scene_id': scene.id,
                         'track_id': request.track_id,
                         'scene_tags': proto_to_dict(scene.scene_tags),
                     }
+
+                    ground_truth_trajectory = get_gt_trajectory(scene, request.track_id)
+                    if ground_truth_trajectory.shape[0] > 0:
+                        if self._transform_ground_truth_to_agent_frame:
+                            ground_truth_trajectory = transform_2d_points(
+                                ground_truth_trajectory, to_track_frame_tf)
+                        result['ground_truth_trajectory'] = ground_truth_trajectory
 
                     if self._prerendered_dataset_path:
                         fm_path = self._get_serialized_fm_path(fpath, scene.id, request.track_id)

@@ -15,7 +15,7 @@ commandLineParser.add_argument('--eval_dev_overlap', type=str, default='yes', ch
 def main():
     '''Partitions tabular weather data for distributional shift'''
     args = commandLineParser.parse_args()
-
+        
     eval_dev_overlap = False
     if args.eval_dev_overlap == 'yes':
         eval_dev_overlap = True
@@ -25,7 +25,7 @@ def main():
 
     # Partition the raw weather data
     partitioner = Partitioner(args.data_path, args.climate_info_path, config)
-    print()
+    
     # Print number of data points in each data split
     for name, df in partitioner.dfs_to_save.items():
         print(name, df.shape[0])

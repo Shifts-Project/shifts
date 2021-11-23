@@ -51,6 +51,15 @@ def filter_ood_development_data(scene_tags_dict):
         return False
 
 
+def filter_ood_evaluation_data(scene_tags_dict):
+    if (scene_tags_dict['track'] in ['AnnArbor', 'TelAviv'] and
+        scene_tags_dict[
+            'precipitation'] in ['kNoPrecipitation', 'kRain', 'kSnow']):
+        return True
+    else:
+        return False
+
+
 DATASETS_TO_FILTERS = {
     'train': {
         'moscow__train': filter_moscow_no_precipitation_data
@@ -58,5 +67,9 @@ DATASETS_TO_FILTERS = {
     'development': {
         'moscow__development': filter_moscow_no_precipitation_data,
         'ood__development': filter_ood_development_data
+    },
+    'evaluation': {
+        'moscow__evaluation': filter_moscow_no_precipitation_data,
+        'ood__evaluation': filter_ood_evaluation_data
     }
 }

@@ -65,8 +65,11 @@ Canonical parition of the training and development data can be downloaded [here]
 The evaluation stage has begun and the data is now available below:
 
 [Weather Prediction Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-eval-data.tar)
+
 [Machine Translation Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/translation/eval-data.tar)
+
 [Vehicle Motion Prediction Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-eval-data.tar)
+
 
 The weather and motion prediction data should be as simple to load as the development data. A description of how to process the evaluation data for the translation track is provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
 

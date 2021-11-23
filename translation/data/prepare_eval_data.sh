@@ -28,7 +28,7 @@ FILES=(
 )
 
 CORPORA=(
-  "global_voices_eval"
+  "eval"
 )
 
 OUTDIR=wmt20_en_ru
