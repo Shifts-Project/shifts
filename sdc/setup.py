@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='ysdc_dataset_api',
-    packages=find_packages(exclude=["*.tests"]),
+    packages=find_packages(exclude=["*.tests", "data_partitioning"]),
     install_requires=[
         "jupyter",
         "matplotlib",
