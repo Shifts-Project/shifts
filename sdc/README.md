@@ -133,8 +133,8 @@ Each of the $T$ states $s_t$ correspond to the x- and y-displacement of the vehi
 - Average Displacement Error (ADE)
 
 The average displacement error measures the quality of a predicted plan $\bm{y}$ with respect to the ground-truth plan $\bm{y}^*$ as
-
-    \text{ADE}(\bm{y}) \coloneqq \frac{1}{T} \sum_{t = 1}^T \left\lVert s_t - s^*_t \right\rVert_2,
+    
+$\text{ADE}(\bm{y}) \coloneqq \frac{1}{T} \sum_{t = 1}^T \left\lVert s_t - s^*_t \right\rVert_2$
 
 where $\bm{y} = (s_1, \dots, s_T)$.
 
@@ -144,13 +144,13 @@ Stochastic models define a predictive distribution $q(\bf{y}|\bm{x}; \bm{\theta}
 
 For example, we can measure an aggregated ADE over $D$ samples with
 
-    \text{aggADE}_D(q) \coloneqq \underset{\{\bm{y}\}_{d = 1}^{D} \sim q(\bf{y} \mid \bf{x})}{\oplus} \text{ADE}(\mathbf{y}^{d}),
+$\text{aggADE}_D(q) \coloneqq \underset{\{\bm{y}\}_{d = 1}^{D} \sim q(\bf{y} \mid \bf{x})}{\oplus} \text{ADE}(\mathbf{y}^{d})$
 
 where $\oplus$ is an aggregation operator, e.g., $\oplus = \min$ recovers the minimum ADE ($\text{minADE}_{D}$)
 
 We consider minimum and mean aggregation (minADE, avgADE), as well as the final displacement error (FDE)
 
-    \text{FDE}(\bf{y}) \coloneqq \left\lVert s_T - s^*_T \right\rVert,
+$\text{FDE}(\bf{y}) \coloneqq \left\lVert s_T - s^*_T \right\rVert$
 
 as well as its aggregated variants minFDE and avgFDE.
 
@@ -159,13 +159,13 @@ as well as its aggregated variants minFDE and avgFDE.
 A stochastic model used in practice for motion prediction ultimately must **decide** on a particular predicted plan for a given prediction request.
 We may make this decision by selecting for evaluation the predicted plan with the **highest per-plan confidence score**.
 
-In other words, given per-plan confidence scores $c^{(d)}, d \in \{1, \dots D\}$ we select the top plan $y^{(d^{\*})}, d^* = \underset{d}{\arg \max}\ c^{(d)}$, and measure the decision quality using ``top1'' ADE and FDE metrics, e.g.,
+In other words, given per-plan confidence scores $c^{(d)}, d \in \{1, \dots D\}$ we select the top plan $y^{(d^{*})}, d^* = \underset{d}{\arg \max}\ c^{(d)} $, and measure the decision quality using ``top1'' ADE and FDE metrics, e.g.,
 
-    \text{top1ADE}_D(q) \coloneqq \text{ADE}(\mathbf{y}^{(d^*)}).
+$\text{top1ADE}_D(q) \coloneqq \text{ADE}(\mathbf{y}^{(d^*)})$
 
 We may also wish to assess the quality of the relative weighting of the $D$ plans with their corresponding per-plan confidence scores $c^{(d)}$. This is accomplished with a weighted metric
 
-    \text{weightedADE}_D(q) \coloneqq \sum_{d \in D} c^{(d)} \cdot \text{ADE}(\mathbf{y}^{(d)}).
+$\text{weightedADE}_D(q) \coloneqq \sum_{d \in D} c^{(d)} \cdot \text{ADE}(\mathbf{y}^{(d)})$
 
 top1FDE and weightedFDE follow analogously to the above.
 
