@@ -7,13 +7,38 @@ from ..proto import Scene
 from .serialization import deserialize_numpy
 
 
+def get_file_paths(dataset_path: str) -> List[str]:
+    """Returns a sorted list with file paths to raw protobuf files.
+
+    Args:
+        dataset_path (str): path to datset directory
+
+    Returns:
+        List[str]: sorted list of file paths
+    """
+    sub_dirs = sorted([
+        os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
+        if os.path.isdir(os.path.join(dataset_path, d))
+    ])
+    res = []
+    for d in sub_dirs:
+        file_names = sorted(os.listdir(d))
+        res += [
+            os.path.join(d, fname)
+            for fname in file_names
+            if fname.endswith('.pb')
+        ]
+    return res
+
+
 def scenes_generator(
         file_paths: List[str], yield_fpath: bool = False
 ) -> Generator[Union[Tuple[Scene, str], Scene], None, None]:
     """Generates protobuf messages from files with serialized scenes.
 
     Args:
-        file_paths (List[str]): paths to serialized protobuf scenes
+        file_paths (List[str]): Paths to serialized protobuf scenes.
+            Use the function get_file_paths() defined above to get file paths for the dataset.
         yield_fpath (bool, optional): If set to True generator yield file path as well.
           Defaults to False.
 
@@ -57,28 +82,3 @@ def read_scene_from_file(filepath: str) -> Scene:
     scene = Scene()
     scene.ParseFromString(scene_serialized)
     return scene
-
-
-def get_file_paths(dataset_path: str) -> List[str]:
-    """Returns a sorted list with file paths to raw protobuf files.
-
-    Args:
-        dataset_path (str): path to datset directory
-
-    Returns:
-        List[str]: sorted list of file paths
-    """
-    sub_dirs = sorted([
-        os.path.join(dataset_path, d) for d in os.listdir(dataset_path)
-        if os.path.isdir(os.path.join(dataset_path, d))
-    ])
-    res = []
-    for d in sub_dirs:
-        # file_names = sorted(os.listdir(os.path.join(dataset_path, d)))
-        file_names = sorted(os.listdir(d))
-        res += [
-            os.path.join(d, fname)
-            for fname in file_names
-            if fname.endswith('.pb')
-        ]
-    return res
