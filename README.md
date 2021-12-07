@@ -50,26 +50,21 @@ As the [Shifts Challenge](https://research.yandex.com/shifts) is currently under
 
 ### Weather Prediction
 
-Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-trn-dev-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/baseline-models.tar).
+Canonical parition of the training, development and evaluation data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-partitioned-dataset.tar). The full dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/full-dataset.tar).  Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/weather/baseline-models.tar).
+
+The weather and motion prediction data should be as simple to load as the development data. 
 
 ### Machine Translation
 
-The training data for this task is the [WMT'20 En-Ru](http://www.statmt.org/wmt20/translation-task.html) dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar) and the development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar). All data is automatically downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline-models.tar).
+The training data for this task is the [WMT'20 En-Ru](http://www.statmt.org/wmt20/translation-task.html) dataset can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/train-data.tar), the development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/dev-data.tar) and the evaluation data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/eval-data.tar) All data is automatically downloaded via the scripts provided [here](https://github.com/yandex-research/shifts/tree/main/translation). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/translation/baseline-models.tar).
+
+A description of how to process the evaluation data for the translation track is provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
 
 ### Motion Prediction
 
-Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar).
-
-# Shifts Challenge Evaluation Stage
-
-The evaluation stage has begun and the data is now available below:
-
-[Weather Prediction Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/weather/canonical-eval-data.tar)
-
-[Machine Translation Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/translation/eval-data.tar)
-
-[Vehicle Motion Prediction Evaluation Dataset](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-eval-data.tar)
+Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar). The canonical parition of the evaluation data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-eval-data.tar). The full, unpartitioned dataset is available [here]((https://storage.yandexcloud.net/yandex-research/shifts/sdc/full-unpartitioned-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar).
 
 
-The weather and motion prediction data should be as simple to load as the development data. A description of how to process the evaluation data for the translation track is provided [here](https://github.com/yandex-research/shifts/tree/main/translation).
+
+
 
