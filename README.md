@@ -62,7 +62,7 @@ A description of how to process the evaluation data for the translation track is
 
 ### Motion Prediction
 
-Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar). The canonical parition of the evaluation data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-eval-data.tar). The full, unpartitioned dataset is available [here]((https://storage.yandexcloud.net/yandex-research/shifts/sdc/full-unpartitioned-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar).
+Canonical parition of the training and development data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-trn-dev-data.tar). The canonical parition of the evaluation data can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/canonical-eval-data.tar). The full, unpartitioned dataset is available [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/full-unpartitioned-data.tar). Baseline models can be downloaded [here](https://storage.yandexcloud.net/yandex-research/shifts/sdc/baseline-models.tar).
 
 
 
