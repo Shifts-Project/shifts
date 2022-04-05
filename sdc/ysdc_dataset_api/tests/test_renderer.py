@@ -1,7 +1,7 @@
 import pathlib
 
 from ..features import FeatureRenderer
-from ..utils import get_to_track_frame_transform, get_latest_track_state_by_id, read_scene_from_file
+from ..utils import read_scene_from_file
 
 
 TEST_CONFIG = {
@@ -58,7 +58,6 @@ def test_produce_features():
     scene = read_scene_from_file(get_test_scene_path())
     renderer = FeatureRenderer(TEST_CONFIG)
     for request in scene.prediction_requests:
-        track = get_latest_track_state_by_id(scene, request.track_id)
-        to_track_frame_tf = get_to_track_frame_transform(track)
-        feature_maps = renderer.produce_features(scene, to_track_frame_tf)
+        feature_maps = renderer.produce_features(scene, request)
         assert feature_maps
+        assert feature_maps['feature_maps'].shape == (26, 400, 400)
