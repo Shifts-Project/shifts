@@ -25,7 +25,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
             self,
             dataset_path: str,
             scene_tags_fpath: str = None,
-            feature_producer: FeatureProducerBase = None,
+            feature_producers: List[FeatureProducerBase] = None,
             prerendered_dataset_path: str = None,
             transform_ground_truth_to_agent_frame: bool = True,
             scene_tags_filter: Union[Callable, None] = None,
@@ -58,7 +58,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         Args:
             dataset_path: path to the dataset directory
             scene_tags_fpath: path to the tags file
-            feature_producer: instance of the FeatureProducerBase class,
+            feature_producers: a list of instances of the FeatureProducerBase class,
                 used to generate features for a data item. Defaults to None.
             prerendered_dataset_path: path to the pre-rendered dataset. Defaults to None.
             transform_ground_truth_to_agent_frame: whether to transform ground truth
@@ -73,7 +73,7 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
         """
         super(MotionPredictionDataset, self).__init__()
 
-        self._feature_producer = feature_producer
+        self._feature_producers = feature_producers or []
         self._prerendered_dataset_path = prerendered_dataset_path
         self._transform_ground_truth_to_agent_frame = transform_ground_truth_to_agent_frame
 
@@ -132,9 +132,8 @@ class MotionPredictionDataset(torch.utils.data.IterableDataset):
                         fm_path = self._get_serialized_fm_path(fpath, scene.id, request.track_id)
                         result['prerendered_feature_map'] = read_feature_map_from_file(fm_path)
 
-                    if self._feature_producer:
-                        result.update(
-                            self._feature_producer.produce_features(scene, to_track_frame_tf))
+                    for producer in self._feature_producers:
+                        result.update(producer.produce_features(scene, request))
 
                     if self._yield_metadata:
                         result = (

@@ -6,8 +6,10 @@ import cv2
 import numpy as np
 
 from .producing import FeatureProducerBase
-from ..proto import Scene
+from ..proto import PredictionRequest, Scene
 from ..utils import (
+    get_latest_track_state_by_id,
+    get_to_track_frame_transform,
     get_tracks_polygons,
     transform_2d_points,
     transform_2d_vectors,
@@ -117,7 +119,7 @@ class TrackRendererBase(FeatureMapRendererBase):
             to_track_transform (np.ndarray): transform to agent-centric coordinates
         """
         transform = self._to_feature_map_tf @ to_track_transform
-        for ts_ind in self._history_indices:
+        for i, ts_ind in enumerate(self._history_indices):
             tracks_at_frame = self._get_tracks_at_timestamp(scene, ts_ind)
             if not tracks_at_frame:
                 continue
@@ -128,7 +130,7 @@ class TrackRendererBase(FeatureMapRendererBase):
             fm_values = self._get_fm_values(tracks_at_frame, to_track_transform)
 
             for channel_idx in range(fm_values.shape[1]):
-                fm_channel_slice = feature_map[ts_ind * self.num_channels + channel_idx, :, :]
+                fm_channel_slice = feature_map[i * self.num_channels + channel_idx, :, :]
                 for track_idx in range(fm_values.shape[0]):
                     cv2.fillPoly(
                         fm_channel_slice,
@@ -480,18 +482,18 @@ class FeatureRenderer(FeatureProducerBase):
         self._num_channels = self._get_num_channels()
 
     def produce_features(
-            self, scene: Scene, to_track_frame_tf: np.ndarray) -> Dict[str, np.ndarray]:
-        """Produces feature maps given the scene and the transform from global coordinates to
-        an actor-centric coordinates.
+            self, scene: Scene, request: PredictionRequest) -> Dict[str, np.ndarray]:
+        """Produces feature maps for request given the scene.
 
         Args:
             scene (Scene): current scene to render
-            to_track_frame_tf (np.ndarray): transform from global coordinated to actor-centric
-              system.
+            request (PredictionRequest): prediction request to produce feature maps for
 
         Returns:
             Dict[str, np.ndarray]: dict with structure {'feature_maps': np.ndarray}
         """
+        track = get_latest_track_state_by_id(scene, request.track_id)
+        to_track_frame_tf = get_to_track_frame_transform(track)
         feature_maps = self._create_feature_maps()
         slice_start = 0
         for renderer in self._renderers:
