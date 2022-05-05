@@ -1,28 +1,10 @@
-import pathlib
-
 from ..features import FeatureVectorizer
 from ..utils import read_scene_from_file
 
 
-TEST_CONFIG = {
-    'time_grid_params': {
-        'start': 0,
-        'stop': 2,
-        'step': 2,
-    },
-    'features': ['position', 'velocity', 'acceleration', 'yaw']
-}
-
-TEST_SCENE_FNAME = 'test_scene.pb'
-
-
-def get_test_scene_path():
-    return pathlib.Path(__file__).parent.absolute() / TEST_SCENE_FNAME
-
-
-def test_produce_vector_features():
-    scene = read_scene_from_file(get_test_scene_path())
-    vectorizer = FeatureVectorizer(TEST_CONFIG)
+def test_produce_vector_features(scene_file_path, vectorizer_config):
+    scene = read_scene_from_file(scene_file_path)
+    vectorizer = FeatureVectorizer(vectorizer_config)
     for request in scene.prediction_requests:
         vector_features = vectorizer.produce_features(scene, request)
         assert vector_features

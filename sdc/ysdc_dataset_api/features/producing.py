@@ -12,3 +12,6 @@ class FeatureProducerBase:
             self, scene: Scene, request: PredictionRequest, *args, **kwargs
     ) -> Dict[str, Union[np.ndarray, torch.Tensor]]:
         raise NotImplementedError()
+
+    def get_tf_signature(self):
+        raise NotImplementedError()

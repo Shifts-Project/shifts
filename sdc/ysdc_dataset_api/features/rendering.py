@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Union
 
 import cv2
 import numpy as np
+import tensorflow as tf
 
 from .producing import FeatureProducerBase
 from ..proto import PredictionRequest, Scene
@@ -502,6 +503,16 @@ class FeatureRenderer(FeatureProducerBase):
             slice_start = slice_end
         return {
             'feature_maps': feature_maps,
+        }
+
+    def get_tf_signature(self):
+        return {
+            'feature_maps': tf.TensorSpec(
+                shape=(
+                    self._num_channels,
+                    self._feature_map_params['rows'],
+                    self._feature_map_params['cols']),
+                dtype=tf.float32)
         }
 
     @property
