@@ -1,6 +1,7 @@
 from typing import Dict
 
 import numpy as np
+import tensorflow as tf
 
 from .producing import FeatureProducerBase
 from ..proto import PredictionRequest, Scene
@@ -73,7 +74,7 @@ class FeatureVectorizer(FeatureProducerBase):
     def produce_features(
             self, scene: Scene, request: PredictionRequest) -> Dict[str, np.ndarray]:
         # The last channel is a binary indicator whether the state is known
-        features = np.zeros((self._n_history_steps, self._get_num_channels() + 1))
+        features = np.zeros((self._n_history_steps, self._get_num_channels() + 1), dtype=np.float32)
 
         to_track_frame_tf = get_to_track_frame_transform(
             get_latest_track_state_by_id(scene, request.track_id))
@@ -87,4 +88,11 @@ class FeatureVectorizer(FeatureProducerBase):
 
         return {
             'vector_features': features,
+        }
+
+    def get_tf_signature(self):
+        return {
+            'vector_features': tf.TensorSpec(
+                shape=(self._n_history_steps, self._get_num_channels() + 1),
+                dtype=tf.float32)
         }
