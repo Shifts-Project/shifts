@@ -1,6 +1,6 @@
 ![img](https://github.com/yandex-research/uncertainty-challenge/blob/main/Logoshifts_full_white.png)
 
-# Shifts Challege
+# Shifts Challenge
 
 This repository contains data readers and examples for the three tracks of the Shifts Dataset and the [Shifts Challenge](https://research.yandex.com/shifts). 
 
