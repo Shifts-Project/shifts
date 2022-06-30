@@ -20,7 +20,6 @@ def get_train_transforms():
     return Compose(
     [
         LoadImaged(keys=["image","label"]),AddChanneld(keys=["image","label"]),
-        Spacingd(keys=["image","label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
         NormalizeIntensityd(keys=["image"], nonzero=True),
         RandShiftIntensityd(keys="image",offsets=0.1,prob=1.0),
         RandScaleIntensityd(keys="image",factors=0.1,prob=1.0),
@@ -47,7 +46,6 @@ def get_val_transforms():
     return Compose(
     [
         LoadImaged(keys=["image", "label"]),AddChanneld(keys=["image","label"]),
-        Spacingd(keys=["image", "label"], pixdim=(1.0, 1.0, 1.0), mode=("bilinear", "nearest")),
         NormalizeIntensityd(keys=["image"], nonzero=True),
         ToTensord(keys=["image", "label"]),
     ]
