@@ -5,7 +5,7 @@ import seaborn as sns
 from typing import List, Dict
 from sklearn.metrics import auc
 
-from src.utils.assessment import f_beta_metrics, calc_uncertainty_regection_curve
+from vpower.src.utils.assessment import f_beta_metrics, calc_uncertainty_regection_curve
 
 
 def violin_plot(x: pd.Series, y: pd.Series, xlabel: str):
