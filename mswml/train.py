@@ -1,6 +1,6 @@
 """
 @author: Originally by Francesco La Rosa
-         Adapted by Vatsal Raina
+         Adapted by Vatsal Raina, Nataliia Molchanova
 """
 
 import argparse
@@ -12,7 +12,7 @@ from monai.losses import DiceLoss
 from monai.networks.nets import UNet
 import numpy as np
 import random
-from perf_metrics import dice_metric
+from metrics import dice_metric
 from data_load import get_train_dataloader, get_val_dataloader
 
 parser = argparse.ArgumentParser(description='Get all command line arguments.')

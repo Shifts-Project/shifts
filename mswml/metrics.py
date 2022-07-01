@@ -1,12 +1,17 @@
+"""
+Metrics used for validation during training and evaluation: 
+Dice score, Normalised Dice score, Lesion F1 score.
+"""
 import numpy as np
 from functools import partial
 from scipy import ndimage
 from collections import Counter
+from joblib import Parallel, delayed
 
 
 def dice_metric(ground_truth, predictions):
     """
-    Returns Dice coefficient for a single example.
+    Compute Dice coefficient for a single example.
     Args:
       ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
                      with shape [W, H, D].
@@ -31,7 +36,7 @@ def dice_metric(ground_truth, predictions):
 
 def dice_norm_metric(ground_truth, predictions):
     """
-    Returns Normalised Dice Coefficient (nDSC), 
+    Compute Normalised Dice Coefficient (nDSC), 
     False positive rate (FPR),
     False negative rate (FNR) for a single example.
     
@@ -75,20 +80,33 @@ def dice_norm_metric(ground_truth, predictions):
 
 
 def intersection_over_union(mask1, mask2):
-    """Compute IoU for 2 binary masks:
-    `mask1` and `mask2` should have same dimensions
+    """
+    Compute IoU for 2 binary masks.
+    
+    Args:
+      mask1: `numpy.ndarray`, binary mask.
+      mask2:  `numpy.ndarray`, binary mask of the same shape as `mask1`.
+    Returns:
+      Intersection over union between `mask1` and `mask2` (`float` in [0.0, 1.0]).
     """
     return np.sum(mask1 * mask2) / np.sum(mask1 + mask2 - mask1 * mask2)
 
 
-def lesion_f1_score(ground_truth, predictions, IoU_threshold, parallel_backend):
+def lesion_f1_score(ground_truth, predictions, IoU_threshold=0.25, parallel_backend=None):
     """
-    For a single example returns DSC_norm, fpr, fnr
-
-    Parameters:
-        * ground_truth (numpy.ndarray) - size [H, W, D]
-        * predictions (numpy.ndarray) - size [H, W, D]
-        * IoU_threshold (float) - see description in the scientific report
+    Compute lesion-scale F1 score.
+    
+    Args:
+      ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
+                     with shape [H, W, D].
+      predictions:  `numpy.ndarray`, binary segmentation predictions,
+                     with shape [H, W, D].
+      IoU_threshold: `float` in [0.0, 1.0], IoU threshold for max IoU between 
+      		      predicted and ground truth lesions to classify them as
+      		      TP, FP or FN.
+      parallel_backend: None | joblib.Parallel() class object for parallel computations.
+    Returns:
+      Intersection over union between `mask1` and `mask2` (`float` in [0.0, 1.0]).
     """
 
     def get_tp_fp(label_pred, mask_multi_pred, mask_multi_gt):
@@ -124,6 +142,9 @@ def lesion_f1_score(ground_truth, predictions, IoU_threshold, parallel_backend):
     mask_multi_pred_, n_les_pred = ndimage.label(predictions)
     mask_multi_gt_, n_les_gt = ndimage.label(ground_truth)
 
+    if parallel_backend is None:
+        parallel_backend = Parallel(n_jobs=1)
+
     process_fp_tp = partial(get_tp_fp, mask_multi_pred=mask_multi_pred_,
                             mask_multi_gt=mask_multi_gt_)
 
@@ -140,10 +161,6 @@ def lesion_f1_score(ground_truth, predictions, IoU_threshold, parallel_backend):
                           for label_gt in np.unique(mask_multi_gt_) if label_gt != 0)
     fn = float(np.sum(fn))
     
-    tpr = tp / (tp + fn) if tp + fn > 0 else 1.0
-    fnr = 1 - tpr
-    fpr = fp / n_les_pred if n_les_pred > 0 else 0.0
-    ppv = tp / (tp + fp) if tp + fp > 0 else 1.0
     f1 = 1.0 if tp + 0.5 * (fp + fn) == 0.0 else tp / (tp + 0.5 * (fp + fn))
 
-    return f1, tpr, fnr, fpr, ppv
+    return f1
