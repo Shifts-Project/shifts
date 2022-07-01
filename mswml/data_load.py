@@ -53,9 +53,9 @@ def get_val_transforms():
 
 def get_train_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
     """Get torch.data.DataLoader for training """
-    flair = sorted(glob(os.path.join(flair_path, "*FLAIR.nii.gz")),
+    flair = sorted(glob(os.path.join(flair_path, "*FLAIR_isovox.nii.gz")),
                  key=lambda i: int(re.sub('\D', '', i)))  # Collect all flair images sorted
-    segs = sorted(glob(os.path.join(gts_path, "*gt.nii")),
+    segs = sorted(glob(os.path.join(gts_path, "*gt_isovox.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding ground truths
     
     files = [{"image": fl,"label": seg} for fl, seg in zip(flair, segs)]
@@ -69,9 +69,9 @@ def get_train_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
 
 def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
     """Get torch.data.DataLoader for validation and testing """
-    flair = sorted(glob(os.path.join(flair_path, "*FLAIR.nii.gz")),
+    flair = sorted(glob(os.path.join(flair_path, "*FLAIR_isovox.nii.gz")),
                  key=lambda i: int(re.sub('\D', '', i)))  # Collect all flair images sorted
-    segs = sorted(glob(os.path.join(gts_path, "*gt.nii")),
+    segs = sorted(glob(os.path.join(gts_path, "*gt_isovox.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding ground truths
     
     files = [{"image": fl,"label": seg} for fl, seg in zip(flair, segs)]
