@@ -58,12 +58,12 @@ Provided datasets are:
 2. Tutorials:
    1. A notebook to download the `data` and the `trained baseline models` in the current directory.
       * get_files.ipynb
-   2. Data analysis tutorial that provides insights about the quality of the data.
+   2. Data analysis tutorial illustrating the distributional shifts of the partitions.
        * data_analysis.ipynb
    3. Model training tutorial. This tutorial steps through the data preprocessing and model training process for an
-      ensemble of 10 probabilistic MC dropout neural networks
+      ensemble of 10 probabilistic MC dropout neural networks.
        * ens_prob_mc_dropout_training.ipynb
-   4. Tutorial for model evaluation
+   4. Tutorial for model evaluation.
        * model_evaluation.ipynb
 
 ### Who do I talk to?
