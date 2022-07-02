@@ -10,7 +10,6 @@ from joblib import Parallel
 from monai.inferers import sliding_window_inference
 from monai.networks.nets import UNet
 import numpy as np
-import random
 from data_load import remove_connected_components, get_val_dataloader
 from metrics import dice_norm_metric, lesion_f1_score
 
@@ -81,10 +80,7 @@ def main(args):
     with Parallel(n_jobs=args.n_jobs) as parallel_backend:
 	    with torch.no_grad():
 	        for count, batch_data in enumerate(val_loader):
-	            inputs, gt  = (
-	                    batch_data["image"].to(device),
-	                    batch_data["label"].cpu().numpy()
-	                    )
+	            inputs, gt  = (batch_data["image"].to(device), batch_data["label"].cpu().numpy())
 	            # get ensemble predictions
 	            all_outputs = []
 	            for model in models:
@@ -115,7 +111,6 @@ def main(args):
 
     print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
     print(f"Lesion F1 score:\t{np.mean(f1):.4f} +- {np.std(f1):.4f}")
- 
           
 #%%
 if __name__ == "__main__":
