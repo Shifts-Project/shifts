@@ -6,6 +6,7 @@ Metrics are displayed in console.
 import argparse
 import os
 import torch
+from joblib import Parallel
 from monai.inferers import sliding_window_inference
 from monai.networks.nets import UNet
 import numpy as np
@@ -64,10 +65,12 @@ def main(args):
         )
     
     for i, model in enumerate(models):
-        model.load_state_dict(torch.load(os.path.join(root_dir, f"seed{i+1}", "Best_model_finetuning.pth")))
+        model.load_state_dict(torch.load(os.path.join(args.path_model, 
+                                                      f"seed{i+1}", 
+                                                      "Best_model_finetuning.pth")))
         model.eval()
 
-    act = nn.Softmax(dim=1)
+    act = torch.nn.Softmax(dim=1)
     th = args.threshold
     roi_size = (96, 96, 96)
     sw_batch_size = 4
@@ -107,8 +110,8 @@ def main(args):
 						            	IoU_threshold=0.5, 
 						            	parallel_backend=parallel_backend)]
 
-	ndsc = np.asarray(ndsc) * 100.
-	f1 = np.asarray(f1) * 100.
+    ndsc = np.asarray(ndsc) * 100.
+    f1 = np.asarray(f1) * 100.
 
     print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
     print(f"Lesion F1 score:\t{np.mean(f1):.4f} +- {np.std(f1):.4f}")
