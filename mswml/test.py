@@ -5,7 +5,9 @@ Metrics are displayed in console.
 
 import argparse
 import os
+from joblib import Parallel, delayed
 import torch
+import torch.nn as nn
 from monai.inferers import sliding_window_inference
 from monai.networks.nets import UNet
 import numpy as np
@@ -64,7 +66,7 @@ def main(args):
         )
     
     for i, model in enumerate(models):
-        model.load_state_dict(torch.load(os.path.join(root_dir, f"seed{i+1}", "Best_model_finetuning.pth")))
+        model.load_state_dict(torch.load(os.path.join(args.path_model, f"seed{i+1}", "Best_model_finetuning.pth")))
         model.eval()
 
     act = nn.Softmax(dim=1)
@@ -78,12 +80,9 @@ def main(args):
     with Parallel(n_jobs=args.n_jobs) as parallel_backend:
 	    with torch.no_grad():
 	        for count, batch_data in enumerate(val_loader):
-	            inputs, gt  = (
-	                    batch_data["image"].to(device),
-	                    batch_data["label"].cpu().numpy()
-	                    )
+	            inputs, gt  = (batch_data["image"].to(device), batch_data["label"].cpu().numpy())
 	            # get ensemble predictions
-	            all_outputs = []
+				all_outputs = []
 	            for model in models:
 	                outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, mode='gaussian')
 	                outputs = act(outputs).cpu().numpy()
@@ -110,9 +109,8 @@ def main(args):
 	ndsc = np.asarray(ndsc) * 100.
 	f1 = np.asarray(f1) * 100.
 
-    print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
+	print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
     print(f"Lesion F1 score:\t{np.mean(f1):.4f} +- {np.std(f1):.4f}")
- 
           
 #%%
 if __name__ == "__main__":
