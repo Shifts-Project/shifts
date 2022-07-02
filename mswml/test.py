@@ -64,9 +64,9 @@ def main(args):
         )
     
     for i, model in enumerate(models):
-        model.load_state_dict(torch.load(os.path.join(args.path_model, 
-                                                      f"seed{i+1}", 
-                                                      "Best_model_finetuning.pth")))
+        # model.load_state_dict(torch.load(os.path.join(args.path_model, 
+        #                                               f"seed{i+1}", 
+        #                                               "Best_model_finetuning.pth")))
         model.eval()
 
     act = torch.nn.Softmax(dim=1)
@@ -84,7 +84,10 @@ def main(args):
 	            # get ensemble predictions
 	            all_outputs = []
 	            for model in models:
-	                outputs = sliding_window_inference(inputs, roi_size, sw_batch_size, model, mode='gaussian')
+	                outputs = sliding_window_inference(inputs, roi_size, 
+                                                    sw_batch_size, model, 
+                                                    mode='gaussian')
+	                print(outputs.size())
 	                outputs = act(outputs).cpu().numpy()
 	                outputs = np.squeeze(outputs[0,1])
 	                all_outputs.append(outputs)

@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser(description='Get all command line arguments.')
 # trainining
 parser.add_argument('--learning_rate', type=float, default=1e-5, 
                     help='Specify the initial learning rate')
-parser.add_argument('--n_epochs', type=int, default=200, 
+parser.add_argument('--n_epochs', type=int, default=300, 
                     help='Specify the number of epochs to train for')
 # initialisation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       
 parser.add_argument('--seed', type=int, default=1, help='Specify the global random seed')
@@ -41,6 +41,8 @@ parser.add_argument('--val_interval', type=int, default=5,
                     help='Validation every n-th epochs')
 parser.add_argument('--threshold', type=float, default=0.4, 
                     help='Probability threshold')
+
+
 def get_default_device():
     """ Set device """
     if torch.cuda.is_available():
@@ -49,8 +51,6 @@ def get_default_device():
     else:
         return torch.device('cpu')
     
-
-#%%
 
 def main(args):
     seed_val = args.seed
@@ -81,7 +81,8 @@ def main(args):
         strides=(2, 2, 2, 2),
         num_res_units=0).to(device)
     
-    loss_function = DiceLoss(to_onehot_y=True, softmax=True, sigmoid=False,
+    loss_function = DiceLoss(to_onehot_y=True, 
+                             softmax=True, sigmoid=False,
                              include_background=False)
     optimizer = torch.optim.Adam(model.parameters(), args.learning_rate)
     act = nn.Softmax(dim=1)
@@ -108,7 +109,7 @@ def main(args):
         step = 0
         for batch_data in train_loader:
             n_samples = batch_data["image"].size(0)
-            for m in range(0,batch_data["image"].size(0),2):
+            for m in range(0,batch_data["image"].size(0), 2):
                 step += 2
                 inputs, labels = (
                     batch_data["image"][m:(m+2)].to(device),
@@ -117,7 +118,7 @@ def main(args):
                 outputs = model(inputs)
                 
                 # Dice loss
-                loss1 = loss_function(outputs,labels)
+                loss1 = loss_function(outputs, labels)
                 # Focal loss
                 ce_loss = nn.CrossEntropyLoss(reduction='none')
                 ce = ce_loss(outputs, torch.squeeze(labels, dim=1))
@@ -152,16 +153,16 @@ def main(args):
                     
                     val_outputs = sliding_window_inference(val_inputs, roi_size, 
                                                            sw_batch_size, 
-                                                           model,mode='gaussian')
+                                                           model, mode='gaussian')
                    
                     gt = np.squeeze(val_labels.cpu().numpy())
                     
                     seg = act(val_outputs).cpu().numpy()
-                    seg= np.squeeze(seg[:,1])
+                    seg= np.squeeze(seg[0,1])
                     seg[seg >= thresh] = 1
                     seg[seg < thresh] = 0
                     
-                    value = dice_metric(ground_truth=gt, predictions=seg)
+                    value = dice_metric(ground_truth=gt.flatten(), predictions=seg.flatten())
 
                     metric_count += 1
                     metric_sum += value.sum().item()
