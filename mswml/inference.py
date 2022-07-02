@@ -10,9 +10,7 @@ from monai.inferers import sliding_window_inference
 from monai.networks.nets import UNet
 from monai.data import write_nifti
 import numpy as np
-import random
-from data_load import remove_connected_components, get_val_dataloader
-from metrics import dice_norm_metric, lesion_f1_score
+from data_load import remove_connected_components, get_flair_dataloader
 
 parser = argparse.ArgumentParser(description='Get all command line arguments.')
 # save options
@@ -63,15 +61,15 @@ def main(args):
         )
     
     for i, model in enumerate(models):
-        model.load_state_dict(torch.load(os.path.join(root_dir, f"seed{i+1}", "Best_model_finetuning.pth")))
+        model.load_state_dict(torch.load(os.path.join(args.path_model, 
+                                                      f"seed{i+1}", 
+                                                      "Best_model_finetuning.pth")))
         model.eval()
 
-    act = nn.Softmax(dim=1)
+    act = torch.nn.Softmax(dim=1)
     th = args.threshold
     roi_size = (96, 96, 96)
     sw_batch_size = 4
-
-    ndsc, f1 = [], []
 
     ''' Predictions loop '''
     with torch.no_grad():
@@ -103,18 +101,20 @@ def main(args):
             filename_or_obj = batch_data['image_meta_data']['filename_or_obj']
             filename_or_obj = os.path.basename(filename_or_obj)
             
-            filename = re.sub("FLAIR_isovox.nii.gz", 'pred_prob.nii.gz', filename_or_obj)
-            filepath = os.path.join(args.path_pred, new_filename)
-            write_nifti(outputs_mean, _filepath,
-                        affine=affine,
-                        target_affine=affine if args.isovoxspace else original_affine,
+            filename = re.sub("FLAIR_isovox.nii.gz", 'pred_prob.nii.gz', 
+                              filename_or_obj)
+            filepath = os.path.join(args.path_pred, filename)
+            write_nifti(outputs_mean, filepath,
+                        affine=original_affine,
+                        target_affine=affine,
                         output_spatial_shape=spatial_shape)
  
-            filename = re.sub("FLAIR_isovox.nii.gz", 'pred_seg.nii.gz', filename_or_obj)
-            filepath = os.path.join(args.path_pred, new_filename)
-            write_nifti(seg, _filepath,
-                        affine=affine,
-                        target_affine=affine if args.isovoxspace else original_affine,
+            filename = re.sub("FLAIR_isovox.nii.gz", 'pred_seg.nii.gz', 
+                              filename_or_obj)
+            filepath = os.path.join(args.path_pred, filename)
+            write_nifti(seg, filepath,
+                        affine=original_affine,
+                        target_affine=affine,
                         output_spatial_shape=spatial_shape)
 
 #%%
