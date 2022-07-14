@@ -90,7 +90,7 @@ def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=N
         pos = int(N_ * frac_)
         curr_preds = preds if pos == N_ else np.concatenate(
             (preds_[:pos], gts_[pos:]))
-        return dice_norm_metric(gts_, curr_preds)[0]
+        return dice_norm_metric(gts_, curr_preds)
     
     if parallel_backend is None:
         parallel_backend = Parallel(n_jobs=1)
