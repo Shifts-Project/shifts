@@ -11,7 +11,8 @@ from monai.inferers import sliding_window_inference
 from monai.networks.nets import UNet
 import numpy as np
 from data_load import remove_connected_components, get_val_dataloader
-from metrics import dice_norm_metric, lesion_f1_score
+from metrics import dice_norm_metric, lesion_f1_score, ndsc_aac_metric
+from uncertainty import ensemble_uncertainties_classification
 
 parser = argparse.ArgumentParser(description='Get all command line arguments.')
 # model
@@ -64,9 +65,9 @@ def main(args):
         )
     
     for i, model in enumerate(models):
-        # model.load_state_dict(torch.load(os.path.join(args.path_model, 
-        #                                               f"seed{i+1}", 
-        #                                               "Best_model_finetuning.pth")))
+        model.load_state_dict(torch.load(os.path.join(args.path_model, 
+                                                      f"seed{i+1}", 
+                                                      "Best_model_finetuning.pth")))
         model.eval()
 
     act = torch.nn.Softmax(dim=1)
@@ -74,7 +75,7 @@ def main(args):
     roi_size = (96, 96, 96)
     sw_batch_size = 4
 
-    ndsc, f1 = [], []
+    ndsc, f1, ndsc_aac = [], [], []
 
     ''' Evaluatioin loop '''
     with Parallel(n_jobs=args.n_jobs) as parallel_backend:
@@ -95,12 +96,18 @@ def main(args):
 
 	            # obtain binary segmentation mask
 	            seg = np.mean(all_outputs, axis=0)
-	            seg[seg>th]=1
-	            seg[seg<th]=0
+	            seg[seg >= th] = 1
+	            seg[seg < th] = 0
 	            seg= np.squeeze(seg)
 	            seg = remove_connected_components(seg)
 	  
 	            gt = np.squeeze(gt)
+                
+                # compute reverse mutual information uncertainty map
+	            uncs_map = ensemble_uncertainties_classification(np.concatenate(
+                    (np.expand_dims(all_outputs, axis=-1), 
+                     np.expand_dims(1. - all_outputs, axis=-1)), 
+                    axis=-1))['reverse_mutual_information']
 
 	            # compute metrics
 	            ndsc += [dice_norm_metric(ground_truth=gt, predictions=seg)]
@@ -108,12 +115,19 @@ def main(args):
 						            	predictions=seg, 
 						            	IoU_threshold=0.5, 
 						            	parallel_backend=parallel_backend)]
+	            ndsc_aac += [ndsc_aac_metric(ground_truth=gt, 
+                                             predictions=seg, 
+                                             uncertainties=uncs_map, 
+                                             parallel_backend=parallel_backend)]
+                
 
     ndsc = np.asarray(ndsc) * 100.
     f1 = np.asarray(f1) * 100.
+    ndsc_aac = np.asarray(ndsc_aac) * 100.
 
     print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
     print(f"Lesion F1 score:\t{np.mean(f1):.4f} +- {np.std(f1):.4f}")
+    print(f"nDSC-AAC:\t{np.mean(ndsc_aac):.4f} +- {np.std(ndsc_aac):.4f}")
           
 #%%
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ from functools import partial
 from scipy import ndimage
 from collections import Counter
 from joblib import Parallel, delayed
+import sklearn
 
 
 def dice_metric(ground_truth, predictions):
@@ -59,7 +60,7 @@ def dice_norm_metric(ground_truth, predictions):
     seg = predictions.astype("float32")
     im_sum = np.sum(seg) + np.sum(gt)
     if im_sum == 0:
-        return 1.0, 1.0, 1.0
+        return 1.0
     else:
         if np.sum(gt) == 0:
             k = 1.0
@@ -69,16 +70,49 @@ def dice_norm_metric(ground_truth, predictions):
         fp = np.sum(seg[gt == 0])
         fn = np.sum(gt[seg == 0])
         fp_scaled = k * fp
-        dsc_norm = 2 * tp / (fp_scaled + 2 * tp + fn)
-
-        fpr = fp / (len(gt.flatten()) - np.sum(gt))
-        if np.sum(gt) == 0:
-            fnr = 1.0
-        else:
-            fnr = fn / np.sum(gt)
-        return dsc_norm, fpr, fnr
+        dsc_norm = 2. * tp / (fp_scaled + 2. * tp + fn)
+        return dsc_norm
 
 
+def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=None):
+    """
+    Compute area above Normalised Dice Coefficient (nDSC) retention curve.
+    
+    Args:
+      ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
+                     with shape [H, W, D].
+      predictions:  `numpy.ndarray`, binary segmentation predictions,
+                     with shape [H, W, D].
+    Returns:
+      nDSC R-AAC (`float` in [0.0, 1.0]).
+    """
+    def compute_dice_norm(frac_, preds_, gts_, N_):
+        pos = int(N_ * frac_)
+        curr_preds = preds if pos == N_ else np.concatenate(
+            (preds_[:pos], gts_[pos:]))
+        return dice_norm_metric(gts_, curr_preds)[0]
+    
+    if parallel_backend is None:
+        parallel_backend = Parallel(n_jobs=1)
+        
+    ordering = uncertainties.argsort()
+    gts = ground_truth[ordering].copy()
+    preds = predictions[ordering].copy()
+    N = len(gts)
+
+    # # Significant class imbalance means it is important to use logspacing between values
+    # # so that it is more granular for the higher retention fractions
+    fracs_retained = np.log(np.arange(200 + 1)[1:])
+    fracs_retained /= np.amax(fracs_retained)
+
+    process = partial(compute_dice_norm, preds_=preds, gts_=gts, N_=N)
+    dsc_norm_scores = np.asarray(
+        parallel_backend(delayed(process)(frac)
+                                for frac in fracs_retained)
+    )
+    
+    return 1. - sklearn.metrics.auc(fracs_retained, dsc_norm_scores)
+    
 def intersection_over_union(mask1, mask2):
     """
     Compute IoU for 2 binary masks.
