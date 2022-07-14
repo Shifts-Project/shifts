@@ -1,5 +1,6 @@
 """
-Computation of performance metrics (nDSC, lesion F1 score) for an ensemble of models.
+Computation of performance metrics (nDSC, lesion F1 score, nDSC R-AAC) 
+for an ensemble of models.
 Metrics are displayed in console.
 """
 
@@ -115,9 +116,9 @@ def main(args):
 						            	predictions=seg, 
 						            	IoU_threshold=0.5, 
 						            	parallel_backend=parallel_backend)]
-	            ndsc_aac += [ndsc_aac_metric(ground_truth=gt, 
-                                             predictions=seg, 
-                                             uncertainties=uncs_map, 
+	            ndsc_aac += [ndsc_aac_metric(ground_truth=gt.flatten(), 
+                                             predictions=seg.flatten(), 
+                                             uncertainties=uncs_map.flatten(), 
                                              parallel_backend=parallel_backend)]
                 
 
