@@ -92,7 +92,7 @@ def get_train_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
     return DataLoader(ds, batch_size=1, shuffle=True, 
                               num_workers=num_workers)
 
-def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_path=False):
+def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_path=None):
     """
     Get dataloader for validation and testing. Either with or without brain masks.
 
@@ -110,14 +110,14 @@ def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_pat
     """
     flair = sorted(glob(os.path.join(flair_path, "*FLAIR_isovox.nii.gz")),
                  key=lambda i: int(re.sub('\D', '', i)))  # Collect all flair images sorted
-    segs = sorted(glob(os.path.join(gts_path, "*gt_isovox.nii.gz")),
+    segs = sorted(glob(os.path.join(gts_path, "*_isovox.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding ground truths
     
     if bm_path is not None:
-        bms = sorted(glob(os.path.join(gts_path, "*mask_isovox.nii.gz")),
+        bms = sorted(glob(os.path.join(bm_path, "*mask_isovox.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding brain masks
     
-        assert len(flair) == len(segs) == len(bms), "Some files must be missing"
+        assert len(flair) == len(segs) == len(bms), f"Some files must be missing: {[len(flair), len(segs), len(bms)]}"
         
         files = [
             {"image": fl,"label": seg, "brain_mask": bm} for fl, seg, bm 
@@ -126,7 +126,7 @@ def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_pat
         
         val_transforms = get_val_transforms(keys=["image", "label", "brain_mask"])
     else:
-        assert len(flair) == len(segs), "Some files must be missing"
+        assert len(flair) == len(segs), f"Some files must be missing: {[len(flair), len(segs)]}"
         
         files = [{"image": fl,"label": seg} for fl, seg in zip(flair, segs)]
         

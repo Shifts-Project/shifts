@@ -52,7 +52,8 @@ def main(args):
     '''' Initialise dataloaders '''
     val_loader = get_val_dataloader(flair_path=args.path_data, 
                                     gts_path=args.path_gts, 
-                                    num_workers=args.num_workers)
+                                    num_workers=args.num_workers,
+                                    bm_path=args.path_bm)
   
     ''' Load trained models  '''
     K = args.num_models
@@ -127,6 +128,9 @@ def main(args):
                                              predictions=seg[brain_mask == 1].flatten(), 
                                              uncertainties=uncs_map[brain_mask == 1].flatten(), 
                                              parallel_backend=parallel_backend)]
+                
+                # for nervous people
+	            if count % 10 == 0: print(f"Processed {count}/{len(val_loader)}")
                 
 
     ndsc = np.asarray(ndsc) * 100.

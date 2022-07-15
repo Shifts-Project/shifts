@@ -138,6 +138,7 @@ def main(args):
 
     ndsc_rc = np.asarray(ndsc_rc)
     y = np.mean(ndsc_rc, axis=0)
+    np.save(os.path.join(args.path_save, 'nDSC_rc.npy'), y)
     
     plt.plot(fracs_retained, y, 
              label=f"R-AUC: {1. - metrics.auc(fracs_retained, y):.4f}")
