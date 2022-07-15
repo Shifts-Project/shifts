@@ -141,7 +141,7 @@ def main(args):
     np.save(os.path.join(args.path_save, 'nDSC_rc.npy'), y)
     
     plt.plot(fracs_retained, y, 
-             label=f"R-AUC: {1. - metrics.auc(fracs_retained, y):.4f}")
+             label=f"nDSC R-AUC: {1. - metrics.auc(fracs_retained, y):.4f}")
     plt.xlabel("Retention Fraction")
     plt.ylabel("nDSC")
     plt.xlim([0.0,1.01])

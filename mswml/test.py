@@ -1,5 +1,5 @@
 """
-Computation of performance metrics (nDSC, lesion F1 score, nDSC R-AAC) 
+Computation of performance metrics (nDSC, lesion F1 score, nDSC R-AUC) 
 for an ensemble of models.
 Metrics are displayed in console.
 """
@@ -139,7 +139,7 @@ def main(args):
 
     print(f"nDSC:\t{np.mean(ndsc):.4f} +- {np.std(ndsc):.4f}")
     print(f"Lesion F1 score:\t{np.mean(f1):.4f} +- {np.std(f1):.4f}")
-    print(f"nDSC-AAC:\t{np.mean(ndsc_aac):.4f} +- {np.std(ndsc_aac):.4f}")
+    print(f"nDSC R-AUC:\t{np.mean(ndsc_aac):.4f} +- {np.std(ndsc_aac):.4f}")
           
 #%%
 if __name__ == "__main__":

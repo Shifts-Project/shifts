@@ -114,7 +114,7 @@ def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_pat
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding ground truths
     
     if bm_path is not None:
-        bms = sorted(glob(os.path.join(bm_path, "*mask_isovox.nii.gz")),
+        bms = sorted(glob(os.path.join(bm_path, "*isovox_mask.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding brain masks
     
         assert len(flair) == len(segs) == len(bms), f"Some files must be missing: {[len(flair), len(segs), len(bms)]}"
