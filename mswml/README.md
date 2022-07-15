@@ -14,11 +14,15 @@
 
 ## Baseline model
 
-1. Training baseline ensemble of 5 UNET models.
+As the baseline model a deep ensemble of 3 UNET^-^ models was chosen.
+
+1. Training.
+
+Use the following bash script to sequentually fit models in the ensemble.
 
 ```bash
 #!/bin/bash
-for seed in 1 2 3 4 5
+for seed in 1 2 3
 do
 	python mswml/train.py \
 	--seed $seed \
@@ -29,7 +33,10 @@ do
 	--path_save "/path/to/models/save/dir/${seed}"
 done
 ```
-2. Performence metrics computation for a trained ensemble
+2. Evaluation.
+
+Compute performance metrics (nDSC, lesion F1 score, nDSC R-AAC) for an ensemble of models.
+Metrics are displayed in console.
 
 ```bash
 python mswml/test.py \
@@ -39,18 +46,25 @@ python mswml/test.py \
 --threshold 0.35
 ```
 
-Additional parameters like `--num_workers` and `--n_jobs` control the number of workers used for parallel processing of images and paralle computaiton of lesion F1 score respectively.
+Additional parameters like `--num_workers` and `--n_jobs` control the number of workers used for parallel processing of images and parallel computaiton of lesion F1 score respectively.
 
 Probablity threshold `threshold` is used for obtaining binary lesion masks from probability output.
 
-3. Saving predicted probability and binary segmentation maps
+3. Inference.
+
+Perform inference for an ensemble of baseline models and save 3D Nifti images of
+predicted probability maps averaged across ensemble models (saved to "*pred_prob.nii.gz" files),
+binary segmentation maps predicted obtained by thresholding of average predictions and 
+removing all connected components smaller than 9 voxels (saved to "*pred_seg.nii.gz"),
+uncertainty maps for reversed mutual information measure (saved to "*uncs_rmi.nii.gz").
+
 
 ```bash
 python mswml/inference.py \
 --path_pred /path/to/dir/to/save/predictions/ \
 --path_model /path/to/models/save/dir/ \
 --path_data /path/to/test/FLAIR \
---num_workers 10\
+--num_workers 10 \
 --threshold 0.35
 ```
 

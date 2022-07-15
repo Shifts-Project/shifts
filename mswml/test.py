@@ -17,7 +17,7 @@ from uncertainty import ensemble_uncertainties_classification
 
 parser = argparse.ArgumentParser(description='Get all command line arguments.')
 # model
-parser.add_argument('--num_models', type=int, default=5, 
+parser.add_argument('--num_models', type=int, default=3, 
 					help='Number of models in ensemble')
 parser.add_argument('--path_model', type=str, default='', 
 					help='Specify the dir to al the trained models')
@@ -26,8 +26,10 @@ parser.add_argument('--path_data', type=str, required=True,
                     help='Specify the path to the directory with FLAIR images')
 parser.add_argument('--path_gts', type=str, required=True, 
                     help='Specify the path to the directory with ground truth binary masks')
+parser.add_argument('--path_bm', type=str, required=True, 
+                    help='Specify the path to the directory with brain masks')
 # parallel computation
-parser.add_argument('--num_workers', type=int, default=10, 
+parser.add_argument('--num_workers', type=int, default=1, 
                     help='Number of workers to preprocess images')
 parser.add_argument('--n_jobs', type=int, default=1, 
 					help='Number of parallel workers for F1 score computation')
@@ -82,14 +84,18 @@ def main(args):
     with Parallel(n_jobs=args.n_jobs) as parallel_backend:
 	    with torch.no_grad():
 	        for count, batch_data in enumerate(val_loader):
-	            inputs, gt  = (batch_data["image"].to(device), batch_data["label"].cpu().numpy())
-	            # get ensemble predictions
+	            inputs, gt, brain_mask  = (
+                    batch_data["image"].to(device), 
+                    batch_data["label"].cpu().numpy(),
+                    batch_data["brain_mask"].cpu().numpy()
+                    )
+	            
+                # get ensemble predictions
 	            all_outputs = []
 	            for model in models:
 	                outputs = sliding_window_inference(inputs, roi_size, 
                                                     sw_batch_size, model, 
                                                     mode='gaussian')
-	                print(outputs.size())
 	                outputs = act(outputs).cpu().numpy()
 	                outputs = np.squeeze(outputs[0,1])
 	                all_outputs.append(outputs)
@@ -103,6 +109,7 @@ def main(args):
 	            seg = remove_connected_components(seg)
 	  
 	            gt = np.squeeze(gt)
+	            brain_mask = np.squeeze(brain_mask)
                 
                 # compute reverse mutual information uncertainty map
 	            uncs_map = ensemble_uncertainties_classification(np.concatenate(
@@ -116,9 +123,9 @@ def main(args):
 						            	predictions=seg, 
 						            	IoU_threshold=0.5, 
 						            	parallel_backend=parallel_backend)]
-	            ndsc_aac += [ndsc_aac_metric(ground_truth=gt.flatten(), 
-                                             predictions=seg.flatten(), 
-                                             uncertainties=uncs_map.flatten(), 
+	            ndsc_aac += [ndsc_aac_metric(ground_truth=gt[brain_mask == 1].flatten(), 
+                                             predictions=seg[brain_mask == 1].flatten(), 
+                                             uncertainties=uncs_map[brain_mask == 1].flatten(), 
                                              parallel_backend=parallel_backend)]
                 
 

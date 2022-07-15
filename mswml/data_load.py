@@ -49,33 +49,19 @@ def get_train_transforms():
     ]
     )
 
-def get_val_transforms():
+def get_val_transforms(keys=["image", "label"], image_keys=["image"]):
     """ Get transforms for testing on FLAIR images and ground truth:
-    - Loads 3D images from Nifti file
+    - Loads 3D images and masks from Nifti file
     - Adds channel dimention
+    - Applies intensity normalisation to scans
     - Converts to torch.Tensor()
     """
     return Compose(
     [
-        LoadImaged(keys=["image", "label"]),
-        AddChanneld(keys=["image","label"]),
-        NormalizeIntensityd(keys=["image"], nonzero=True),
-        ToTensord(keys=["image", "label"]),
-    ]
-    )
-
-def get_flair_transforms():
-    """ Get transforms for testing on FLAIR images:
-    - Loads 3D images from Nifti file
-    - Adds channel dimention
-    - Converts to torch.Tensor()
-    """
-    return Compose(
-    [
-        LoadImaged(keys=["image"]),
-        AddChanneld(keys=["image"]),
-        NormalizeIntensityd(keys=["image"], nonzero=True),
-        ToTensord(keys=["image"]),
+        LoadImaged(keys=keys),
+        AddChanneld(keys=keys),
+        NormalizeIntensityd(keys=image_keys, nonzero=True),
+        ToTensord(keys=keys),
     ]
     )
 
@@ -106,9 +92,9 @@ def get_train_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
     return DataLoader(ds, batch_size=1, shuffle=True, 
                               num_workers=num_workers)
 
-def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
+def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1, bm_path=False):
     """
-    Get dataloader for validation and testing
+    Get dataloader for validation and testing. Either with or without brain masks.
 
     Args:
       flair_path: `str`, path to directory with FLAIR images.
@@ -117,6 +103,8 @@ def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
       num_workers:  `int`,  number of worker threads to use for parallel processing
                     of images
       cache_rate:  `float` in (0.0, 1.0], percentage of cached data in total.
+      bm_path:   `None|str`. If `str`, then defines path to directory with
+                 brain masks. If `None`, dataloader does not return brain masks. 
     Returns:
       monai.data.DataLoader() class object.
     """
@@ -125,11 +113,28 @@ def get_val_dataloader(flair_path, gts_path, num_workers, cache_rate=0.1):
     segs = sorted(glob(os.path.join(gts_path, "*gt_isovox.nii.gz")),
                   key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding ground truths
     
-    files = [{"image": fl,"label": seg} for fl, seg in zip(flair, segs)]
+    if bm_path is not None:
+        bms = sorted(glob(os.path.join(gts_path, "*mask_isovox.nii.gz")),
+                  key=lambda i: int(re.sub('\D', '', i))) # Collect all corresponding brain masks
+    
+        assert len(flair) == len(segs) == len(bms), "Some files must be missing"
+        
+        files = [
+            {"image": fl,"label": seg, "brain_mask": bm} for fl, seg, bm 
+                 in zip(flair, segs, bms)
+                 ]
+        
+        val_transforms = get_val_transforms(keys=["image", "label", "brain_mask"])
+    else:
+        assert len(flair) == len(segs), "Some files must be missing"
+        
+        files = [{"image": fl,"label": seg} for fl, seg in zip(flair, segs)]
+        
+        val_transforms = get_val_transforms()
     
     print("Number of validation files:", len(files))
     
-    ds = CacheDataset(data=files, transform=get_val_transforms(), 
+    ds = CacheDataset(data=files, transform=val_transforms, 
                             cache_rate=cache_rate, num_workers=num_workers)
     return DataLoader(ds, batch_size=1, shuffle=False, 
                               num_workers=num_workers)
@@ -153,7 +158,7 @@ def get_flair_dataloader(flair_path, num_workers, cache_rate=0.1):
     
     print("Number of FLAIR files:", len(files))
     
-    ds = CacheDataset(data=files, transform=get_flair_transforms(), 
+    ds = CacheDataset(data=files, transform=get_val_transforms(keys=["image"]), 
                             cache_rate=cache_rate, num_workers=num_workers)
     return DataLoader(ds, batch_size=1, shuffle=False, 
                               num_workers=num_workers)

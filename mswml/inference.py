@@ -1,5 +1,9 @@
 """
-Save predicted probability and binary segmentation maps to Nifti images.
+Perform inference for an ensemble of baseline models and save 3D Nifti images of
+predicted probability maps averaged across ensemble models (saved to "*pred_prob.nii.gz" files),
+binary segmentation maps predicted obtained by thresholding of average predictions and 
+removing all connected components smaller than 9 voxels (saved to "pred_seg.nii.gz"),
+uncertainty maps for reversed mutual information measure (saved to "uncs_rmi.nii.gz").
 """
 
 import argparse
@@ -11,13 +15,14 @@ from monai.networks.nets import UNet
 from monai.data import write_nifti
 import numpy as np
 from data_load import remove_connected_components, get_flair_dataloader
+from uncertainty import ensemble_uncertainties_classification
 
 parser = argparse.ArgumentParser(description='Get all command line arguments.')
 # save options
 parser.add_argument('--path_pred', type=str, required=True, 
                     help='Specify the path to the directory to store predictions')
 # model
-parser.add_argument('--num_models', type=int, default=5, 
+parser.add_argument('--num_models', type=int, default=3, 
 					help='Number of models in ensemble')
 parser.add_argument('--path_model', type=str, default='', 
 					help='Specify the dir to al the trained models')
@@ -40,6 +45,7 @@ def get_default_device():
         return torch.device('cpu')
 
 def main(args):
+    os.makedirs(args.path_pred, exist_ok=True)
     device = get_default_device()
     torch.multiprocessing.set_sharing_strategy('file_system')
     
@@ -84,22 +90,16 @@ def main(args):
                 outputs = np.squeeze(outputs[0,1])
                 all_outputs.append(outputs)
             all_outputs = np.asarray(all_outputs)
-
-            # obtain probability and binary segmentation masks
-            outputs_mean = np.mean(all_outputs, axis=0)
-
-            seg = outputs_mean.copy()
-            seg[seg>th]=1
-            seg[seg<th]=0
-            seg= np.squeeze(seg)
-            seg = remove_connected_components(seg)
-
-            # save predictions
-            original_affine = batch_data['image_meta_data']['original_affine']
-            affine = batch_data['image_meta_data']['affine']
-            spatial_shape = batch_data['image_meta_data']['spatial_shape']
-            filename_or_obj = batch_data['image_meta_data']['filename_or_obj']
+            
+            # get image metadata
+            original_affine = batch_data['image_meta_dict']['original_affine'][0]
+            affine = batch_data['image_meta_dict']['affine'][0]
+            spatial_shape = batch_data['image_meta_dict']['spatial_shape'][0]
+            filename_or_obj = batch_data['image_meta_dict']['filename_or_obj'][0]
             filename_or_obj = os.path.basename(filename_or_obj)
+
+            # # obtain and save probability maps averaged across models in an ensemble
+            outputs_mean = np.mean(all_outputs, axis=0)
             
             filename = re.sub("FLAIR_isovox.nii.gz", 'pred_prob.nii.gz', 
                               filename_or_obj)
@@ -108,11 +108,32 @@ def main(args):
                         affine=original_affine,
                         target_affine=affine,
                         output_spatial_shape=spatial_shape)
- 
+            
+            # obtain and save binry segmentation masks
+            seg = outputs_mean.copy()
+            seg[seg >= th] = 1
+            seg[seg < th] = 0
+            seg = np.squeeze(seg)
+            seg = remove_connected_components(seg)
+            
             filename = re.sub("FLAIR_isovox.nii.gz", 'pred_seg.nii.gz', 
                               filename_or_obj)
             filepath = os.path.join(args.path_pred, filename)
             write_nifti(seg, filepath,
+                        affine=original_affine,
+                        target_affine=affine,
+                        output_spatial_shape=spatial_shape)
+            
+            # obtain and save uncedrtainty map (voxel-wise reverse mutual information)
+            uncs_map = ensemble_uncertainties_classification(np.concatenate(
+                (np.expand_dims(all_outputs, axis=-1), 
+                  np.expand_dims(1. - all_outputs, axis=-1)), 
+                axis=-1))['reverse_mutual_information']
+            
+            filename = re.sub("FLAIR_isovox.nii.gz", 'uncs_rmi.nii.gz', 
+                              filename_or_obj)
+            filepath = os.path.join(args.path_pred, filename)
+            write_nifti(uncs_map, filepath,
                         affine=original_affine,
                         target_affine=affine,
                         output_spatial_shape=spatial_shape)
