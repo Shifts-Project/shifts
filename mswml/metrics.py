@@ -1,13 +1,13 @@
 """
 Metrics used for validation during training and evaluation: 
-Dice score, Normalised Dice score, Lesion F1 score.
+Dice Score, Normalised Dice score, Lesion F1 score and nDSC R-AAC.
 """
 import numpy as np
 from functools import partial
 from scipy import ndimage
 from collections import Counter
 from joblib import Parallel, delayed
-import sklearn
+from sklearn import metrics
 
 
 def dice_metric(ground_truth, predictions):
@@ -80,9 +80,11 @@ def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=N
     
     Args:
       ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
-                     with shape [H, W, D].
+                     with shape [H * W * D].
       predictions:  `numpy.ndarray`, binary segmentation predictions,
-                     with shape [H, W, D].
+                     with shape [H * W * D].
+      uncertainties:  `numpy.ndarray`, voxel-wise uncertainties,
+                     with shape [H * W * D].
     Returns:
       nDSC R-AAC (`float` in [0.0, 1.0]).
     """
@@ -111,7 +113,47 @@ def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=N
                                 for frac in fracs_retained)
     )
     
-    return 1. - sklearn.metrics.auc(fracs_retained, dsc_norm_scores)
+    return 1. - metrics.auc(fracs_retained, dsc_norm_scores)
+
+
+def ndsc_retention_curve(ground_truth, predictions, uncertainties, fracs_retained, parallel_backend=None):
+    """
+    Compute Normalised Dice Coefficient (nDSC) retention curve.
+    
+    Args:
+      ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
+                     with shape [H * W * D].
+      predictions:  `numpy.ndarray`, binary segmentation predictions,
+                     with shape [H * W * D].
+      uncertainties:  `numpy.ndarray`, voxel-wise uncertainties,
+                     with shape [H * W * D].
+      fracs_retained:  `numpy.ndarray`, array of increasing valies of retained 
+                       fractions of most certain voxels, with shape [N].
+    Returns:
+      (y-axis) nDSC at each point of the retention curve (`numpy.ndarray` with shape [N]).
+    """
+    def compute_dice_norm(frac_, preds_, gts_, N_):
+        pos = int(N_ * frac_)
+        curr_preds = preds if pos == N_ else np.concatenate(
+            (preds_[:pos], gts_[pos:]))
+        return dice_norm_metric(gts_, curr_preds)
+    
+    if parallel_backend is None:
+        parallel_backend = Parallel(n_jobs=1)
+        
+    ordering = uncertainties.argsort()
+    gts = ground_truth[ordering].copy()
+    preds = predictions[ordering].copy()
+    N = len(gts)
+
+    process = partial(compute_dice_norm, preds_=preds, gts_=gts, N_=N)
+    dsc_norm_scores = np.asarray(
+        parallel_backend(delayed(process)(frac)
+                                for frac in fracs_retained)
+    )
+    
+    return dsc_norm_scores
+
     
 def intersection_over_union(mask1, mask2):
     """
