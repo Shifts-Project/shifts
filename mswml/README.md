@@ -1,7 +1,7 @@
 # Multiple Sclerosis White Matter Lesions Segmentation
 
 This repo contains code regarding the [Track 1 of Shifts Challenge](https://shifts.grand-challenge.org/medical-dataset/)
-dedicatd to segmentation of white matter Multiple sclerosis (MS) lesions on 3D FLAIR scans.
+dedicated to segmentation of white matter Multiple Sclerosis (MS) lesions on 3D FLAIR scans.
 
 ## Task description
 
@@ -9,7 +9,7 @@ dedicatd to segmentation of white matter Multiple sclerosis (MS) lesions on 3D F
 White matter lesions (WML) are regions of inflamation in the brain charateristic 
 in MS patients. Detection and accurate delineation of WML are important for both 
 diagnosis and prognosis of MS, however manual segmentation is time-consuming and 
-expert-depended. 
+expert-dependent. 
 
 In current track we propose you to explore posibility of automatic WML segmentation 
 from 3D Magnetic resonance imaging (MRI) scans, called FLAIR. Therefore, the task 
@@ -47,13 +47,13 @@ for reproduction of a baseline model.
 
 ## Reproduce the baseline
 
-As the baseline model a deep ensemble of 3 UNET models was chosen based on nDSC R-AUC value.
-You can always download the baseline models from this [link](https://drive.google.com/file/d/1eTTgga7Cd1GjR0YupVbLuLd3unl6_Jj3/view?usp=sharing).
+As the baseline model, a deep ensemble of 3 UNET models was chosen based on the nDSC R-AUC value.
+You can download the baseline models from this [link](https://drive.google.com/file/d/1eTTgga7Cd1GjR0YupVbLuLd3unl6_Jj3/view?usp=sharing).
 
 
 1. Training.
 
-Use the following bash script to sequentually fit models in the ensemble.
+Use the following bash script to sequentially fit models in the ensemble.
 
 ```bash
 #!/bin/bash
@@ -117,6 +117,6 @@ For the visualisation of images, we suggest either using [ITK-SNAP](http://www.i
 for medical images visualisation or [nilearn](https://nilearn.github.io/stable/index.html) 
 Python library for displaying cuts of 3D images. For the last option consider 
 using `nilearn.plotting.plot_img()` function to display slices of a 
-3D image and `nilearn.plotting_plot_roi()` for displaing slices of a 3D image 
+3D image and `nilearn.plotting_plot_roi()` for displaying slices of a 3D image 
 with additional overlays, e.g. ground truth masks or predicted binary masks.
 
