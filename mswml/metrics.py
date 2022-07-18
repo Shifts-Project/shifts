@@ -76,11 +76,13 @@ def dice_norm_metric(ground_truth, predictions):
 
 def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=None):
     """
-    Compute area above Normalised Dice Coefficient (nDSC) retention curve.
+    Compute area above Normalised Dice Coefficient (nDSC) retention curve for 
+    one subject. `ground_truth`, `predictions`, `uncertainties` - are flattened 
+    arrays of correponding 3D maps within the foreground mask only.
     
     Args:
       ground_truth: `numpy.ndarray`, binary ground truth segmentation target,
-                     with shape [H * W * D].
+                     with shape [H * W * D]. 
       predictions:  `numpy.ndarray`, binary segmentation predictions,
                      with shape [H * W * D].
       uncertainties:  `numpy.ndarray`, voxel-wise uncertainties,
