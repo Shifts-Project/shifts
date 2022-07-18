@@ -10,10 +10,8 @@ from torch.utils.data import Dataset, DataLoader
 
 
 class VPowerDataset(Dataset):
-    def __init__(self, data, scaler, input_features, target):
-        self.full_df = data
-        self.norm_df = scaler.transform(self.full_df)
-
+    def __init__(self, data, input_features, target):
+        self.norm_df = data
         self.items = self.norm_df[input_features].values
         self.labels = self.norm_df[target].values
 
@@ -28,8 +26,9 @@ class VPowerDataset(Dataset):
 
 class ProbMCdropoutDNN(nn.Module):
     """
-    Monte Carlo (MC) dropout neural network with 2 hidden layers
+    Monte Carlo (MC) dropout neural network with 2 hidden layers.
     """
+
     def __init__(self, input_size, hidden_size_1=50, hidden_size_2=20, dropout=0.005):
         super(ProbMCdropoutDNN, self).__init__()
         self.linear1 = nn.Linear(in_features=input_size, out_features=hidden_size_1)
@@ -75,14 +74,6 @@ def get_distributions_params(model, x):
     return np.concatenate([distrs.loc.detach().numpy().reshape(-1, 1),
                            distrs.scale.detach().numpy().reshape(-1, 1)],
                           axis=1)
-
-
-def save_model(model, path):
-    torch.save(model.state_dict(), path)
-
-
-def load_model(model, path):
-    model.load_state_dict(torch.load(path))
 
 
 def check_metric(curr_value, best_value, not_improved, model, store_path):

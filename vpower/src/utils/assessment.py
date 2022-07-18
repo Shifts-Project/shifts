@@ -231,66 +231,38 @@ def f_beta_metrics(errors, uncertainty, threshold, beta=1.0, rank_type="ordered"
     return f_auc, f95, f_scores[::-1]
 
 
-def get_ensemble_errors(predictions, y_true, squared=True):
+def get_model_errors(y_pred, y_true, squared=True):
     """
-    Get the prediction errors of an ensemble, defined as the differences (or squared differences) of actual target
-    values and the ensemble average predicted output
-    :param predictions: array [ensemble_size x num_samples x num_params]
-           where
-           - ensemble size is the number of members of the ensemble
-           - num_samples is the number of records
-           - num_params is the number of parameters the model outputs (ex. in the case of a probabilistic model with
-           Normal distribution at the output, num_params=2 for mean and std of Normal)
-    :param y_true: array of the target values
+    Get the prediction errors, defined as the differences (or squared differences) of actual target values and the
+    model predictions
+    :param y_pred: Predictions
+    :param y_true: Actual target values
     :param squared: Whether to return the squared difference of y_true and ensemble average predicted output
     :return:
     """
-    ens_avg_preds = np.squeeze(np.mean(predictions[:, :, 0], axis=0))
-    y_true = np.asarray(y_true)
     if not squared:
-        errors = y_true - ens_avg_preds
+        errors = y_true - y_pred
     else:
-        errors = (y_true - ens_avg_preds) ** 2
+        errors = (y_true - y_pred) ** 2
 
     return errors
 
 
-def get_ensemble_params(pred: np.array):
+def get_performance_metric(y_pred, y_true, metric):
     """
-    An ensemble of probabilistic models that have a normal distribution at the output, is treated as a mixture of
-    uniformly weighted Normal distributions. The mixture is approximated by the marginal normal distribution
-    N(ensemble_mean, ensemble_std)
-    :param pred: Predictions
-    :return: The parameters of the marginal normal distribution N(ensemble_mean, ensemble_std)
-    """
-    ensemble_mean = np.squeeze(np.mean(pred[:, :, 0], axis=0))
-    ensemble_std = np.sqrt(
-        np.squeeze(
-            np.mean(
-                pred[:, :, 1] + np.square(pred[:, :, 0]), axis=0
-            )
-        ) - np.square(ensemble_mean)
-    )
-
-    return ensemble_mean, ensemble_std
-
-
-def get_ensemble_metric(pred: np.array, y_true: np.array, metric: str) -> float:
-    """
-    Calculates the requested performance metric of an ensemble of models
-    :param pred: Predictions
+    Calculates the requested performance metric
+    :param y_pred: Predictions
     :param y_true: Actual target values
     :param metric: Supported metrics are "mae", "mse", "rmse", "mape"
     :return: The requested performance metric of ensemble
     """
-    mean_pred = np.squeeze(np.mean(pred[:, :, 0], axis=0))
 
     if metric == "mae":
-        error = mean_absolute_error(y_true=y_true, y_pred=mean_pred)
+        error = mean_absolute_error(y_true=y_true, y_pred=y_pred)
     elif metric == "rmse":
-        error = mean_squared_error(y_true=y_true, y_pred=mean_pred, squared=False)
+        error = mean_squared_error(y_true=y_true, y_pred=y_pred, squared=False)
     elif metric == "mse":
-        error = mean_squared_error(y_true=y_true, y_pred=mean_pred, squared=True)
+        error = mean_squared_error(y_true=y_true, y_pred=y_pred, squared=True)
     elif metric == "mape":
-        error = mean_absolute_percentage_error(y_true=y_true, y_pred=mean_pred)
+        error = mean_absolute_percentage_error(y_true=y_true, y_pred=y_pred)
     return error
