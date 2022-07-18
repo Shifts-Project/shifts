@@ -6,12 +6,12 @@ dedicated to segmentation of white matter Multiple Sclerosis (MS) lesions on 3D 
 ## Task description
 
 
-White matter lesions (WML) are regions of inflamation in the brain charateristic 
+White matter lesions (WML) are regions of inflammation in the brain characteristic 
 in MS patients. Detection and accurate delineation of WML are important for both 
 diagnosis and prognosis of MS, however manual segmentation is time-consuming and 
 expert-dependent. 
 
-In current track we propose you to explore posibility of automatic WML segmentation 
+In current track we propose you to explore possibility of automatic WML segmentation 
 from 3D Magnetic resonance imaging (MRI) scans, called FLAIR. Therefore, the task 
 consists of predicting 3D binary mask of WML from a 3D FLAIR scan.
 
@@ -29,7 +29,7 @@ our [Grand Challenge](https://shifts.grand-challenge.org/medical-dataset/) web p
 
 `metrics.py` is a module containing implementations of metrics used for 
 validation during training and evaluation: Dice score, normalised Dice score (nDSC), 
-lesion F1 score, Area under error retenion curve (nDSC R-AUC). Here, nDSC and nDSC R-AUC 
+lesion F1 score, Area under error retention curve (nDSC R-AUC). Here, nDSC and nDSC R-AUC 
 will be used for your model's evaluation and are displayed in the [leaderboard](https://shifts.grand-challenge.org/evaluation/ms-lesion-segmentation-phase-i/leaderboard/).
 
 `uncertainty.py` is a module containing implementations of uncertainty measures 
@@ -81,9 +81,9 @@ python mswml/test.py \
 --threshold 0.35
 ```
 
-Additional parameters like `--num_workers` and `--n_jobs` control the number of workers used for parallel processing of images and parallel computaiton of lesion F1 score respectively.
+Additional parameters like `--num_workers` and `--n_jobs` control the number of workers used for parallel processing of images and parallel computation of lesion F1 score respectively.
 
-Probablity threshold `threshold` is used for obtaining binary lesion masks from probability output.
+Probability threshold `threshold` is used for obtaining binary lesion masks from probability output.
 
 3. Inference.
 
