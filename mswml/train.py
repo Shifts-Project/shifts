@@ -96,11 +96,10 @@ def main(args):
     roi_size = (96, 96, 96)
     sw_batch_size = 4
     
-    
     best_metric, best_metric_epoch = -1, -1
     epoch_loss_values, metric_values = [], []
 
-    ''' Tranining loop '''
+    ''' Training loop '''
     for epoch in range(epoch_num):
         print("-" * 10)
         print(f"epoch {epoch + 1}/{epoch_num}")

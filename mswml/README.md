@@ -43,7 +43,7 @@ needed for training, validation and inference of a baseline model.
 Please, go through it carefully if you are not familiar with how to handle MRI data.
 
 `train.py`, `test.py`, `inference.py`, `retention_curves.py` are programs used 
-for reproduction of a baseline model. 
+for reproducing the baseline model. 
 
 ## Reproduce the baseline
 
@@ -78,6 +78,7 @@ python mswml/test.py \
 --path_model /path/to/baselines/dir/ \
 --path_data /path/to/test/FLAIR \
 --path_gts /path/to/test/ground/truth/masks \
+--path_bm /path/to/test/fg_masks \
 --threshold 0.35
 ```
 
@@ -99,7 +100,7 @@ python mswml/inference.py \
 --path_pred /path/to/dir/to/save/predictions/ \
 --path_model /path/to/baselines/dir/ \
 --path_data /path/to/test/FLAIR \
---num_workers 10 \
+--path_bm /path/to/test/fg_masks \
 --threshold 0.35
 ```
 
@@ -111,12 +112,12 @@ We used python version 3.8.10. For all additional library requirements, please r
 ## Data visualisation
 
 Both 3D FLAIR images and ground truth segmentation masks are distributed in 
-[Nifti](https://nilearn.github.io/dev/modules/generated/nilearn.plotting.plot_roi.html) format.
+[Nifti](http://nifti.nimh.nih.gov) format.
 
 For the visualisation of images, we suggest either using [ITK-SNAP](http://www.itksnap.org/pmwiki/pmwiki.php) software 
 for medical images visualisation or [nilearn](https://nilearn.github.io/stable/index.html) 
 Python library for displaying cuts of 3D images. For the last option consider 
 using `nilearn.plotting.plot_img()` function to display slices of a 
-3D image and `nilearn.plotting_plot_roi()` for displaying slices of a 3D image 
+3D image and `nilearn.plotting.plot_roi()` for displaying slices of a 3D image 
 with additional overlays, e.g. ground truth masks or predicted binary masks.
 

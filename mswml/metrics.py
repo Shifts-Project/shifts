@@ -87,18 +87,21 @@ def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=N
                      with shape [H * W * D].
       uncertainties:  `numpy.ndarray`, voxel-wise uncertainties,
                      with shape [H * W * D].
+      parallel_backend: `joblib.Parallel`, for parallel computation
+                     for different retention fractions.
     Returns:
       nDSC R-AAC (`float` in [0.0, 1.0]).
     """
+
     def compute_dice_norm(frac_, preds_, gts_, N_):
         pos = int(N_ * frac_)
         curr_preds = preds if pos == N_ else np.concatenate(
             (preds_[:pos], gts_[pos:]))
         return dice_norm_metric(gts_, curr_preds)
-    
+
     if parallel_backend is None:
         parallel_backend = Parallel(n_jobs=1)
-        
+
     ordering = uncertainties.argsort()
     gts = ground_truth[ordering].copy()
     preds = predictions[ordering].copy()
@@ -112,9 +115,9 @@ def ndsc_aac_metric(ground_truth, predictions, uncertainties, parallel_backend=N
     process = partial(compute_dice_norm, preds_=preds, gts_=gts, N_=N)
     dsc_norm_scores = np.asarray(
         parallel_backend(delayed(process)(frac)
-                                for frac in fracs_retained)
+                         for frac in fracs_retained)
     )
-    
+
     return 1. - metrics.auc(fracs_retained, dsc_norm_scores)
 
 
@@ -131,18 +134,21 @@ def ndsc_retention_curve(ground_truth, predictions, uncertainties, fracs_retaine
                      with shape [H * W * D].
       fracs_retained:  `numpy.ndarray`, array of increasing valies of retained 
                        fractions of most certain voxels, with shape [N].
+      parallel_backend: `joblib.Parallel`, for parallel computation
+                     for different retention fractions.
     Returns:
       (y-axis) nDSC at each point of the retention curve (`numpy.ndarray` with shape [N]).
     """
+
     def compute_dice_norm(frac_, preds_, gts_, N_):
         pos = int(N_ * frac_)
         curr_preds = preds if pos == N_ else np.concatenate(
             (preds_[:pos], gts_[pos:]))
         return dice_norm_metric(gts_, curr_preds)
-    
+
     if parallel_backend is None:
         parallel_backend = Parallel(n_jobs=1)
-        
+
     ordering = uncertainties.argsort()
     gts = ground_truth[ordering].copy()
     preds = predictions[ordering].copy()
@@ -151,12 +157,12 @@ def ndsc_retention_curve(ground_truth, predictions, uncertainties, fracs_retaine
     process = partial(compute_dice_norm, preds_=preds, gts_=gts, N_=N)
     dsc_norm_scores = np.asarray(
         parallel_backend(delayed(process)(frac)
-                                for frac in fracs_retained)
+                         for frac in fracs_retained)
     )
-    
+
     return dsc_norm_scores
 
-    
+
 def intersection_over_union(mask1, mask2):
     """
     Compute IoU for 2 binary masks.
@@ -180,9 +186,10 @@ def lesion_f1_score(ground_truth, predictions, IoU_threshold=0.25, parallel_back
       predictions:  `numpy.ndarray`, binary segmentation predictions,
                      with shape [H, W, D].
       IoU_threshold: `float` in [0.0, 1.0], IoU threshold for max IoU between 
-      		      predicted and ground truth lesions to classify them as
-      		      TP, FP or FN.
-      parallel_backend: None | joblib.Parallel() class object for parallel computations.
+                     predicted and ground truth lesions to classify them as
+                     TP, FP or FN.
+      parallel_backend: `joblib.Parallel`, for parallel computation
+                     for different retention fractions.
     Returns:
       Intersection over union between `mask1` and `mask2` (`float` in [0.0, 1.0]).
     """
@@ -238,7 +245,7 @@ def lesion_f1_score(ground_truth, predictions, IoU_threshold=0.25, parallel_back
     fn = parallel_backend(delayed(process_fn)(label_gt)
                           for label_gt in np.unique(mask_multi_gt_) if label_gt != 0)
     fn = float(np.sum(fn))
-    
+
     f1 = 1.0 if tp + 0.5 * (fp + fn) == 0.0 else tp / (tp + 0.5 * (fp + fn))
 
     return f1
