@@ -65,7 +65,7 @@ do
 	--path_train_gts /path/to/train/ground/truth/masks \
 	--path_val_data /path/to/val/FLAIR \
 	--path_val_gts /path/to/val/ground/truth/masks \
-	--path_save "/path/to/baselines/dir/${seed}"
+	--path_save "/path/to/baselines/dir/seed${seed}"
 done
 ```
 2. Evaluation.
