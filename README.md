@@ -22,7 +22,11 @@ If you have any questions about the Shifts Dataset, the paper or the benchmarks,
 # Dataset Download And Licenses
 
 ## License
-The Shifts dataset is released under a mixed license. 
+The Shifts dataset is released under a mixed license.
+
+### White matter multiple sclerosis lesions segmentation
+
+Already preprocessed data can be downloaded from [zenodo](https://zenodo.org/record/7051658) under the OFSEP data usage agreement. Data is distributed under [CC BY NC SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode) license.
 
 ### Weather Prediction
 
