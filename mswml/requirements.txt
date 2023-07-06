@@ -14,7 +14,7 @@ numpy==1.23.0
 pandas==1.4.3
 scikit-image==0.19.3
 scikit-learn==1.1.1
-scipy==1.8.1
+scipy==1.10.0
 seaborn==0.11.2
 SimpleITK==2.1.1.2
 torch==1.12.0
